@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kitap Kurdu - Öğretmen</title>
+    <link rel="stylesheet" href="/static/css/admin-modern.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: var(--font-family), 'Segoe UI', sans-serif;
+            background: var(--gradient-candy);
+            min-height: 100vh;
+        }
+        .header {
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(12px);
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            box-shadow: var(--shadow-md);
+        }
+        .header h1 { font-size: 1.6em; font-weight: 700; }
+        .btn-back {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.4);
+            padding: 10px 22px;
+            border-radius: var(--radius-lg);
+            cursor: pointer;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all var(--transition-fast);
+        }
+        .btn-back:hover { background: rgba(255,255,255,0.3); }
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .tab {
+            padding: 12px 25px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .tab.active, .tab:hover {
+            background: white;
+            color: #667eea;
+        }
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+        .card h2 {
+            color: #374151;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .filter-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .filter-row select {
+            padding: 12px 20px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 14px;
+            min-width: 180px;
+        }
+        .filter-row select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+        }
+        .btn-warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+        }
+        .btn-info {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+        .entry-card {
+            background: #f9fafb;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+        .entry-card.pending { border-left-color: #f59e0b; }
+        .entry-card.approved { border-left-color: #10b981; }
+        .entry-card.rejected { border-left-color: #ef4444; }
+        .entry-card h3 {
+            color: #1f2937;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .entry-card .meta {
+            color: #6b7280;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+        }
+        .answer-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border: 1px solid #e5e7eb;
+        }
+        .answer-item .question {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 8px;
+            font-size: 0.95em;
+        }
+        .answer-item .answer {
+            color: #1f2937;
+            line-height: 1.6;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .leaderboard-table th, .leaderboard-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .leaderboard-table th {
+            background: #f9fafb;
+            font-weight: 600;
+            color: #374151;
+        }
+        .rank-1 { color: #f59e0b; font-weight: bold; }
+        .rank-2 { color: #9ca3af; font-weight: bold; }
+        .rank-3 { color: #b45309; font-weight: bold; }
+        .hidden { display: none; }
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        .alert-success { background: #d1fae5; color: #065f46; }
+        .alert-error { background: #fee2e2; color: #991b1b; }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.show { display: flex; }
+        .modal-content {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .modal-content h3 { 
+            margin-bottom: 15px; 
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #6b7280;
+        }
+        .book-list {
+            margin-top: 15px;
+        }
+        .book-item {
+            background: #f9fafb;
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .book-item .title { font-weight: 600; color: #1f2937; }
+        .book-item .pages { color: #6b7280; font-size: 0.9em; }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            font-weight: 500;
+        }
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-approved { background: #d1fae5; color: #065f46; }
+        .status-rejected { background: #fee2e2; color: #991b1b; }
+        .stats-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        .stat-box .number { font-size: 2em; font-weight: 700; }
+        .stat-box .label { font-size: 0.9em; opacity: 0.9; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📚 Kitap Kurdu Yönetimi</h1>
+        <a href="/teacher/dashboard" class="btn-back">← Ana Sayfa</a>
+    </div>
+
+    <div class="container">
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('pending')">⏳ Bekleyen Onaylar</button>
+            <button class="tab" onclick="showTab('approved')">✅ Onaylananlar</button>
+            <button class="tab" onclick="showTab('leaderboard')">🏆 Liderlik Tablosu</button>
+            <button class="tab" onclick="showTab('reports')">📊 Raporlar</button>
+        </div>
+
+        <div id="alertBox"></div>
+
+        <div id="tab-pending" class="tab-content">
+            <div class="card">
+                <h2>⏳ Onay Bekleyen Kitap Girişleri</h2>
+                
+                <div class="filter-row">
+                    <select id="semesterFilter" onchange="loadPendingEntries(); loadApprovedEntries(); loadLeaderboard();">
+                        <option value="">Aktif Dönem</option>
+                    </select>
+                    <select id="pendingClassFilter" onchange="loadPendingEntries()">
+                        <option value="">Tüm Sınıflar</option>
+                    </select>
+                    <span id="pendingCount" style="color: #6b7280;"></span>
+                </div>
+                
+                <div id="pendingEntriesList"></div>
+            </div>
+        </div>
+
+        <div id="tab-approved" class="tab-content hidden">
+            <div class="card">
+                <h2>✅ Onaylanan Kitap Girişleri</h2>
+                
+                <div class="filter-row">
+                    <select id="approvedClassFilter" onchange="loadApprovedEntries()">
+                        <option value="">Tüm Sınıflar</option>
+                    </select>
+                </div>
+                
+                <div id="approvedEntriesList"></div>
+            </div>
+        </div>
+
+        <div id="tab-leaderboard" class="tab-content hidden">
+            <div class="card">
+                <h2>🏆 Kitap Kurdu Liderlik Tablosu</h2>
+                <p style="color: #6b7280; margin-bottom: 15px;">En çok kitap okuyan öğrenciler. İlk 3 öğrenci rozet kazanır!</p>
+                
+                <table class="leaderboard-table">
+                    <thead>
+                        <tr>
+                            <th>Sıra</th>
+                            <th>Öğrenci</th>
+                            <th>Sınıf</th>
+                            <th>Kitap Sayısı</th>
+                            <th>Toplam Sayfa</th>
+                            <th>Detay</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboardBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="tab-reports" class="tab-content hidden">
+            <div class="card">
+                <h2>📊 Sınıf Bazlı Raporlar</h2>
+                <p style="color: #6b7280; margin-bottom: 20px;">Sınıf seçerek PDF rapor indirebilirsiniz.</p>
+                
+                <div class="filter-row">
+                    <select id="reportClassSelect">
+                        <option value="">Sınıf Seçin...</option>
+                    </select>
+                    <button class="btn btn-warning" onclick="downloadClassReport()">
+                        📥 PDF Rapor İndir
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="rejectModal" class="modal">
+        <div class="modal-content">
+            <h3>
+                ❌ Reddetme Gerekçesi
+                <button class="close-btn" onclick="closeRejectModal()">&times;</button>
+            </h3>
+            <div style="margin-bottom: 15px;">
+                <textarea id="rejectReason" rows="4" placeholder="Neden reddedildiğini yazın..." style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px;"></textarea>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-danger" onclick="confirmReject()">Reddet</button>
+                <button class="btn" onclick="closeRejectModal()" style="background: #e5e7eb; color: #374151;">İptal</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <h3>
+                <span id="detailStudentName">Öğrenci Detayı</span>
+                <button class="close-btn" onclick="closeDetailModal()">&times;</button>
+            </h3>
+            <div id="detailStudentInfo" style="color: #6b7280; margin-bottom: 15px;"></div>
+            <div class="book-list" id="detailBookList"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentRejectId = null;
+        let questions = [];
+
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById('tab-' + tabName).classList.remove('hidden');
+            event.target.classList.add('active');
+
+            if (tabName === 'pending') loadPendingEntries();
+            if (tabName === 'approved') loadApprovedEntries();
+            if (tabName === 'leaderboard') loadLeaderboard();
+        }
+
+        function showAlert(message, type) {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => alertBox.innerHTML = '', 5000);
+        }
+
+        async function loadQuestions() {
+            try {
+                const response = await fetch('/api/book-entries/questions');
+                const result = await response.json();
+                if (result.success) {
+                    questions = result.questions;
+                }
+            } catch (error) {
+                console.error('Load questions error:', error);
+            }
+        }
+
+        async function loadClasses() {
+            const classes = ['5A','5B','5C','5D','5E','6A','6B','6C','6D','6E','7A','7B','7C','7D','7E','8A','8B','8C','8D','8E'];
+            
+            ['pendingClassFilter', 'approvedClassFilter', 'reportClassSelect'].forEach(id => {
+                const select = document.getElementById(id);
+                if (select) {
+                    const firstOption = select.options[0].outerHTML;
+                    select.innerHTML = firstOption;
+                    classes.forEach(c => {
+                        select.innerHTML += `<option value="${c}">${c}</option>`;
+                    });
+                }
+            });
+        }
+
+        let activeSemester = '';
+        
+        async function loadSemesters() {
+            try {
+                const response = await fetch('/api/teacher/book-entries?status=pending');
+                const result = await response.json();
+                const semesterSelect = document.getElementById('semesterFilter');
+                
+                activeSemester = result.active_semester || '';
+                
+                if (result.semesters && result.semesters.length > 0) {
+                    semesterSelect.innerHTML = result.semesters.map(s => 
+                        `<option value="${s}" ${s === activeSemester ? 'selected' : ''}>${s}${s === activeSemester ? ' (Aktif)' : ' (Arşiv)'}</option>`
+                    ).join('');
+                }
+            } catch (error) {
+                console.error('Load semesters error:', error);
+            }
+        }
+        
+        async function loadPendingEntries() {
+            const classFilter = document.getElementById('pendingClassFilter').value;
+            const semesterFilter = document.getElementById('semesterFilter').value || activeSemester;
+            try {
+                const response = await fetch(`/api/teacher/book-entries?status=pending&class_name=${classFilter}&semester=${semesterFilter}`);
+                const result = await response.json();
+                const list = document.getElementById('pendingEntriesList');
+                
+                document.getElementById('pendingCount').textContent = `${result.entries?.length || 0} giriş bekliyor`;
+                
+                if (!result.entries || result.entries.length === 0) {
+                    list.innerHTML = '<p style="color: #6b7280; text-align: center; padding: 20px;">Bekleyen giriş yok.</p>';
+                    return;
+                }
+
+                list.innerHTML = result.entries.map(e => renderEntryCard(e, true)).join('');
+            } catch (error) {
+                console.error('Load pending entries error:', error);
+            }
+        }
+
+        async function loadApprovedEntries() {
+            const classFilter = document.getElementById('approvedClassFilter').value;
+            const semesterFilter = document.getElementById('semesterFilter').value || activeSemester;
+            try {
+                const response = await fetch(`/api/teacher/book-entries?status=approved&class_name=${classFilter}&semester=${semesterFilter}`);
+                const result = await response.json();
+                const list = document.getElementById('approvedEntriesList');
+                
+                if (!result.entries || result.entries.length === 0) {
+                    list.innerHTML = '<p style="color: #6b7280; text-align: center; padding: 20px;">Onaylanan giriş yok.</p>';
+                    return;
+                }
+
+                list.innerHTML = result.entries.map(e => renderEntryCard(e, false)).join('');
+            } catch (error) {
+                console.error('Load approved entries error:', error);
+            }
+        }
+
+        function renderEntryCard(e, showActions) {
+            const answers = typeof e.answers === 'string' ? JSON.parse(e.answers) : e.answers;
+            const date = new Date(e.submitted_at).toLocaleDateString('tr-TR');
+            
+            const answersHtml = questions.map((q, i) => `
+                <div class="answer-item">
+                    <div class="question">Soru ${i+1}: ${q}</div>
+                    <div class="answer">${answers[i] || '(Cevap yok)'}</div>
+                </div>
+            `).join('');
+
+            const actionsHtml = showActions ? `
+                <div class="action-buttons">
+                    <button class="btn btn-success btn-sm" onclick="approveEntry(${e.id})">✅ Onayla</button>
+                    <button class="btn btn-danger btn-sm" onclick="openRejectModal(${e.id})">❌ Reddet</button>
+                    <button class="btn btn-sm" style="background: #6b7280; color: white;" onclick="deleteEntry(${e.id})">🗑️ Sil</button>
+                </div>
+            ` : `
+                <div class="action-buttons">
+                    <button class="btn btn-sm" style="background: #6b7280; color: white;" onclick="deleteEntry(${e.id})">🗑️ Sil</button>
+                </div>
+            `;
+
+            return `
+                <div class="entry-card ${e.status}">
+                    <h3>
+                        <span>📖 ${e.book_title}</span>
+                        <span class="status-badge status-${e.status}">${e.page_count} sayfa</span>
+                    </h3>
+                    <div class="meta">
+                        👤 ${e.student_name} | 📚 ${e.class_name} | 📅 ${date}
+                    </div>
+                    ${answersHtml}
+                    ${actionsHtml}
+                </div>
+            `;
+        }
+
+        async function approveEntry(id) {
+            if (!confirm('Bu kitap girişini onaylamak istediğinize emin misiniz?')) return;
+            
+            try {
+                const response = await fetch(`/api/teacher/book-entries/${id}/approve`, { method: 'POST' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert('Kitap girişi onaylandı!', 'success');
+                    loadPendingEntries();
+                } else {
+                    showAlert(result.error, 'error');
+                }
+            } catch (error) {
+                showAlert('Hata: ' + error.message, 'error');
+            }
+        }
+
+        function openRejectModal(id) {
+            currentRejectId = id;
+            document.getElementById('rejectReason').value = '';
+            document.getElementById('rejectModal').classList.add('show');
+        }
+
+        function closeRejectModal() {
+            document.getElementById('rejectModal').classList.remove('show');
+            currentRejectId = null;
+        }
+
+        async function confirmReject() {
+            const reason = document.getElementById('rejectReason').value.trim();
+            if (!reason) {
+                alert('Lütfen red gerekçesi yazın!');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/teacher/book-entries/${currentRejectId}/reject`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reason })
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert('Kitap girişi reddedildi.', 'success');
+                    closeRejectModal();
+                    loadPendingEntries();
+                } else {
+                    showAlert(result.error, 'error');
+                }
+            } catch (error) {
+                showAlert('Hata: ' + error.message, 'error');
+            }
+        }
+
+        async function loadLeaderboard() {
+            try {
+                const semesterFilter = document.getElementById('semesterFilter').value || activeSemester;
+                const response = await fetch(`/api/book-entries/leaderboard?semester=${semesterFilter}`);
+                const result = await response.json();
+                const tbody = document.getElementById('leaderboardBody');
+                
+                if (!result.leaderboard || result.leaderboard.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #6b7280;">Henüz veri yok.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = result.leaderboard.map((s, i) => {
+                    const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
+                    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+                    const badge = i < 3 ? ' 📚' : '';
+                    
+                    return `
+                        <tr>
+                            <td class="${rankClass}">${medal}</td>
+                            <td>${s.full_name}${badge}</td>
+                            <td>${s.class_name || '-'}</td>
+                            <td><strong>${s.approved_count}</strong> kitap</td>
+                            <td>${s.total_pages} sayfa</td>
+                            <td>
+                                <button class="btn btn-info btn-sm" onclick="showStudentDetail(${s.id})">
+                                    🔍 Detay Gör
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Load leaderboard error:', error);
+            }
+        }
+
+        async function showStudentDetail(studentId) {
+            currentDetailStudentId = studentId;
+            try {
+                const response = await fetch(`/api/book-entries/student/${studentId}/details`);
+                const result = await response.json();
+                
+                if (!result.success) {
+                    showAlert(result.error, 'error');
+                    return;
+                }
+
+                document.getElementById('detailStudentName').textContent = `📚 ${result.student.full_name}`;
+                document.getElementById('detailStudentInfo').innerHTML = `
+                    <strong>Sınıf:</strong> ${result.student.class_name} | 
+                    <strong>Toplam:</strong> ${result.total_books} kitap, ${result.total_pages} sayfa
+                `;
+
+                const bookList = document.getElementById('detailBookList');
+                if (result.books.length === 0) {
+                    bookList.innerHTML = '<p style="color: #6b7280;">Henüz onaylanan kitap yok.</p>';
+                } else {
+                    bookList.innerHTML = result.books.map(b => {
+                        const date = new Date(b.submitted_at).toLocaleDateString('tr-TR');
+                        return `
+                            <div class="book-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; margin-bottom: 8px; background: #f9fafb; border-radius: 8px; border-left: 3px solid #10b981;">
+                                <div>
+                                    <span class="title" style="font-weight: 600; color: #1f2937;">📖 ${b.book_title}</span>
+                                    <span class="pages" style="display: block; font-size: 0.85em; color: #6b7280;">${b.page_count} sayfa - ${date}</span>
+                                </div>
+                                <button onclick="deleteBookFromDetail(${b.id})" style="background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85em;" title="Bu kitabı sil">🗑️ Sil</button>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                document.getElementById('detailModal').classList.add('show');
+            } catch (error) {
+                showAlert('Hata: ' + error.message, 'error');
+            }
+        }
+
+        let currentDetailStudentId = null;
+
+        function closeDetailModal() {
+            document.getElementById('detailModal').classList.remove('show');
+            currentDetailStudentId = null;
+        }
+
+        async function deleteBookFromDetail(bookId) {
+            if (!confirm('Bu kitap girişini silmek istediğinize emin misiniz? Bu işlem geri alınamaz!')) return;
+            
+            try {
+                const response = await fetch(`/api/teacher/book-entries/${bookId}/delete`, { method: 'DELETE' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert('Kitap girişi silindi!', 'success');
+                    // Detay modalını yenile
+                    if (currentDetailStudentId) {
+                        showStudentDetail(currentDetailStudentId);
+                    }
+                    // Lider tablosunu da yenile
+                    loadLeaderboard();
+                } else {
+                    showAlert(result.error, 'error');
+                }
+            } catch (error) {
+                showAlert('Hata: ' + error.message, 'error');
+            }
+        }
+
+        function downloadClassReport() {
+            const className = document.getElementById('reportClassSelect').value;
+            if (!className) {
+                alert('Lütfen bir sınıf seçin!');
+                return;
+            }
+            window.open(`/api/teacher/book-entries/report/${className}/pdf`, '_blank');
+        }
+
+        async function deleteEntry(id) {
+            if (!confirm('Bu kitap girişini silmek istediğinize emin misiniz? Bu işlem geri alınamaz!')) return;
+            
+            try {
+                const response = await fetch(`/api/teacher/book-entries/${id}/delete`, { method: 'DELETE' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert('Kitap girişi silindi!', 'success');
+                    loadPendingEntries();
+                    loadApprovedEntries();
+                } else {
+                    showAlert(result.error, 'error');
+                }
+            } catch (error) {
+                showAlert('Hata: ' + error.message, 'error');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            loadQuestions();
+            loadClasses();
+            await loadSemesters();
+            loadPendingEntries();
+        });
+
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.classList.remove('show');
+            }
+        }
+    </script>
+</body>
+</html>

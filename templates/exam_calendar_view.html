@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deneme Sınavı Takvimi</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header h1 { font-size: 1.8em; display: inline-block; }
+        .btn-back {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid white;
+            padding: 8px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            float: right;
+            margin-top: 10px;
+        }
+        .btn-back:hover { background: rgba(255,255,255,0.3); }
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .card h2 {
+            color: #374151;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .calendar-nav {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .calendar-nav button {
+            padding: 8px 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .calendar-nav button:hover { background: #5568d3; }
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            margin-top: 15px;
+        }
+        .calendar-day-header {
+            text-align: center;
+            padding: 10px;
+            font-weight: 600;
+            color: #667eea;
+            background: #f3f4f6;
+            border-radius: 5px;
+        }
+        .calendar-day {
+            aspect-ratio: 1;
+            border: 1px solid #e5e7eb;
+            border-radius: 5px;
+            padding: 5px;
+            position: relative;
+        }
+        .calendar-day.other-month {
+            color: #9ca3af;
+        }
+        .calendar-day.today {
+            background: #dbeafe;
+            border-color: #3b82f6;
+        }
+        .calendar-day.has-exam {
+            background: #fef3c7;
+            border-color: #f59e0b;
+        }
+        .calendar-day-number {
+            font-weight: 600;
+            margin-bottom: 3px;
+        }
+        .calendar-day-content {
+            font-size: 11px;
+            color: #6b7280;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .exam-list {
+            margin-top: 20px;
+        }
+        .exam-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: #f9fafb;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+        }
+        .exam-item-date {
+            font-weight: 600;
+            color: #374151;
+            min-width: 100px;
+        }
+        .exam-item-desc {
+            flex: 1;
+            margin: 0 15px;
+            color: #6b7280;
+        }
+        .empty-state {
+            text-align: center;
+            color: #9ca3af;
+            padding: 40px;
+            font-size: 16px;
+        }
+
+        @media (max-width: 768px) {
+            .container { padding: 0 10px; }
+            .card { padding: 15px; }
+            .calendar-day-content { font-size: 9px; }
+            .exam-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+            .exam-item-date { min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📅 Deneme Sınavı Takvimi</h1>
+        <button class="btn-back" onclick="goBack()">← Geri Dön</button>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <div class="calendar-header">
+                <h2 id="currentMonth"></h2>
+                <div class="calendar-nav">
+                    <button onclick="changeMonth(-1)">◀ Önceki</button>
+                    <button onclick="goToToday()">Bugün</button>
+                    <button onclick="changeMonth(1)">Sonraki ▶</button>
+                </div>
+            </div>
+
+            <div class="calendar-grid">
+                <div class="calendar-day-header">Paz</div>
+                <div class="calendar-day-header">Pzt</div>
+                <div class="calendar-day-header">Sal</div>
+                <div class="calendar-day-header">Çar</div>
+                <div class="calendar-day-header">Per</div>
+                <div class="calendar-day-header">Cum</div>
+                <div class="calendar-day-header">Cmt</div>
+            </div>
+            <div class="calendar-grid" id="calendarDays"></div>
+        </div>
+
+        <div class="card">
+            <h2>Yaklaşan Sınavlar</h2>
+            <div class="exam-list" id="examList"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentDate = new Date();
+        let allExams = [];
+        let userRole = null;
+
+        const monthNames = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+                           'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/current-user');
+                const data = await response.json();
+                
+                if (!data.authenticated) {
+                    window.location.href = '/ameo_kullanıcı_giriş';
+                    return;
+                }
+                
+                userRole = data.user.role;
+                loadExams();
+            } catch (error) {
+                window.location.href = '/ameo_kullanıcı_giriş';
+            }
+        }
+
+        function goBack() {
+            if (userRole === 'student') {
+                window.location.href = '/student/dashboard';
+            } else if (userRole === 'teacher') {
+                window.location.href = '/teacher/dashboard';
+            } else {
+                window.location.href = '/';
+            }
+        }
+
+        async function loadExams() {
+            try {
+                const year = currentDate.getFullYear();
+                const month = currentDate.getMonth() + 1;
+                const response = await fetch(`/api/exam-calendar/month/${year}/${month}`);
+                const data = await response.json();
+                allExams = data.exams || [];
+                renderCalendar();
+                renderExamList();
+            } catch (error) {
+                console.error('Sınavlar yüklenemedi:', error);
+                document.getElementById('examList').innerHTML = 
+                    '<div class="empty-state">Sınavlar yüklenirken hata oluştu</div>';
+            }
+        }
+
+        function renderCalendar() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            
+            document.getElementById('currentMonth').textContent = 
+                `${monthNames[month]} ${year}`;
+
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const prevLastDay = new Date(year, month, 0);
+            
+            const startDay = firstDay.getDay();
+            const daysInMonth = lastDay.getDate();
+            const prevDaysInMonth = prevLastDay.getDate();
+
+            const calendarDays = document.getElementById('calendarDays');
+            calendarDays.innerHTML = '';
+
+            for (let i = startDay - 1; i >= 0; i--) {
+                const day = prevDaysInMonth - i;
+                const dayDiv = createDayElement(day, true, new Date(year, month - 1, day));
+                calendarDays.appendChild(dayDiv);
+            }
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayDiv = createDayElement(day, false, new Date(year, month, day));
+                calendarDays.appendChild(dayDiv);
+            }
+
+            const totalCells = calendarDays.children.length;
+            const remainingCells = 42 - totalCells;
+            for (let day = 1; day <= remainingCells; day++) {
+                const dayDiv = createDayElement(day, true, new Date(year, month + 1, day));
+                calendarDays.appendChild(dayDiv);
+            }
+        }
+
+        function createDayElement(day, isOtherMonth, date) {
+            const div = document.createElement('div');
+            div.className = 'calendar-day';
+            if (isOtherMonth) div.classList.add('other-month');
+
+            const today = new Date();
+            if (date.toDateString() === today.toDateString()) {
+                div.classList.add('today');
+            }
+
+            const dateStr = date.toISOString().split('T')[0];
+            const examsOnDay = allExams.filter(e => e.date === dateStr);
+            
+            if (examsOnDay.length > 0) {
+                div.classList.add('has-exam');
+            }
+
+            div.innerHTML = `
+                <div class="calendar-day-number">${day}</div>
+                <div class="calendar-day-content">
+                    ${examsOnDay.map(e => e.description).join('<br>')}
+                </div>
+            `;
+
+            return div;
+        }
+
+        function renderExamList() {
+            const examList = document.getElementById('examList');
+            
+            if (allExams.length === 0) {
+                examList.innerHTML = '<div class="empty-state">Bu ay için planlanmış sınav yok</div>';
+                return;
+            }
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const upcomingExams = allExams
+                .filter(exam => new Date(exam.date + 'T00:00:00') >= today)
+                .sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            if (upcomingExams.length === 0) {
+                examList.innerHTML = '<div class="empty-state">Yaklaşan sınav yok</div>';
+                return;
+            }
+            
+            examList.innerHTML = upcomingExams.map(exam => `
+                <div class="exam-item">
+                    <div class="exam-item-date">${formatDate(exam.date)}</div>
+                    <div class="exam-item-desc">${exam.description}</div>
+                </div>
+            `).join('');
+        }
+
+        function formatDate(dateStr) {
+            const date = new Date(dateStr + 'T00:00:00');
+            const day = date.getDate();
+            const month = monthNames[date.getMonth()];
+            const year = date.getFullYear();
+            return `${day} ${month} ${year}`;
+        }
+
+        function changeMonth(delta) {
+            currentDate.setMonth(currentDate.getMonth() + delta);
+            loadExams();
+        }
+
+        function goToToday() {
+            currentDate = new Date();
+            loadExams();
+        }
+
+        checkAuth();
+    </script>
+</body>
+</html>

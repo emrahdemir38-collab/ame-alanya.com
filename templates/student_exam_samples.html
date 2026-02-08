@@ -1,0 +1,269 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Yazılı Örnekleri{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/admin-modern.css">
+<style>
+    .page-header {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        color: white;
+        padding: 30px;
+        border-radius: 16px;
+        margin-bottom: 24px;
+    }
+    .page-header h1 { font-size: 1.8rem; margin-bottom: 8px; }
+    .page-header p { opacity: 0.9; }
+    
+    .content-card {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    }
+    
+    .samples-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+    }
+    
+    .sample-card {
+        background: #f9fafb;
+        border-radius: 14px;
+        padding: 20px;
+        transition: all 0.3s;
+        cursor: pointer;
+        border: 2px solid transparent;
+    }
+    .sample-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        border-color: #6366f1;
+    }
+    
+    .sample-header {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 14px;
+    }
+    .sample-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: white;
+    }
+    .sample-icon.pdf { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+    .sample-icon.link { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+    
+    .sample-title { font-size: 1.1rem; font-weight: 700; color: #1f2937; }
+    .sample-teacher { font-size: 0.85rem; color: #6b7280; margin-top: 4px; }
+    
+    .sample-desc {
+        color: #4b5563;
+        font-size: 0.9rem;
+        margin-bottom: 14px;
+        line-height: 1.5;
+    }
+    
+    .sample-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 14px;
+        border-top: 1px solid #e5e7eb;
+    }
+    .sample-date {
+        font-size: 0.8rem;
+        color: #9ca3af;
+    }
+    
+    .btn-action {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .btn-action:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 80px 20px;
+        color: #9ca3af;
+    }
+    .empty-state .icon { font-size: 5rem; margin-bottom: 20px; }
+    .empty-state h3 { color: #6b7280; margin-bottom: 8px; }
+    
+    .pdf-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.8);
+        z-index: 1000;
+        padding: 20px;
+    }
+    .pdf-modal.active { display: flex; align-items: center; justify-content: center; }
+    .pdf-container {
+        background: white;
+        border-radius: 16px;
+        width: 100%;
+        max-width: 900px;
+        height: 90vh;
+        display: flex;
+        flex-direction: column;
+    }
+    .pdf-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 20px;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    .pdf-header h3 { margin: 0; color: #1f2937; }
+    .pdf-close {
+        background: #fee2e2;
+        color: #dc2626;
+        border: none;
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 1.2rem;
+    }
+    .pdf-close:hover { background: #fecaca; }
+    .pdf-frame {
+        flex: 1;
+        border: none;
+        border-radius: 0 0 16px 16px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>📄 Yazılı Örnekleri</h1>
+    <p>Öğretmenlerinizin paylaştığı yazılı örneklerini inceleyin</p>
+</div>
+
+<div class="content-card">
+    <div class="samples-grid" id="samplesGrid">
+        <div class="empty-state">
+            <div class="icon">📄</div>
+            <h3>Yükleniyor...</h3>
+        </div>
+    </div>
+</div>
+
+<div class="pdf-modal" id="pdfModal">
+    <div class="pdf-container">
+        <div class="pdf-header">
+            <h3 id="pdfTitle">PDF Görüntüleyici</h3>
+            <button class="pdf-close" onclick="closePdfModal()">✕</button>
+        </div>
+        <iframe class="pdf-frame" id="pdfFrame"></iframe>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function loadSamples() {
+    try {
+        const res = await fetch('/api/student/exam-samples');
+        const samples = await res.json();
+        
+        const container = document.getElementById('samplesGrid');
+        
+        if (samples.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state" style="grid-column: 1 / -1;">
+                    <div class="icon">📄</div>
+                    <h3>Henüz yazılı örneği yok</h3>
+                    <p>Öğretmenleriniz yazılı örnekleri paylaştığında burada görünecek</p>
+                </div>
+            `;
+            return;
+        }
+        
+        container.innerHTML = samples.map(s => {
+            const date = new Date(s.created_at).toLocaleDateString('tr-TR', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+            });
+            
+            const actionBtn = s.sample_type === 'pdf' 
+                ? `<button class="btn-action" onclick="openPdf('${s.file_path}', '${s.title.replace(/'/g, "\\'")}')">👁️ Görüntüle</button>`
+                : `<button class="btn-action" onclick="window.open('${s.link_url}', '_blank')">🔗 Linke Git</button>`;
+            
+            return `
+                <div class="sample-card">
+                    <div class="sample-header">
+                        <div class="sample-icon ${s.sample_type}">${s.sample_type === 'pdf' ? '📁' : '🔗'}</div>
+                        <div>
+                            <div class="sample-title">${s.title}</div>
+                            <div class="sample-teacher">${s.teacher_name}</div>
+                        </div>
+                    </div>
+                    ${s.description ? `<div class="sample-desc">${s.description}</div>` : ''}
+                    <div class="sample-footer">
+                        <div class="sample-date">📅 ${date}</div>
+                        ${actionBtn}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch (err) {
+        console.error('Samples loading error:', err);
+        document.getElementById('samplesGrid').innerHTML = `
+            <div class="empty-state" style="grid-column: 1 / -1;">
+                <div class="icon">❌</div>
+                <h3>Yükleme hatası</h3>
+                <p>Lütfen sayfayı yenileyin</p>
+            </div>
+        `;
+    }
+}
+
+function openPdf(path, title) {
+    document.getElementById('pdfTitle').textContent = title;
+    document.getElementById('pdfFrame').src = path;
+    document.getElementById('pdfModal').classList.add('active');
+}
+
+function closePdfModal() {
+    document.getElementById('pdfModal').classList.remove('active');
+    document.getElementById('pdfFrame').src = '';
+}
+
+document.getElementById('pdfModal').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('pdfModal')) {
+        closePdfModal();
+    }
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closePdfModal();
+});
+
+loadSamples();
+</script>
+{% endblock %}

@@ -1,0 +1,182 @@
+{% set breadcrumbs = [{'text': 'Ders Programı', 'url': ''}] %}
+{% extends "base_dashboard.html" %}
+
+{% block title %}Ders Programım{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/admin-modern.css">
+<style>
+    .dashboard-content { padding: 24px 28px; }
+    .schedule-table {
+        background: white;
+        border-radius: var(--radius-xl);
+        padding: 28px;
+        box-shadow: var(--shadow-lg);
+        border: 1px solid var(--gray-100);
+        overflow-x: auto;
+    }
+    .schedule-table h2 {
+        margin-bottom: 24px;
+        color: var(--gray-800);
+        font-weight: 700;
+    }
+    table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    th, td {
+        padding: 14px 16px;
+        text-align: left;
+        border-bottom: 1px solid var(--gray-100);
+    }
+    th {
+        background: var(--gray-50);
+        font-weight: 700;
+        color: var(--gray-700);
+        text-transform: uppercase;
+        font-size: 0.85em;
+        letter-spacing: 0.03em;
+    }
+    th:first-child { border-radius: var(--radius-lg) 0 0 0; }
+    th:last-child { border-radius: 0 var(--radius-lg) 0 0; }
+    tr:hover td { background: var(--gray-50); }
+    .lesson {
+        background: var(--gradient-primary);
+        color: white;
+        padding: 8px 14px;
+        border-radius: var(--radius-md);
+        margin: 4px 0;
+        display: inline-block;
+        font-weight: 600;
+        font-size: 0.9em;
+    }
+    .course {
+        background: var(--gradient-success);
+        color: white;
+        padding: 8px 14px;
+        border-radius: var(--radius-md);
+        margin: 4px 0;
+        display: inline-block;
+        font-weight: 600;
+        font-size: 0.9em;
+    }
+    .time {
+        color: var(--gray-500);
+        font-size: 0.9em;
+    }
+    .empty {
+        color: var(--gray-400);
+        font-style: italic;
+    }
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--gray-400);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-content">
+    <div class="page-header-modern">
+        <h1>🗓️ Ders Programım</h1>
+        <p>Haftalık ders programınızı görüntüleyin</p>
+    </div>
+
+    <div class="schedule-table">
+        <h2>Haftalık Program</h2>
+        <div id="scheduleContent">
+            <div style="text-align: center; padding: 40px; color: var(--gray-400);">
+                <div class="loading-spinner" style="margin: 0 auto 16px;"></div>
+                <p>Ders programı yükleniyor...</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function loadSchedule() {
+        try {
+            const response = await fetch('/api/current-user');
+            const userData = await response.json();
+            
+            if (!userData.authenticated || userData.user.role !== 'student') {
+                window.location.href = '/ameo_kullanıcı_giriş';
+                return;
+            }
+            
+            const classId = userData.user.class_id;
+            if (!classId) {
+                document.getElementById('scheduleContent').innerHTML = `
+                    <div class="empty-state">
+                        <p>Sınıf bilgisi bulunamadı</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            const scheduleRes = await fetch(`/api/lesson-schedule/${classId}`);
+            const scheduleData = await scheduleRes.json();
+            
+            if (!scheduleData.schedule || scheduleData.schedule.length === 0) {
+                document.getElementById('scheduleContent').innerHTML = `
+                    <div class="empty-state">
+                        <p>Henüz ders programı oluşturulmamış</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            renderSchedule(scheduleData.schedule);
+        } catch (error) {
+            console.error('Program yüklenirken hata:', error);
+            document.getElementById('scheduleContent').innerHTML = `
+                <div class="empty-state">
+                    <p style="color: var(--error-500);">Program yüklenirken hata oluştu</p>
+                </div>
+            `;
+        }
+    }
+
+    function renderSchedule(schedule) {
+        const days = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma'];
+        const periods = [...new Set(schedule.map(s => s.period_number))].sort((a,b) => a-b);
+        
+        let html = `
+            <table>
+                <thead>
+                    <tr>
+                        <th>Saat</th>
+                        ${days.map(d => `<th>${d}</th>`).join('')}
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        periods.forEach(period => {
+            html += '<tr>';
+            html += `<td class="time">${period}. Ders</td>`;
+            
+            days.forEach((day, dayIndex) => {
+                const lesson = schedule.find(s => s.period_number === period && s.day_of_week === dayIndex + 1);
+                if (lesson) {
+                    const isSchoolLesson = lesson.lesson_type === 'school';
+                    html += `<td><span class="${isSchoolLesson ? 'lesson' : 'course'}">${lesson.subject}</span></td>`;
+                } else {
+                    html += '<td class="empty">-</td>';
+                }
+            });
+            
+            html += '</tr>';
+        });
+        
+        html += '</tbody></table>';
+        document.getElementById('scheduleContent').innerHTML = html;
+    }
+
+    loadSchedule();
+</script>
+{% endblock %}

@@ -1,0 +1,106 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Sınav Takvimi{% endblock %}
+
+{% block content %}
+<nav class="breadcrumb-nav">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/student/dashboard">Ana Sayfa</a></li>
+        <li class="breadcrumb-item active">Sınav Takvimi</li>
+    </ol>
+</nav>
+
+<div style="max-width: 1000px; margin: 0 auto;">
+    <div style="background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+        <h2 style="margin-bottom: 20px; color: #374151;">📅 Yaklaşan Sınavlarım</h2>
+        
+        <div id="examList">
+            <p style="text-align: center; color: #9ca3af; padding: 40px;">Yükleniyor...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+async function loadExams() {
+    try {
+        const response = await fetch('/api/exam-calendar/all');
+        const data = await response.json();
+        const exams = data.exams || [];
+        
+        const listDiv = document.getElementById('examList');
+        
+        if (exams.length === 0) {
+            listDiv.innerHTML = '<p style="text-align: center; color: #9ca3af; padding: 40px;">Henüz planlanmış sınav yok</p>';
+            return;
+        }
+        
+        // Backend zaten gelecek sınavları filtreliyor, sıralama yap
+        const myExams = exams.sort((a, b) => new Date(a.date) - new Date(b.date));
+        
+        if (myExams.length === 0) {
+            listDiv.innerHTML = '<p style="text-align: center; color: #9ca3af; padding: 40px;">Yaklaşan sınavın bulunmuyor</p>';
+            return;
+        }
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        let html = '<div style="display: flex; flex-direction: column; gap: 15px;">';
+        
+        myExams.forEach(exam => {
+            const dateObj = new Date(exam.date + 'T00:00:00');
+            const formattedDate = dateObj.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+            const dayName = dateObj.toLocaleDateString('tr-TR', { weekday: 'long' });
+            
+            // Kalan gün hesapla
+            const diffTime = dateObj - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            let daysText = '';
+            let daysColor = '#10b981';
+            if (diffDays === 0) {
+                daysText = 'Bugün';
+                daysColor = '#ef4444';
+            } else if (diffDays === 1) {
+                daysText = 'Yarın';
+                daysColor = '#f59e0b';
+            } else if (diffDays <= 7) {
+                daysText = `${diffDays} gün kaldı`;
+                daysColor = '#f59e0b';
+            } else {
+                daysText = `${diffDays} gün kaldı`;
+            }
+            
+            html += `
+                <div style="border: 2px solid #e5e7eb; border-radius: 8px; padding: 20px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="font-size: 1.2em; font-weight: 600; color: #111827; margin-bottom: 8px;">
+                            ${exam.title || exam.description}
+                        </div>
+                        <div style="color: #6b7280; margin-bottom: 4px;">
+                            📅 ${formattedDate} (${dayName})
+                        </div>
+                        <div style="color: #6b7280; font-size: 0.9em;">
+                            👥 ${exam.classes || '-'}
+                        </div>
+                    </div>
+                    <div style="background: ${daysColor}; color: white; padding: 12px 20px; border-radius: 8px; font-weight: 600; text-align: center; min-width: 120px;">
+                        ${daysText}
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        listDiv.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Sınavlar yüklenemedi:', error);
+        document.getElementById('examList').innerHTML = 
+            '<p style="text-align: center; color: #ef4444; padding: 40px;">❌ Sınavlar yüklenirken hata oluştu</p>';
+    }
+}
+
+loadExams();
+</script>
+{% endblock %}

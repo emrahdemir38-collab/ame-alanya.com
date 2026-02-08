@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kitap Kurdu - Öğrenci</title>
+    <link rel="stylesheet" href="/static/css/admin-modern.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: var(--font-family), 'Segoe UI', sans-serif;
+            background: var(--gradient-candy);
+            min-height: 100vh;
+        }
+        .header {
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(12px);
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            box-shadow: var(--shadow-md);
+        }
+        .header h1 { font-size: 1.6em; font-weight: 700; }
+        .btn-back {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.4);
+            padding: 10px 22px;
+            border-radius: var(--radius-lg);
+            cursor: pointer;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all var(--transition-fast);
+        }
+        .btn-back:hover { background: rgba(255,255,255,0.3); }
+        .container {
+            max-width: 1000px;
+            margin: 24px auto;
+            padding: 0 24px;
+        }
+        .tabs {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+        .tab {
+            padding: 14px 28px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            border-radius: var(--radius-lg);
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all var(--transition-fast);
+        }
+        .tab.active, .tab:hover {
+            background: white;
+            color: var(--accent-indigo);
+            box-shadow: var(--shadow-lg);
+        }
+        .card {
+            background: white;
+            border-radius: var(--radius-xl);
+            padding: 28px;
+            box-shadow: var(--shadow-xl);
+            border: 1px solid var(--gray-100);
+            margin-bottom: 24px;
+        }
+        .card h2 {
+            color: var(--gray-800);
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 700;
+        }
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            background: var(--gradient-candy);
+            color: white;
+            padding: 22px;
+            border-radius: var(--radius-xl);
+            text-align: center;
+            box-shadow: var(--shadow-primary);
+        }
+        .stat-card .number {
+            font-size: 2.2em;
+            font-weight: 800;
+        }
+        .stat-card .label {
+            font-size: 0.9em;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #374151;
+            font-weight: 600;
+            font-size: 0.95em;
+        }
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 14px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 15px;
+            transition: border-color 0.3s;
+        }
+        .form-group input:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .form-group textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+        .form-group small {
+            color: #6b7280;
+            font-size: 0.85em;
+            margin-top: 5px;
+            display: block;
+        }
+        .btn {
+            padding: 14px 28px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .entry-card {
+            background: #f9fafb;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+        .entry-card.approved { border-left-color: #10b981; }
+        .entry-card.pending { border-left-color: #f59e0b; }
+        .entry-card.rejected { border-left-color: #ef4444; }
+        .entry-card h3 {
+            color: #1f2937;
+            margin-bottom: 8px;
+        }
+        .entry-card .meta {
+            color: #6b7280;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-approved { background: #d1fae5; color: #065f46; }
+        .status-rejected { background: #fee2e2; color: #991b1b; }
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .leaderboard-table th, .leaderboard-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .leaderboard-table th {
+            background: #f9fafb;
+            font-weight: 600;
+            color: #374151;
+        }
+        .rank-1 { color: #f59e0b; font-weight: bold; }
+        .rank-2 { color: #9ca3af; font-weight: bold; }
+        .rank-3 { color: #b45309; font-weight: bold; }
+        .my-row { background: #dbeafe; }
+        .hidden { display: none; }
+        .alert {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        .alert-success { background: #d1fae5; color: #065f46; }
+        .alert-error { background: #fee2e2; color: #991b1b; }
+        .badge-display {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            padding: 18px;
+            border-radius: 14px;
+            margin-bottom: 20px;
+        }
+        .badge-icon { font-size: 2.5em; }
+        .badge-info h4 { color: #92400e; margin-bottom: 5px; }
+        .badge-info p { color: #a16207; font-size: 0.9em; }
+        .rejection-box {
+            background: #fee2e2;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+            border-left: 3px solid #ef4444;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📚 Kitap Kurdu</h1>
+        <a href="/student/dashboard" class="btn-back">← Ana Sayfa</a>
+    </div>
+
+    <div class="container">
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('new-entry')">📖 Yeni Kitap Gir</button>
+            <button class="tab" onclick="showTab('my-books')">📚 Kitaplarım</button>
+            <button class="tab" onclick="showTab('leaderboard')">🏆 Liderlik Tablosu</button>
+        </div>
+
+        <div id="alertBox"></div>
+
+        <div id="myBadgeCard" class="card" style="display: none;">
+            <div class="badge-display">
+                <div class="badge-icon">📚</div>
+                <div class="badge-info">
+                    <h4>Kitap Kurdu Rozeti</h4>
+                    <p>Tebrikler! Liderlik tablosunda ilk 3'te yer aldığın için bu rozeti kazandın!</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="number" id="approvedCount">0</div>
+                    <div class="label">Onaylanan Kitap</div>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                    <div class="number" id="pendingCount">0</div>
+                    <div class="label">Bekleyen</div>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                    <div class="number" id="totalPages">0</div>
+                    <div class="label">Toplam Sayfa</div>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
+                    <div class="number" id="myRank">-</div>
+                    <div class="label">Sıralaman</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-new-entry" class="tab-content">
+            <div class="card">
+                <h2>📖 Yeni Kitap Girişi</h2>
+                <p style="color: #6b7280; margin-bottom: 20px;">Okuduğunuz kitabı aşağıdaki formu doldurarak öğretmeninize gönderin.</p>
+                
+                <form id="bookEntryForm">
+                    <div id="questionsContainer"></div>
+                    
+                    <button type="submit" class="btn btn-success" style="width: 100%; margin-top: 10px;">
+                        📤 Öğretmene Gönder
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div id="tab-my-books" class="tab-content hidden">
+            <div class="card">
+                <h2>📚 Gönderdiğim Kitaplar</h2>
+                <div id="myBooksList"></div>
+            </div>
+        </div>
+
+        <div id="tab-leaderboard" class="tab-content hidden">
+            <div class="card">
+                <h2>🏆 Kitap Kurdu Liderlik Tablosu</h2>
+                <p style="color: #6b7280; margin-bottom: 15px;">En çok kitap okuyan öğrenciler! İlk 3'e girenlere özel rozet verilir.</p>
+                <table class="leaderboard-table">
+                    <thead>
+                        <tr>
+                            <th>Sıra</th>
+                            <th>Öğrenci</th>
+                            <th>Sınıf</th>
+                            <th>Kitap Sayısı</th>
+                            <th>Toplam Sayfa</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboardBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const currentUserId = {{ user.id }};
+        let questions = [];
+
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById('tab-' + tabName).classList.remove('hidden');
+            event.target.classList.add('active');
+
+            if (tabName === 'leaderboard') loadLeaderboard();
+            if (tabName === 'my-books') loadMyBooks();
+        }
+
+        function showAlert(message, type) {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => alertBox.innerHTML = '', 5000);
+        }
+
+        async function loadQuestions() {
+            try {
+                const response = await fetch('/api/book-entries/questions');
+                const result = await response.json();
+                if (result.success) {
+                    questions = result.questions;
+                    renderQuestionForm();
+                }
+            } catch (error) {
+                console.error('Load questions error:', error);
+            }
+        }
+
+        function renderQuestionForm() {
+            const container = document.getElementById('questionsContainer');
+            container.innerHTML = questions.map((q, i) => {
+                const isPageCount = i === 1;
+                const needsTextarea = i >= 2;
+                
+                return `
+                    <div class="form-group">
+                        <label>Soru ${i+1}: ${q}</label>
+                        ${isPageCount ? 
+                            `<input type="number" id="answer-${i}" placeholder="Sayfa sayısını yazın..." required min="1">` :
+                            needsTextarea ?
+                                `<textarea id="answer-${i}" placeholder="Cevabınızı yazın..." required></textarea>
+                                 <small>En az 5 cümle yazmanız beklenmektedir.</small>` :
+                                `<input type="text" id="answer-${i}" placeholder="Cevabınızı yazın..." required>`
+                        }
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function loadMyStats() {
+            try {
+                const response = await fetch('/api/student/book-entries/stats');
+                const result = await response.json();
+                if (result.success) {
+                    document.getElementById('approvedCount').textContent = result.stats.approved_count || 0;
+                    document.getElementById('pendingCount').textContent = result.stats.pending_count || 0;
+                    document.getElementById('totalPages').textContent = result.stats.total_pages || 0;
+                    document.getElementById('myRank').textContent = result.stats.my_rank || '-';
+                    
+                    if (result.stats.my_rank && result.stats.my_rank <= 3) {
+                        document.getElementById('myBadgeCard').style.display = 'block';
+                    }
+                }
+            } catch (error) {
+                console.error('Load stats error:', error);
+            }
+        }
+
+        async function loadMyBooks() {
+            try {
+                const response = await fetch('/api/student/book-entries');
+                const result = await response.json();
+                const list = document.getElementById('myBooksList');
+                
+                if (!result.entries || result.entries.length === 0) {
+                    list.innerHTML = '<p style="color: #6b7280; text-align: center;">Henüz kitap girişiniz bulunmuyor.</p>';
+                    return;
+                }
+
+                list.innerHTML = result.entries.map(e => {
+                    const statusClass = e.status;
+                    const statusLabel = e.status === 'approved' ? '✅ Onaylandı' : 
+                                       e.status === 'pending' ? '⏳ Bekliyor' : '❌ Reddedildi';
+                    const statusBadgeClass = e.status === 'approved' ? 'status-approved' : 
+                                            e.status === 'pending' ? 'status-pending' : 'status-rejected';
+                    const date = new Date(e.submitted_at).toLocaleDateString('tr-TR');
+
+                    let rejectionHtml = '';
+                    if (e.status === 'rejected' && e.rejection_reason) {
+                        rejectionHtml = `<div class="rejection-box"><strong>Red Gerekçesi:</strong> ${e.rejection_reason}</div>`;
+                    }
+
+                    return `
+                        <div class="entry-card ${statusClass}">
+                            <h3>📖 ${e.book_title}</h3>
+                            <div class="meta">
+                                ${e.page_count} sayfa | ${date}
+                                <span class="status-badge ${statusBadgeClass}">${statusLabel}</span>
+                            </div>
+                            ${rejectionHtml}
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Load books error:', error);
+            }
+        }
+
+        document.getElementById('bookEntryForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const answers = [];
+            for (let i = 0; i < questions.length; i++) {
+                const value = document.getElementById(`answer-${i}`).value.trim();
+                if (!value) {
+                    showAlert(`Lütfen ${i+1}. soruyu cevaplayın!`, 'error');
+                    return;
+                }
+                answers.push(value);
+            }
+
+            try {
+                const response = await fetch('/api/student/book-entries', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ answers })
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('✅ Kitabınız başarıyla gönderilmiştir!\n\nÖğretmeninizin onayını bekliyor.');
+                    showAlert('Kitap girişiniz öğretmene gönderildi! Onay bekleniyor.', 'success');
+                    document.getElementById('bookEntryForm').reset();
+                    loadMyStats();
+                } else {
+                    showAlert(result.error, 'error');
+                }
+            } catch (error) {
+                showAlert('Gönderme hatası: ' + error.message, 'error');
+            }
+        });
+
+        async function loadLeaderboard() {
+            try {
+                const response = await fetch('/api/book-entries/leaderboard');
+                const result = await response.json();
+                const tbody = document.getElementById('leaderboardBody');
+                
+                if (!result.leaderboard || result.leaderboard.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #6b7280;">Henüz kimse kitap okumamış. İlk sen ol!</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = result.leaderboard.map((s, i) => {
+                    const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
+                    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+                    const isMe = s.id === currentUserId;
+                    const badge = i < 3 ? ' 📚' : '';
+                    
+                    return `
+                        <tr class="${isMe ? 'my-row' : ''}">
+                            <td class="${rankClass}">${medal}</td>
+                            <td>${s.full_name}${isMe ? ' (Sen)' : ''}${badge}</td>
+                            <td>${s.class_name || '-'}</td>
+                            <td><strong>${s.approved_count}</strong> kitap</td>
+                            <td>${s.total_pages} sayfa</td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Load leaderboard error:', error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadQuestions();
+            loadMyStats();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMEO Dosya Yöneticisi</title>
+    <style>
+        body { font-family: Arial; margin: 0; padding: 10px; background: #f5f7fa; }
+        .file-btn {
+            display: inline-block;
+            padding: 12px 20px;
+            margin: 8px 5px;
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            text-decoration: none;
+        }
+        .file-btn:hover { background: #059669; }
+        .file-btn.download { background: #3b82f6; }
+        .file-btn.download:hover { background: #2563eb; }
+        
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        .loading-overlay.show { display: flex; }
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 6px solid #f3f3f3;
+            border-top: 6px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .loading-text {
+            color: white;
+            margin-top: 20px;
+            font-size: 18px;
+            text-align: center;
+            line-height: 1.6;
+        }
+        .loading-tip {
+            color: #aaa;
+            font-size: 14px;
+            margin-top: 15px;
+            text-align: center;
+        }
+        .file-info {
+            background: #e0f2fe;
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h2>📄 Dosya İşlemleri</h2>
+    <div id="file-container"></div>
+    
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">
+            📄 Lütfen bekleyiniz...<br>
+            Dosya açılıyor
+        </div>
+        <div class="loading-tip" id="loading-tip">
+            Büyük dosyalar daha uzun sürebilir
+        </div>
+    </div>
+
+    <script>
+        function getFileFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('file');
+        }
+
+        function getApiUrl() {
+            // Dinamik URL - mevcut domain'i kullan
+            return window.location.origin;
+        }
+        
+        function showLoading(message) {
+            document.querySelector('.loading-text').innerHTML = message || '📄 Lütfen bekleyiniz...<br>Dosya açılıyor';
+            document.getElementById('loading-overlay').classList.add('show');
+        }
+        
+        function hideLoading() {
+            document.getElementById('loading-overlay').classList.remove('show');
+        }
+
+        function viewFile(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const fileUrl = `${getApiUrl()}/view-file/${filename}`;
+            
+            // Tüm dosyaları yeni sekmede aç
+            // PDF: Tarayıcının kendi görüntüleyicisi açılır
+            // Resim: Tarayıcıda gösterilir
+            // Diğerleri: İndirilir
+            showLoading('📄 Dosya açılıyor...');
+            
+            setTimeout(() => {
+                hideLoading();
+                window.open(fileUrl, '_blank');
+            }, 200);
+        }
+
+        function downloadFile(filename) {
+            // Kodular'ın OnDownloadStart event'ini tetiklemek için window.location.href kullan
+            // fetch + blob WebViewer'ı donduruyor çünkü Kodular bunu algılayamıyor
+            const fileUrl = `${getApiUrl()}/download-file/${filename}`;
+            
+            // Direkt URL'e yönlendir - Kodular Download bileşeni devralacak
+            window.location.href = fileUrl;
+        }
+
+        window.openFile = function(action, filename) {
+            if (action === 'view') {
+                viewFile(filename);
+            } else if (action === 'download') {
+                downloadFile(filename);
+            }
+        };
+
+        window.addEventListener('load', () => {
+            const file = getFileFromUrl();
+            if (file) {
+                const ext = file.split('.').pop().toLowerCase();
+                const isPdf = ext === 'pdf';
+                const fileName = file.split('/').pop();
+                
+                document.getElementById('file-container').innerHTML = `
+                    <div class="file-info">
+                        <strong>📁 Dosya:</strong> ${fileName}
+                    </div>
+                    <button class="file-btn" onclick="viewFile('${file}')">
+                        👁️ ${isPdf ? 'PDF Görüntüle' : 'Görüntüle'}
+                    </button>
+                    <button class="file-btn download" onclick="downloadFile('${file}')">
+                        📥 İndir
+                    </button>
+                    ${isPdf ? '<p style="color:#666; font-size:13px; margin-top:15px;">💡 PDF açılması dosya boyutuna göre 5-30 saniye sürebilir.</p>' : ''}
+                `;
+            }
+        });
+    </script>
+</body>
+</html>

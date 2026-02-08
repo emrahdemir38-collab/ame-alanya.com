@@ -1,0 +1,582 @@
+{% extends "base_public.html" %}
+
+{% block title %}Yıldızlar ve Enler - AMEO LMS{% endblock %}
+
+{% block extra_head %}
+<style>
+    .leaderboard-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .page-header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+    
+    .page-header h1 {
+        font-size: 2.5em;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 10px;
+    }
+    
+    .page-header p {
+        color: #6b7280;
+        font-size: 1.1em;
+    }
+    
+    .grade-tabs {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-bottom: 30px;
+        flex-wrap: wrap;
+    }
+    
+    .grade-tab {
+        padding: 12px 30px;
+        background: white;
+        border: 2px solid #e5e7eb;
+        border-radius: 10px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 1.1em;
+        transition: all 0.3s;
+    }
+    
+    .grade-tab:hover {
+        border-color: #667eea;
+        color: #667eea;
+    }
+    
+    .grade-tab.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-color: transparent;
+    }
+    
+    .leaderboard-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .leaderboard-card {
+        background: white;
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    .leaderboard-card h2 {
+        font-size: 1.5em;
+        margin-bottom: 20px;
+        color: #374151;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+    }
+    
+    .card-title-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .pdf-download-btn {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.9em;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.3s;
+        box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+    }
+    
+    .pdf-download-btn:hover {
+        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+        transform: translateY(-2px);
+    }
+    
+    .pdf-download-btn:active {
+        transform: translateY(0);
+    }
+    
+    .leaderboard-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .leaderboard-table thead {
+        background: #f9fafb;
+        border-bottom: 2px solid #e5e7eb;
+    }
+    
+    .leaderboard-table th {
+        padding: 12px;
+        text-align: left;
+        font-weight: 600;
+        color: #374151;
+        font-size: 0.9em;
+    }
+    
+    .leaderboard-table td {
+        padding: 12px;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    
+    .leaderboard-table tbody tr:hover {
+        background: #f9fafb;
+    }
+    
+    .rank-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        font-weight: 700;
+        color: white;
+        font-size: 1em;
+    }
+    
+    .rank-1 {
+        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+        box-shadow: 0 2px 8px rgba(251, 191, 36, 0.4);
+    }
+    
+    .rank-2 {
+        background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+        box-shadow: 0 2px 8px rgba(156, 163, 175, 0.4);
+    }
+    
+    .rank-3 {
+        background: linear-gradient(135deg, #cd7f32 0%, #a0522d 100%);
+        box-shadow: 0 2px 8px rgba(205, 127, 50, 0.4);
+    }
+    
+    .rank-other {
+        background: #e5e7eb;
+        color: #6b7280;
+    }
+    
+    .score-badge {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.95em;
+    }
+    
+    .score-green {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        font-weight: 700;
+        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+    }
+    
+    .score-yellow {
+        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+        color: white;
+        font-weight: 700;
+        box-shadow: 0 2px 8px rgba(251, 191, 36, 0.4);
+    }
+    
+    .score-red {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        color: white;
+        font-weight: 700;
+        box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+    }
+    
+    .change-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-weight: 600;
+        font-size: 0.95em;
+    }
+    
+    .change-positive {
+        color: #059669;
+    }
+    
+    .change-neutral {
+        color: #d97706;
+    }
+    
+    .change-negative {
+        color: #dc2626;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #9ca3af;
+    }
+    
+    .empty-state .icon {
+        font-size: 4em;
+        margin-bottom: 20px;
+    }
+    
+    @media (max-width: 1024px) {
+        .leaderboard-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .leaderboard-container {
+            padding: 10px;
+        }
+        
+        .grade-tabs {
+            gap: 5px;
+        }
+        
+        .grade-tab {
+            padding: 10px 20px;
+            font-size: 1em;
+        }
+        
+        .leaderboard-card {
+            padding: 15px;
+        }
+        
+        .leaderboard-table {
+            font-size: 0.9em;
+        }
+        
+        .leaderboard-table th,
+        .leaderboard-table td {
+            padding: 8px 6px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="leaderboard-container">
+    <div class="page-header">
+        <h1>🌟 Yıldızlar ve Enler</h1>
+        <p>Deneme sınavlarında başarılı olan ve en çok yükselen öğrenciler</p>
+    </div>
+    
+    <div class="grade-tabs">
+        <button class="grade-tab active" onclick="selectGrade(this, '5')">5. Sınıflar</button>
+        <button class="grade-tab" onclick="selectGrade(this, '6')">6. Sınıflar</button>
+        <button class="grade-tab" onclick="selectGrade(this, '7')">7. Sınıflar</button>
+        <button class="grade-tab" onclick="selectGrade(this, '8')">8. Sınıflar</button>
+    </div>
+    
+    <div class="leaderboard-grid">
+        <div class="leaderboard-card">
+            <h2>
+                <span class="card-title-left">⭐ Denemenin Yıldızları</span>
+                <button id="pdf-stars-btn" class="pdf-download-btn" onclick="downloadPDF('stars')" style="display: none;">
+                    📄 PDF İndir
+                </button>
+            </h2>
+            <div id="stars-content">
+                <div class="empty-state">
+                    <div class="icon">⏳</div>
+                    <p>Yükleniyor...</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="leaderboard-card">
+            <h2>
+                <span class="card-title-left">🚀 Denemenin Yükselenleri</span>
+                <button id="pdf-risers-btn" class="pdf-download-btn" onclick="downloadPDF('risers')" style="display: none;">
+                    📄 PDF İndir
+                </button>
+            </h2>
+            <div id="risers-content">
+                <div class="empty-state">
+                    <div class="icon">⏳</div>
+                    <p>Yükleniyor...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentGrade = '5';
+let allowedGrades = ['5', '6', '7', '8']; // Default: herkese açık
+let currentUserId = null;
+let currentUserRole = null;
+
+function selectGrade(button, grade) {
+    currentGrade = grade;
+    
+    document.querySelectorAll('.grade-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    button.classList.add('active');
+    
+    loadLeaderboards();
+}
+
+// İsim maskeleme: Kendi ismi tam, diğerleri A******* formatında
+function maskName(fullName, studentId) {
+    // Öğretmen/Admin tüm isimleri görsün
+    if (currentUserRole === 'admin' || currentUserRole === 'teacher') {
+        return fullName;
+    }
+    
+    // Kendi ismi tam gösterilsin
+    if (currentUserId && studentId === currentUserId) {
+        return fullName;
+    }
+    
+    // Diğer isimleri maskele: "Ahmet Yılmaz" -> "A*******"
+    if (!fullName || fullName.trim() === '') return '***';
+    const firstLetter = fullName.trim()[0].toUpperCase();
+    return firstLetter + '*******';
+}
+
+async function loadLeaderboards() {
+    loadStars();
+    loadRisers();
+}
+
+// PDF Download fonksiyonu
+function downloadPDF(type) {
+    const endpoint = type === 'stars' ? 
+        `/api/leaderboards/stars/pdf?grade=${currentGrade}` :
+        `/api/leaderboards/risers/pdf?grade=${currentGrade}`;
+    
+    window.open(endpoint, '_blank');
+}
+
+// PDF butonlarını göster/gizle (sadece admin/teacher)
+function togglePDFButtons() {
+    const starsBtn = document.getElementById('pdf-stars-btn');
+    const risersBtn = document.getElementById('pdf-risers-btn');
+    
+    if (currentUserRole === 'admin' || currentUserRole === 'teacher') {
+        starsBtn.style.display = 'flex';
+        risersBtn.style.display = 'flex';
+    } else {
+        starsBtn.style.display = 'none';
+        risersBtn.style.display = 'none';
+    }
+}
+
+// Sayfa yüklendiğinde tab'leri filtrele
+async function initializeTabs() {
+    try {
+        // İlk API çağrısından metadata al
+        const response = await fetch('/api/leaderboards/stars?grade=5');
+        const data = await response.json();
+        
+        if (data.allowed_grades) {
+            allowedGrades = data.allowed_grades;
+            currentUserId = data.current_user_id;
+            currentUserRole = data.current_user_role;
+            
+            // Tab'leri filtrele
+            const allTabs = document.querySelectorAll('.grade-tab');
+            allTabs.forEach(tab => {
+                const grade = tab.textContent.trim()[0]; // "5. Sınıflar" -> "5"
+                if (!allowedGrades.includes(grade)) {
+                    tab.style.display = 'none'; // Gizle
+                } else {
+                    tab.style.display = 'inline-block'; // Göster
+                }
+            });
+            
+            // İlk görünür tab'ı aktif yap
+            currentGrade = allowedGrades[0];
+            allTabs.forEach(tab => {
+                const grade = tab.textContent.trim()[0];
+                if (grade === currentGrade) {
+                    tab.classList.add('active');
+                } else {
+                    tab.classList.remove('active');
+                }
+            });
+            
+            // PDF butonlarını göster (sadece admin/teacher)
+            togglePDFButtons();
+        }
+        
+        loadLeaderboards();
+    } catch (error) {
+        console.error('Tab initialization error:', error);
+        loadLeaderboards(); // Fallback: tüm tab'ler görünür
+    }
+}
+
+async function loadStars() {
+    const container = document.getElementById('stars-content');
+    
+    try {
+        const response = await fetch(`/api/leaderboards/stars?grade=${currentGrade}`);
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.error || 'Veri yüklenemedi');
+        }
+        
+        if (!data.leaderboard || data.leaderboard.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="icon">📊</div>
+                    <h3>Henüz veri yok</h3>
+                    <p>${currentGrade}. sınıflar için deneme sınavı verisi bulunmuyor.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        container.innerHTML = `
+            <table class="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th>Sıra</th>
+                        <th>Öğrenci</th>
+                        <th>Sınıf</th>
+                        <th>Deneme Sayısı</th>
+                        <th>En Düşük</th>
+                        <th>Ortalama</th>
+                        <th>En Yüksek</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${data.leaderboard.map((student, idx) => {
+                        let rankClass = 'rank-other';
+                        if (idx === 0) rankClass = 'rank-1';
+                        else if (idx === 1) rankClass = 'rank-2';
+                        else if (idx === 2) rankClass = 'rank-3';
+                        
+                        const displayName = maskName(student.student_name, student.student_id);
+                        
+                        return `
+                            <tr>
+                                <td><span class="rank-badge ${rankClass}">${student.rank}</span></td>
+                                <td><strong>${displayName}</strong></td>
+                                <td>${student.class_name}</td>
+                                <td>${student.exam_count}</td>
+                                <td><span class="score-badge">${student.min_score}</span></td>
+                                <td><span class="score-badge score-${student.color}">${student.avg_score}</span></td>
+                                <td><span class="score-badge">${student.max_score}</span></td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error('Stars loading error:', error);
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="icon">❌</div>
+                <p>Veriler yüklenirken hata oluştu</p>
+            </div>
+        `;
+    }
+}
+
+async function loadRisers() {
+    const container = document.getElementById('risers-content');
+    
+    try {
+        const response = await fetch(`/api/leaderboards/risers?grade=${currentGrade}`);
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.error || 'Veri yüklenemedi');
+        }
+        
+        if (!data.leaderboard || data.leaderboard.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="icon">📊</div>
+                    <h3>Henüz veri yok</h3>
+                    <p>${currentGrade}. sınıflar için en az iki deneme verisi gerekiyor.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        container.innerHTML = `
+            <table class="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th>Sıra</th>
+                        <th>Öğrenci</th>
+                        <th>Sınıf</th>
+                        <th>Son Puan</th>
+                        <th>Değişim</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${data.leaderboard.map((student, idx) => {
+                        let rankClass = 'rank-other';
+                        if (idx === 0) rankClass = 'rank-1';
+                        else if (idx === 1) rankClass = 'rank-2';
+                        else if (idx === 2) rankClass = 'rank-3';
+                        
+                        let changeClass = 'change-negative';
+                        let changeIcon = '📉';
+                        if (student.score_change >= 25) {
+                            changeClass = 'change-positive';
+                            changeIcon = '🚀';
+                        } else if (student.score_change >= 15) {
+                            changeClass = 'change-neutral';
+                            changeIcon = '📈';
+                        }
+                        
+                        const displayName = maskName(student.student_name, student.student_id);
+                        
+                        return `
+                            <tr>
+                                <td><span class="rank-badge ${rankClass}">${student.rank}</span></td>
+                                <td><strong>${displayName}</strong></td>
+                                <td>${student.class_name}</td>
+                                <td><span class="score-badge score-${student.color}">${student.latest_score}</span></td>
+                                <td>
+                                    <span class="change-badge ${changeClass}">
+                                        ${changeIcon} ${student.score_change > 0 ? '+' : ''}${student.score_change}
+                                    </span>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error('Risers loading error:', error);
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="icon">❌</div>
+                <p>Veriler yüklenirken hata oluştu</p>
+            </div>
+        `;
+    }
+}
+
+// Sayfa yüklendiğinde tab'leri filtrele ve veriyi yükle
+initializeTabs();
+</script>
+</div>
+{% endblock %}

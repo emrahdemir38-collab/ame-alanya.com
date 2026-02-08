@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ exam.title }} - Sınav Görüntüleme</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f5f7fa; }
+        .header { background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .btn-back { background: #10b981; color: white; padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; text-decoration: none; display: inline-block; transition: all 0.3s; }
+        .btn-back:hover { background: #059669; transform: translateY(-2px); }
+        .container { max-width: 800px; margin: 20px auto; padding: 0 20px; }
+        .info-box { background: #dbeafe; border-left: 4px solid #3b82f6; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .info-box strong { color: #1e40af; }
+        
+        /* Sınav Bilgileri */
+        .exam-info-card { background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .exam-title { font-size: 1.8em; color: #1f2937; margin-bottom: 15px; font-weight: bold; }
+        .exam-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .meta-item { background: #f9fafb; padding: 15px; border-radius: 8px; border: 2px solid #e5e7eb; }
+        .meta-item strong { color: #374151; display: block; margin-bottom: 5px; font-size: 0.9em; }
+        .meta-value { font-size: 1.1em; color: #1f2937; font-weight: 500; }
+        
+        /* Dosya Butonları */
+        .files-section { background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .files-title { font-size: 1.3em; color: #1f2937; margin-bottom: 15px; font-weight: bold; }
+        .file-buttons { display: flex; flex-direction: column; gap: 12px; }
+        .btn-view-file { background: #3b82f6; color: white; padding: 15px 25px; border: none; border-radius: 8px; cursor: pointer; font-size: 1.05em; font-weight: 500; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.3s; }
+        .btn-view-file:hover { background: #2563eb; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3); }
+        
+        /* Mobil */
+        @media (max-width: 768px) {
+            .header { padding: 12px 15px; flex-direction: column; gap: 10px; align-items: flex-start; }
+            .container { padding: 0 10px; }
+            .exam-info-card { padding: 15px; }
+            .exam-title { font-size: 1.4em; }
+            .exam-meta { grid-template-columns: 1fr; gap: 10px; }
+            .meta-item { padding: 12px; }
+            .files-section { padding: 15px; }
+            .files-title { font-size: 1.1em; }
+            .btn-view-file { padding: 12px 20px; font-size: 1em; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div style="flex: 1;">
+            <h1>👁️ {{ exam.title }}</h1>
+            <div style="font-size: 0.9em; opacity: 0.9; margin-top: 5px;">Sınav Görüntüleme (Sadece Okuma)</div>
+        </div>
+        <a href="/student/exams" class="btn-back">← Sınavlarıma Dön</a>
+    </div>
+
+    <div class="container">
+        <div class="info-box">
+            <strong>ℹ️ BİLGİ:</strong> Bu sınav süresi dolmuş veya girilmemiş. Sadece sınav dosyalarını görüntüleyebilirsiniz, cevap veremezsiniz.
+        </div>
+
+        <!-- Sınav Bilgileri -->
+        <div class="exam-info-card">
+            <div class="exam-title">{{ exam.title }}</div>
+            
+            <div class="exam-meta">
+                <div class="meta-item">
+                    <strong>📊 Soru Sayısı</strong>
+                    <div class="meta-value">{{ exam.question_count }} soru</div>
+                </div>
+                <div class="meta-item">
+                    <strong>⏱️ Süre</strong>
+                    <div class="meta-value">{{ exam.duration_minutes }} dakika</div>
+                </div>
+                <div class="meta-item">
+                    <strong>🕐 Başlangıç Tarihi</strong>
+                    <div class="meta-value">{{ exam.start_time.strftime('%d/%m/%Y %H:%M') }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sınav Dosyaları -->
+        <div class="files-section">
+            <div class="files-title">📄 Sınav Dosyaları</div>
+            <div class="file-buttons">
+                {% if pdf_files and pdf_files|length > 0 %}
+                    {% for pdf_file in pdf_files %}
+                    <a href="/view-file/{{ pdf_file }}" target="_blank" class="btn-view-file">
+                        🔍 {% if pdf_files|length > 1 %}Dosya {{ loop.index }}/{{ pdf_files|length }} - {% endif %}Tam Ekranda Aç
+                    </a>
+                    {% endfor %}
+                {% else %}
+                    <p style="color: #6b7280; text-align: center; padding: 30px;">📄 Sınav dosyası bulunamadı</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

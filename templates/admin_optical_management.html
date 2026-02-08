@@ -1,0 +1,1305 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Optik Yönetimi - Admin{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/admin-modern.css">
+<style>
+    .optical-container {
+        padding: 24px;
+        background: linear-gradient(135deg, #f0f9ff 0%, #fdf4ff 100%);
+        min-height: 100vh;
+    }
+    
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+        background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%);
+        padding: 24px 32px;
+        border-radius: 20px;
+        box-shadow: 0 10px 40px rgba(30, 64, 175, 0.3);
+    }
+    
+    .page-title {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: white;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .page-title span {
+        font-size: 2.2rem;
+    }
+    
+    .tabs-container {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        background: white;
+        padding: 8px;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+    
+    .tab-btn {
+        padding: 14px 24px;
+        border: none;
+        background: transparent;
+        border-radius: 12px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: #64748b;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .tab-btn:hover {
+        background: linear-gradient(135deg, #f0f9ff 0%, #fdf4ff 100%);
+        color: #6366f1;
+        transform: translateY(-2px);
+    }
+    
+    .tab-btn.active {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+    }
+    
+    .tab-btn span {
+        font-size: 1.2rem;
+    }
+    
+    .tab-content {
+        display: none;
+    }
+    
+    .tab-content.active {
+        display: block;
+    }
+    
+    .card {
+        background: white;
+        border-radius: 20px;
+        padding: 28px;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+        margin-bottom: 24px;
+        border: 1px solid rgba(99, 102, 241, 0.1);
+    }
+    
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        padding-bottom: 20px;
+        border-bottom: 2px solid #f1f5f9;
+    }
+    
+    .card-title {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: #1e293b;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .card-title span {
+        font-size: 1.5rem;
+    }
+    
+    .form-group {
+        margin-bottom: 20px;
+    }
+    
+    .form-label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: var(--gray-700);
+    }
+    
+    .form-control {
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid var(--gray-200);
+        border-radius: 10px;
+        font-size: 1rem;
+        transition: all 0.2s;
+    }
+    
+    .form-control:focus {
+        outline: none;
+        border-color: var(--primary-500);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    .form-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+    }
+    
+    .question-info-box {
+        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        border: 2px solid #38bdf8;
+        border-radius: 12px;
+        padding: 16px 20px;
+        color: #0369a1;
+        font-size: 0.95rem;
+        line-height: 1.6;
+    }
+    
+    .btn {
+        padding: 14px 28px;
+        border: none;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition: all 0.3s;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        text-transform: none;
+    }
+    
+    .btn-primary {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+    }
+    
+    .btn-primary:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(99, 102, 241, 0.5);
+    }
+    
+    .btn-success {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+    }
+    
+    .btn-success:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(16, 185, 129, 0.5);
+    }
+    
+    .btn-warning {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+    }
+    
+    .btn-warning:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(245, 158, 11, 0.5);
+    }
+    
+    .btn-danger {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+    }
+    
+    .btn-danger:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(239, 68, 68, 0.5);
+    }
+    
+    .btn-outline {
+        background: white;
+        border: 2px solid #e2e8f0;
+        color: #475569;
+    }
+    
+    .btn-outline:hover {
+        border-color: #6366f1;
+        color: #6366f1;
+        background: #f0f9ff;
+    }
+    
+    .btn-info {
+        background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(6, 182, 212, 0.3);
+    }
+    
+    .btn-info:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(6, 182, 212, 0.5);
+    }
+    
+    .exam-list {
+        margin-top: 20px;
+    }
+    
+    .exam-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 20px;
+        background: var(--gray-50);
+        border-radius: 12px;
+        margin-bottom: 12px;
+        transition: all 0.2s;
+    }
+    
+    .exam-item:hover {
+        background: var(--gray-100);
+        transform: translateX(4px);
+    }
+    
+    .exam-info h4 {
+        font-weight: 600;
+        color: var(--gray-800);
+        margin-bottom: 4px;
+    }
+    
+    .exam-info p {
+        font-size: 0.85rem;
+        color: var(--gray-500);
+    }
+    
+    .exam-actions {
+        display: flex;
+        gap: 8px;
+    }
+    
+    .badge {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    
+    .badge-success {
+        background: var(--success-100);
+        color: var(--success-700);
+    }
+    
+    .badge-warning {
+        background: var(--warning-100);
+        color: var(--warning-700);
+    }
+    
+    .badge-info {
+        background: var(--primary-100);
+        color: var(--primary-700);
+    }
+    
+    .upload-area {
+        border: 2px dashed var(--gray-300);
+        border-radius: 12px;
+        padding: 40px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: var(--gray-50);
+    }
+    
+    .upload-area:hover {
+        border-color: var(--primary-500);
+        background: var(--primary-50);
+    }
+    
+    .upload-area.dragover {
+        border-color: var(--primary-500);
+        background: var(--primary-100);
+    }
+    
+    .upload-icon {
+        font-size: 3rem;
+        margin-bottom: 16px;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 28px;
+    }
+    
+    .stat-card {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        color: white;
+        padding: 24px;
+        border-radius: 18px;
+        text-align: center;
+        box-shadow: 0 8px 30px rgba(99, 102, 241, 0.3);
+        transition: all 0.3s;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -50%;
+        width: 100%;
+        height: 100%;
+        background: rgba(255,255,255,0.1);
+        border-radius: 50%;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .stat-card.green {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        box-shadow: 0 8px 30px rgba(16, 185, 129, 0.3);
+    }
+    
+    .stat-card.orange {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        box-shadow: 0 8px 30px rgba(245, 158, 11, 0.3);
+    }
+    
+    .stat-card.purple {
+        background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+        box-shadow: 0 8px 30px rgba(168, 85, 247, 0.3);
+    }
+    
+    .stat-value {
+        font-size: 2.5rem;
+        font-weight: 800;
+        position: relative;
+        z-index: 1;
+    }
+    
+    .stat-label {
+        font-size: 0.9rem;
+        opacity: 0.95;
+        font-weight: 500;
+        position: relative;
+        z-index: 1;
+        margin-top: 4px;
+    }
+    
+    .question-counts-grid {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 12px;
+    }
+    
+    .question-count-item {
+        text-align: center;
+    }
+    
+    .question-count-item label {
+        display: block;
+        font-size: 0.8rem;
+        color: var(--gray-600);
+        margin-bottom: 4px;
+    }
+    
+    .question-count-item input {
+        width: 100%;
+        padding: 8px;
+        text-align: center;
+        border: 2px solid var(--gray-200);
+        border-radius: 8px;
+    }
+    
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .modal.active {
+        display: flex;
+    }
+    
+    .modal-content {
+        background: white;
+        border-radius: 20px;
+        padding: 32px;
+        max-width: 800px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+    }
+    
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: var(--gray-500);
+    }
+    
+    .analysis-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .analysis-table th, .analysis-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid var(--gray-200);
+    }
+    
+    .analysis-table th {
+        background: var(--gray-50);
+        font-weight: 600;
+    }
+    
+    .success-rate {
+        font-weight: 600;
+    }
+    
+    .success-rate.high {
+        color: var(--success-600);
+    }
+    
+    .success-rate.medium {
+        color: var(--warning-600);
+    }
+    
+    .success-rate.low {
+        color: var(--danger-600);
+    }
+    
+    .alert {
+        padding: 16px 20px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .alert-success {
+        background: var(--success-100);
+        color: var(--success-700);
+        border: 1px solid var(--success-200);
+    }
+    
+    .alert-danger {
+        background: var(--danger-100);
+        color: var(--danger-700);
+        border: 1px solid var(--danger-200);
+    }
+    
+    @media (max-width: 768px) {
+        .question-counts-grid {
+            grid-template-columns: repeat(3, 1fr);
+        }
+        
+        .tabs-container {
+            flex-direction: column;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="optical-container">
+    <div class="page-header">
+        <h1 class="page-title">
+            <span>📋</span>
+            Optik Form Yönetimi
+        </h1>
+    </div>
+    
+    <div id="alertContainer"></div>
+    
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value" id="totalExams">0</div>
+            <div class="stat-label">Toplam Sınav</div>
+        </div>
+        <div class="stat-card green">
+            <div class="stat-value" id="publishedExams">0</div>
+            <div class="stat-label">Yayınlanan</div>
+        </div>
+        <div class="stat-card orange">
+            <div class="stat-value" id="draftExams">0</div>
+            <div class="stat-label">Taslak</div>
+        </div>
+        <div class="stat-card purple">
+            <div class="stat-value" id="totalStudents">0</div>
+            <div class="stat-label">Toplam Sonuç</div>
+        </div>
+    </div>
+    
+    <div class="tabs-container">
+        <button class="tab-btn active" onclick="showTab('exams')">
+            <span>📝</span> Sınavlar
+        </button>
+        <button class="tab-btn" onclick="showTab('create')">
+            <span>➕</span> Yeni Sınav
+        </button>
+        <button class="tab-btn" onclick="showTab('optical-form')">
+            <span>📄</span> Optik Form PDF
+        </button>
+        <button class="tab-btn" onclick="showTab('templates')">
+            <span>📥</span> Şablonlar
+        </button>
+        <button class="tab-btn" onclick="showTab('pdf-analyze')">
+            <span>📊</span> Karne Analiz
+        </button>
+    </div>
+    
+    <div id="exams-tab" class="tab-content active">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <span>📋</span> Optik Sınav Listesi
+                </h3>
+                <select class="form-control" style="width: auto;" id="gradeFilter" onchange="filterExams()">
+                    <option value="">Tüm Sınıflar</option>
+                    <option value="5">5. Sınıf</option>
+                    <option value="6">6. Sınıf</option>
+                    <option value="7">7. Sınıf</option>
+                    <option value="8">8. Sınıf</option>
+                </select>
+            </div>
+            <div class="exam-list" id="examList">
+                <p style="text-align: center; color: var(--gray-500); padding: 40px;">
+                    Henüz optik sınav oluşturulmamış.
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <div id="create-tab" class="tab-content">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <span>➕</span> Yeni Optik Sınav Oluştur
+                </h3>
+            </div>
+            
+            <form id="createExamForm" onsubmit="createExam(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Sınav Adı</label>
+                        <input type="text" class="form-control" name="exam_name" placeholder="Örn: 1. Deneme Sınavı" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Sınıf Seviyesi</label>
+                        <select class="form-control" name="grade_level" id="gradeLevel" required onchange="updateQuestionCounts()">
+                            <option value="">Seçiniz</option>
+                            <option value="5">5. Sınıf</option>
+                            <option value="6">6. Sınıf</option>
+                            <option value="7">7. Sınıf</option>
+                            <option value="8">8. Sınıf</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Soru Sayıları (Otomatik)</label>
+                    <div class="question-counts-grid">
+                        <div class="question-count-item">
+                            <label>Türkçe</label>
+                            <input type="number" name="turkce" id="qTurkce" value="20" readonly>
+                        </div>
+                        <div class="question-count-item">
+                            <label>Matematik</label>
+                            <input type="number" name="matematik" id="qMatematik" value="20" readonly>
+                        </div>
+                        <div class="question-count-item">
+                            <label>Fen</label>
+                            <input type="number" name="fen" id="qFen" value="20" readonly>
+                        </div>
+                        <div class="question-count-item">
+                            <label>Sosyal/İnkılap</label>
+                            <input type="number" name="sosyal" id="qSosyal" value="10" readonly>
+                        </div>
+                        <div class="question-count-item">
+                            <label>Din Kültürü</label>
+                            <input type="number" name="din" id="qDin" value="10" readonly>
+                        </div>
+                        <div class="question-count-item">
+                            <label>İngilizce</label>
+                            <input type="number" name="ingilizce" id="qIngilizce" value="10" readonly>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card" style="background: var(--gray-50); margin-top: 20px;">
+                    <h4 style="margin-bottom: 16px; color: var(--gray-700);">📤 Cevap Anahtarı Yükle</h4>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">A Kitapçığı Cevap Anahtarı (Excel)</label>
+                            <input type="file" class="form-control" name="answer_key_a" accept=".xlsx,.xls,.csv">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">B Kitapçığı Cevap Anahtarı (Excel)</label>
+                            <input type="file" class="form-control" name="answer_key_b" accept=".xlsx,.xls,.csv">
+                        </div>
+                    </div>
+                    <p style="font-size: 0.85rem; color: var(--gray-500);">
+                        Şablon için "Şablonlar" sekmesinden indirin.
+                    </p>
+                </div>
+                
+                <div class="card" style="background: var(--gray-50); margin-top: 20px;">
+                    <h4 style="margin-bottom: 16px; color: var(--gray-700);">📊 Öğrenci Sonuçları Yükle (Opsiyonel)</h4>
+                    
+                    <div class="upload-area" id="resultsUploadArea">
+                        <div class="upload-icon">📁</div>
+                        <p>Excel dosyasını sürükleyin veya tıklayın</p>
+                        <input type="file" name="results_file" accept=".xlsx,.xls,.csv" style="display: none;" id="resultsFileInput">
+                    </div>
+                    <p id="selectedFileName" style="margin-top: 10px; color: var(--gray-600);"></p>
+                </div>
+                
+                <div style="margin-top: 24px; display: flex; gap: 12px;">
+                    <button type="submit" class="btn btn-primary">
+                        <span>💾</span> Sınav Oluştur
+                    </button>
+                    <button type="button" class="btn btn-outline" onclick="showTab('exams')">
+                        İptal
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div id="optical-form-tab" class="tab-content">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <span>📄</span> Optik Form PDF İndir
+                </h3>
+            </div>
+            
+            <p style="margin-bottom: 20px; color: var(--gray-600);">
+                Her öğrenci için hazır optik form oluşturun. Formlar öğrenci adı, soyadı, sınıfı ve numarasını içerir.
+            </p>
+            
+            <form id="opticalFormDownload">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Sınıf Seçin</label>
+                        <select class="form-control" id="opticalClass" required>
+                            <option value="">Sınıf Seçiniz</option>
+                            {% for class in classes %}
+                            <option value="{{ class.name }}">{{ class.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Soru Şablonu</label>
+                        <select class="form-control" id="opticalGrade" required onchange="updateOpticalQuestions()">
+                            <option value="">Seviye Seçiniz</option>
+                            <option value="5">5-6. Sınıf (15/15/15/10/10/10)</option>
+                            <option value="7">7-8. Sınıf (20/20/20/10/10/10)</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div id="opticalQuestionInfo" style="margin: 16px 0;"></div>
+                
+                <button type="button" class="btn btn-primary" onclick="downloadOpticalForms()">
+                    <span>📥</span> Optik Form PDF İndir
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <div id="templates-tab" class="tab-content">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <span>📥</span> Excel Şablonları
+                </h3>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+                <div style="background: var(--gray-50); padding: 24px; border-radius: 12px;">
+                    <h4 style="margin-bottom: 12px; color: var(--gray-800);">📋 Cevap Anahtarı Şablonu</h4>
+                    <p style="font-size: 0.9rem; color: var(--gray-600); margin-bottom: 16px;">
+                        A ve B kitapçığı cevaplarını yüklemek için kullanın.
+                    </p>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-primary" onclick="downloadTemplate('answer_key_56')">
+                            5-6. Sınıf
+                        </button>
+                        <button class="btn btn-primary" onclick="downloadTemplate('answer_key_78')">
+                            7-8. Sınıf
+                        </button>
+                    </div>
+                </div>
+                
+                <div style="background: var(--gray-50); padding: 24px; border-radius: 12px;">
+                    <h4 style="margin-bottom: 12px; color: var(--gray-800);">📊 Sonuç Yükleme Şablonu</h4>
+                    <p style="font-size: 0.9rem; color: var(--gray-600); margin-bottom: 16px;">
+                        Optik okuyucu sonuçlarını yüklemek için kullanın.
+                    </p>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-success" onclick="downloadTemplate('results_56')">
+                            5-6. Sınıf
+                        </button>
+                        <button class="btn btn-success" onclick="downloadTemplate('results_78')">
+                            7-8. Sınıf
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="pdf-analyze-tab" class="tab-content">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <span>📊</span> Karne PDF Analiz Sistemi
+                </h3>
+            </div>
+            
+            <div style="background: linear-gradient(135deg, #f0f9ff 0%, #fdf4ff 100%); padding: 24px; border-radius: 16px; margin-bottom: 24px; border: 2px dashed #6366f1;">
+                <h4 style="margin-bottom: 16px; color: #1e40af; display: flex; align-items: center; gap: 10px;">
+                    <span>📄</span> Karne PDF Yükleme
+                </h4>
+                <p style="color: #475569; margin-bottom: 16px; line-height: 1.6;">
+                    Optik okuyucu yazılımından aldığınız <strong>karne PDF</strong> dosyalarını buraya yükleyin. 
+                    Sistem otomatik olarak analiz yapacak ve <strong>%50 altında başarı gösteren dersleri</strong> tespit edecektir.
+                </p>
+                
+                <form id="analyzePdfForm" onsubmit="analyzeReportCards(event)" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label class="form-label">PDF Dosyaları (Birden fazla seçebilirsiniz)</label>
+                        <input type="file" class="form-control" name="files" id="pdfFiles" accept=".pdf" multiple required>
+                        <small style="color: #64748b;">Optik okuyucu yazılımından aldığınız "Öğrenci Listesi - Puan Sıralı" PDF'lerini seçin</small>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary" id="analyzeBtn" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);">
+                        <span>📊</span> Analiz Et ve Rapor İndir
+                    </button>
+                </form>
+            </div>
+            
+            <div style="background: var(--gray-50); padding: 24px; border-radius: 16px;">
+                <h4 style="margin-bottom: 16px; color: var(--gray-800); display: flex; align-items: center; gap: 10px;">
+                    <span>ℹ️</span> Nasıl Çalışır?
+                </h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+                    <div style="text-align: center; padding: 16px;">
+                        <div style="font-size: 2rem; margin-bottom: 10px;">1️⃣</div>
+                        <h5 style="margin-bottom: 8px; color: #1e40af;">PDF Yükle</h5>
+                        <p style="font-size: 0.85rem; color: #64748b;">Optik yazılımdan aldığınız karne PDF'lerini seçin</p>
+                    </div>
+                    <div style="text-align: center; padding: 16px;">
+                        <div style="font-size: 2rem; margin-bottom: 10px;">2️⃣</div>
+                        <h5 style="margin-bottom: 8px; color: #1e40af;">Otomatik Analiz</h5>
+                        <p style="font-size: 0.85rem; color: #64748b;">Sistem tüm öğrenci verilerini analiz eder</p>
+                    </div>
+                    <div style="text-align: center; padding: 16px;">
+                        <div style="font-size: 2rem; margin-bottom: 10px;">3️⃣</div>
+                        <h5 style="margin-bottom: 8px; color: #1e40af;">Rapor İndir</h5>
+                        <p style="font-size: 0.85rem; color: #64748b;">%50 altındaki dersler PDF olarak indirilir</p>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 20px; padding: 16px; background: white; border-radius: 12px; border-left: 4px solid #10b981;">
+                    <h5 style="margin-bottom: 8px; color: #10b981;">📋 Raporda Neler Var?</h5>
+                    <ul style="margin: 0; padding-left: 20px; color: #475569; font-size: 0.9rem;">
+                        <li>Ders bazlı genel başarı oranları</li>
+                        <li>%50 altında başarı gösteren dersler</li>
+                        <li>Şube bazlı ders karşılaştırması</li>
+                        <li>Toplam öğrenci sayısı ve şube dağılımı</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="examDetailModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalTitle">Sınav Detayları</h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div id="modalContent"></div>
+    </div>
+</div>
+
+<div class="modal" id="uploadResultsModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Sonuç Yükle</h3>
+            <button class="modal-close" onclick="closeUploadModal()">&times;</button>
+        </div>
+        <form id="uploadResultsForm" onsubmit="uploadResults(event)">
+            <input type="hidden" id="uploadExamId" name="exam_id">
+            
+            <div class="form-group">
+                <label class="form-label">Sonuç Dosyası (Excel)</label>
+                <input type="file" class="form-control" name="results_file" accept=".xlsx,.xls,.csv" required>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">
+                <span>📤</span> Yükle ve Analiz Et
+            </button>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const QUESTION_COUNTS = {
+    '5': { turkce: 15, matematik: 15, fen: 15, sosyal: 10, din: 10, ingilizce: 10 },
+    '6': { turkce: 15, matematik: 15, fen: 15, sosyal: 10, din: 10, ingilizce: 10 },
+    '7': { turkce: 20, matematik: 20, fen: 20, sosyal: 10, din: 10, ingilizce: 10 },
+    '8': { turkce: 20, matematik: 20, fen: 20, sosyal: 10, din: 10, ingilizce: 10 }
+};
+
+function showTab(tabName) {
+    document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    
+    document.getElementById(tabName + '-tab').classList.add('active');
+    event.target.closest('.tab-btn').classList.add('active');
+}
+
+function updateQuestionCounts() {
+    const grade = document.getElementById('gradeLevel').value;
+    if (grade && QUESTION_COUNTS[grade]) {
+        const counts = QUESTION_COUNTS[grade];
+        document.getElementById('qTurkce').value = counts.turkce;
+        document.getElementById('qMatematik').value = counts.matematik;
+        document.getElementById('qFen').value = counts.fen;
+        document.getElementById('qSosyal').value = counts.sosyal;
+        document.getElementById('qDin').value = counts.din;
+        document.getElementById('qIngilizce').value = counts.ingilizce;
+    }
+}
+
+function showAlert(message, type = 'success') {
+    const container = document.getElementById('alertContainer');
+    container.innerHTML = `
+        <div class="alert alert-${type}">
+            <span>${type === 'success' ? '✅' : '❌'}</span>
+            ${message}
+        </div>
+    `;
+    setTimeout(() => container.innerHTML = '', 5000);
+}
+
+async function loadExams() {
+    try {
+        const response = await fetch('/api/admin/optical/exams');
+        const data = await response.json();
+        
+        if (data.success) {
+            document.getElementById('totalExams').textContent = data.stats.total;
+            document.getElementById('publishedExams').textContent = data.stats.published;
+            document.getElementById('draftExams').textContent = data.stats.draft;
+            document.getElementById('totalStudents').textContent = data.stats.total_results;
+            
+            renderExamList(data.exams);
+        }
+    } catch (error) {
+        console.error('Error loading exams:', error);
+    }
+}
+
+function renderExamList(exams) {
+    const container = document.getElementById('examList');
+    
+    if (!exams || exams.length === 0) {
+        container.innerHTML = `
+            <p style="text-align: center; color: var(--gray-500); padding: 40px;">
+                Henüz optik sınav oluşturulmamış.
+            </p>
+        `;
+        return;
+    }
+    
+    container.innerHTML = exams.map(exam => `
+        <div class="exam-item">
+            <div class="exam-info">
+                <h4>${exam.exam_name}</h4>
+                <p>
+                    ${exam.grade_level}. Sınıf - ${exam.exam_number}. Deneme
+                    <span class="badge ${exam.is_published ? 'badge-success' : 'badge-warning'}">
+                        ${exam.is_published ? 'Yayınlandı' : 'Taslak'}
+                    </span>
+                </p>
+            </div>
+            <div class="exam-actions">
+                <button class="btn btn-outline" onclick="viewExamDetail(${exam.id})">
+                    📊 Detay
+                </button>
+                <button class="btn btn-primary" onclick="openUploadModal(${exam.id})">
+                    📤 Sonuç Yükle
+                </button>
+                ${!exam.is_published ? `
+                    <button class="btn btn-success" onclick="publishExam(${exam.id})">
+                        🚀 Yayınla
+                    </button>
+                ` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+async function createExam(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    
+    try {
+        const response = await fetch('/api/admin/optical/exams', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showAlert('Sınav başarıyla oluşturuldu!');
+            event.target.reset();
+            loadExams();
+            showTab('exams');
+        } else {
+            showAlert(data.error || 'Bir hata oluştu', 'danger');
+        }
+    } catch (error) {
+        showAlert('Bir hata oluştu: ' + error.message, 'danger');
+    }
+}
+
+async function viewExamDetail(examId) {
+    try {
+        const response = await fetch(`/api/admin/optical/exams/${examId}/analysis`);
+        const data = await response.json();
+        
+        if (data.success) {
+            document.getElementById('modalTitle').textContent = data.exam.exam_name;
+            document.getElementById('modalContent').innerHTML = renderAnalysis(data);
+            document.getElementById('examDetailModal').classList.add('active');
+        }
+    } catch (error) {
+        showAlert('Detaylar yüklenemedi', 'danger');
+    }
+}
+
+function renderAnalysis(data) {
+    const exam = data.exam;
+    const analysis = data.analysis;
+    
+    if (!analysis || !analysis.class_stats) {
+        return `
+            <p style="text-align: center; color: var(--gray-500); padding: 40px;">
+                Henüz sonuç yüklenmemiş.
+            </p>
+        `;
+    }
+    
+    let html = `
+        <div class="stats-grid" style="margin-bottom: 20px;">
+            <div class="stat-card">
+                <div class="stat-value">${analysis.total_students}</div>
+                <div class="stat-label">Toplam Öğrenci</div>
+            </div>
+            <div class="stat-card green">
+                <div class="stat-value">${analysis.school_average?.toFixed(1) || '-'}</div>
+                <div class="stat-label">Okul Ortalaması</div>
+            </div>
+        </div>
+        
+        <h4 style="margin: 20px 0 10px;">Şube Bazlı Sonuçlar</h4>
+        <table class="analysis-table">
+            <thead>
+                <tr>
+                    <th>Şube</th>
+                    <th>Öğrenci</th>
+                    <th>Ortalama</th>
+                    <th>En Yüksek</th>
+                    <th>En Düşük</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    for (const [className, stats] of Object.entries(analysis.class_stats)) {
+        html += `
+            <tr>
+                <td><strong>${className}</strong></td>
+                <td>${stats.count}</td>
+                <td>${stats.average?.toFixed(1) || '-'}</td>
+                <td>${stats.max?.toFixed(1) || '-'}</td>
+                <td>${stats.min?.toFixed(1) || '-'}</td>
+            </tr>
+        `;
+    }
+    
+    html += `</tbody></table>`;
+    
+    html += `
+        <div style="margin-top: 20px; display: flex; gap: 12px;">
+            <button class="btn btn-primary" onclick="downloadRankedList(${exam.id}, 'school')">
+                📋 Okul Sıralı Liste
+            </button>
+            <button class="btn btn-success" onclick="downloadRankedList(${exam.id}, 'class')">
+                📋 Şube Sıralı Liste
+            </button>
+            <button class="btn btn-warning" onclick="downloadFailedQuestions(${exam.id})">
+                ⚠️ Başarısız Sorular
+            </button>
+        </div>
+    `;
+    
+    return html;
+}
+
+function closeModal() {
+    document.getElementById('examDetailModal').classList.remove('active');
+}
+
+function openUploadModal(examId) {
+    document.getElementById('uploadExamId').value = examId;
+    document.getElementById('uploadResultsModal').classList.add('active');
+}
+
+function closeUploadModal() {
+    document.getElementById('uploadResultsModal').classList.remove('active');
+}
+
+async function uploadResults(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    const examId = document.getElementById('uploadExamId').value;
+    
+    try {
+        const response = await fetch(`/api/admin/optical/exams/${examId}/results`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showAlert(`${data.uploaded} sonuç başarıyla yüklendi!`);
+            closeUploadModal();
+            loadExams();
+        } else {
+            showAlert(data.error || 'Yükleme başarısız', 'danger');
+        }
+    } catch (error) {
+        showAlert('Bir hata oluştu: ' + error.message, 'danger');
+    }
+}
+
+async function publishExam(examId) {
+    if (!confirm('Bu sınav sonuçlarını öğrenci ve öğretmen panellerine göndermek istediğinize emin misiniz?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/admin/optical/exams/${examId}/publish`, {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showAlert('Sınav sonuçları başarıyla yayınlandı!');
+            loadExams();
+        } else {
+            showAlert(data.error || 'Yayınlama başarısız', 'danger');
+        }
+    } catch (error) {
+        showAlert('Bir hata oluştu: ' + error.message, 'danger');
+    }
+}
+
+function updateOpticalQuestions() {
+    const grade = parseInt(document.getElementById('opticalGrade').value);
+    const questionInfo = document.getElementById('opticalQuestionInfo');
+    
+    if (!questionInfo) return;
+    
+    if (grade === 5 || grade === 6) {
+        questionInfo.innerHTML = `
+            <div class="question-info-box">
+                <strong>Soru Sayıları (${grade}. Sınıf):</strong><br>
+                Türkçe: 15 | Matematik: 15 | Fen: 15 | Sosyal: 10 | Din: 10 | İngilizce: 10
+                <br><strong>Toplam: 75 soru</strong>
+            </div>
+        `;
+    } else if (grade === 7 || grade === 8) {
+        questionInfo.innerHTML = `
+            <div class="question-info-box">
+                <strong>Soru Sayıları (${grade}. Sınıf):</strong><br>
+                Türkçe: 20 | Matematik: 20 | Fen: 20 | Sosyal: 10 | Din: 10 | İngilizce: 10
+                <br><strong>Toplam: 90 soru</strong>
+            </div>
+        `;
+    } else {
+        questionInfo.innerHTML = '';
+    }
+}
+
+async function downloadOpticalForms() {
+    const className = document.getElementById('opticalClass').value;
+    const grade = document.getElementById('opticalGrade').value;
+    
+    if (!className || !grade) {
+        showAlert('Lütfen sınıf ve seviye seçin', 'danger');
+        return;
+    }
+    
+    window.open(`/api/admin/optical/forms/pdf?class_name=${encodeURIComponent(className)}&grade=${grade}`, '_blank');
+}
+
+async function downloadTemplate(type) {
+    window.open(`/api/admin/optical/templates/${type}`, '_blank');
+}
+
+async function downloadRankedList(examId, type) {
+    window.open(`/api/admin/optical/exams/${examId}/ranked-list?type=${type}`, '_blank');
+}
+
+async function downloadFailedQuestions(examId) {
+    window.open(`/api/admin/optical/exams/${examId}/failed-questions`, '_blank');
+}
+
+async function analyzeReportCards(event) {
+    event.preventDefault();
+    
+    const fileInput = document.getElementById('pdfFiles');
+    if (!fileInput.files.length) {
+        showAlert('Lütfen PDF dosyası seçin', 'danger');
+        return;
+    }
+    
+    const btn = document.getElementById('analyzeBtn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<span>⏳</span> Analiz ediliyor...';
+    btn.disabled = true;
+    
+    try {
+        const formData = new FormData();
+        for (let i = 0; i < fileInput.files.length; i++) {
+            formData.append('files', fileInput.files[i]);
+        }
+        
+        console.log('Analiz isteği gönderiliyor...');
+        
+        const response = await fetch('/api/admin/optical/analyze-report-cards', {
+            method: 'POST',
+            body: formData
+        });
+        
+        console.log('Response status:', response.status);
+        console.log('Content-Type:', response.headers.get('content-type'));
+        
+        const contentType = response.headers.get('content-type') || '';
+        
+        if (response.ok && contentType.includes('application/pdf')) {
+            const blob = await response.blob();
+            console.log('Blob size:', blob.size);
+            
+            if (blob.size < 100) {
+                showAlert('PDF oluşturulamadı - veri bulunamadı', 'danger');
+                return;
+            }
+            
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = 'karne_analiz_raporu.pdf';
+            document.body.appendChild(a);
+            a.click();
+            
+            setTimeout(() => {
+                window.URL.revokeObjectURL(url);
+                a.remove();
+            }, 100);
+            
+            showAlert('Analiz raporu başarıyla indirildi!');
+        } else if (response.ok) {
+            const text = await response.text();
+            console.log('Unexpected response:', text.substring(0, 200));
+            showAlert('Beklenmeyen yanıt formatı', 'danger');
+        } else {
+            try {
+                const data = await response.json();
+                console.error('Server error:', data);
+                showAlert(data.error || 'Analiz başarısız: ' + response.status, 'danger');
+            } catch(e) {
+                const text = await response.text();
+                console.error('Server error text:', text);
+                showAlert('Sunucu hatası: ' + response.status, 'danger');
+            }
+        }
+    } catch (error) {
+        console.error('Analiz hatası:', error);
+        showAlert('Bir hata oluştu: ' + error.message, 'danger');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+}
+
+const uploadArea = document.getElementById('resultsUploadArea');
+const fileInput = document.getElementById('resultsFileInput');
+
+if (uploadArea) {
+    uploadArea.addEventListener('click', () => fileInput.click());
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('dragover');
+    });
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        if (e.dataTransfer.files.length) {
+            fileInput.files = e.dataTransfer.files;
+            document.getElementById('selectedFileName').textContent = 'Seçilen: ' + e.dataTransfer.files[0].name;
+        }
+    });
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files.length) {
+            document.getElementById('selectedFileName').textContent = 'Seçilen: ' + fileInput.files[0].name;
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', loadExams);
+</script>
+{% endblock %}

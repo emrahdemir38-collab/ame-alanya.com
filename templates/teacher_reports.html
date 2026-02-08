@@ -1,0 +1,624 @@
+{% set breadcrumbs = [{'text': 'Raporlar', 'url': ''}] %}
+{% extends "base_dashboard.html" %}
+
+{% block title %}Sınıf Raporları{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/admin-modern.css">
+<style>
+    .report-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .report-card {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        margin-bottom: 20px;
+    }
+    
+    .report-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 20px;
+        font-size: 1.5em;
+        font-weight: 600;
+        color: #1f2937;
+    }
+    
+    .form-group {
+        margin-bottom: 16px;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+        color: #374151;
+    }
+    
+    .form-group select {
+        width: 100%;
+        padding: 10px 12px;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: border-color 0.2s;
+    }
+    
+    .form-group select:focus {
+        outline: none;
+        border-color: #3b82f6;
+    }
+    
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+    }
+    
+    .btn-group {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+    }
+    
+    .btn {
+        flex: 1;
+        padding: 12px 20px;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    
+    .btn-pdf {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+    }
+    
+    .btn-pdf:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(245, 87, 108, 0.4);
+    }
+    
+    .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    .report-results {
+        margin-top: 30px;
+    }
+    
+    .report-results table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 16px;
+    }
+    
+    .report-results th {
+        background: #f3f4f6;
+        padding: 12px;
+        text-align: left;
+        font-weight: 600;
+        color: #374151;
+        border-bottom: 2px solid #e5e7eb;
+        font-size: 0.9em;
+    }
+    
+    .report-results td {
+        padding: 12px;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 0.9em;
+    }
+    
+    .report-results tr:hover {
+        background: #f9fafb;
+    }
+    
+    .student-name {
+        font-weight: 500;
+        color: #1f2937;
+    }
+    
+    .rank-badge {
+        background: #fef3c7;
+        color: #92400e;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-weight: 600;
+        text-align: center;
+    }
+    
+    .loading-spinner {
+        display: none;
+        text-align: center;
+        padding: 20px;
+    }
+    
+    .spinner {
+        border: 3px solid #f3f4f6;
+        border-top: 3px solid #3b82f6;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: #9ca3af;
+    }
+    
+    .empty-state-icon {
+        font-size: 3em;
+        margin-bottom: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="report-container">
+    <div class="report-card">
+        <div class="report-header">
+            📊 Sınıf Raporları
+        </div>
+        
+        <div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Sınıf Seç</label>
+                    <select id="classSelect" onchange="updateExamOptions()">
+                        <option value="">-- Sınıf Seçiniz --</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Deneme Seç</label>
+                    <select id="examSelect">
+                        <option value="">-- Deneme Seçiniz --</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="loadReportData()">📋 Raporu Yükle</button>
+                <button class="btn btn-pdf" onclick="downloadReportPDF()" id="pdfBtn" disabled>📥 PDF İndir</button>
+            </div>
+            
+        </div>
+    </div>
+    
+    <div id="loadingSpinner" class="loading-spinner">
+        <div class="spinner"></div>
+        <p>Veriler yükleniyor...</p>
+    </div>
+    
+    <div id="reportResults" class="report-card report-results" style="display: none;">
+        <h3 id="reportTitle" style="margin-bottom: 16px; color: #1f2937;"></h3>
+        <div style="overflow-x: auto;">
+            <table id="resultsTable">
+                <thead>
+                    <tr>
+                        <th>Öğrenci Adı</th>
+                        <th colspan="5">Türkçe</th>
+                        <th colspan="5">Matematik</th>
+                        <th colspan="5">Fen</th>
+                        <th colspan="5">Sosyal</th>
+                        <th colspan="5">İngilizce</th>
+                        <th colspan="5">Din</th>
+                        <th>LGS Puanı</th>
+                    </tr>
+                    <tr>
+                        <th></th>
+                        <th>Doğru</th>
+                        <th>Yanlış</th>
+                        <th>Net</th>
+                        <th style="background: #e0e7ff;">Sınıf</th>
+                        <th style="background: #dbeafe;">Okul</th>
+                        <th>Doğru</th>
+                        <th>Yanlış</th>
+                        <th>Net</th>
+                        <th style="background: #e0e7ff;">Sınıf</th>
+                        <th style="background: #dbeafe;">Okul</th>
+                        <th>Doğru</th>
+                        <th>Yanlış</th>
+                        <th>Net</th>
+                        <th style="background: #e0e7ff;">Sınıf</th>
+                        <th style="background: #dbeafe;">Okul</th>
+                        <th>Doğru</th>
+                        <th>Yanlış</th>
+                        <th>Net</th>
+                        <th style="background: #e0e7ff;">Sınıf</th>
+                        <th style="background: #dbeafe;">Okul</th>
+                        <th>Doğru</th>
+                        <th>Yanlış</th>
+                        <th>Net</th>
+                        <th style="background: #e0e7ff;">Sınıf</th>
+                        <th style="background: #dbeafe;">Okul</th>
+                        <th>Doğru</th>
+                        <th>Yanlış</th>
+                        <th>Net</th>
+                        <th style="background: #e0e7ff;">Sınıf</th>
+                        <th style="background: #dbeafe;">Okul</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="reportBody"></tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div id="emptyState" class="report-card" style="display: none; text-align: center; color: #9ca3af;">
+        <div class="empty-state-icon">📋</div>
+        <h3>Henüz Rapor Yüklenmedi</h3>
+        <p>Sınıf ve deneme seçerek raporu yükleyin.</p>
+    </div>
+</div>
+
+<script>
+    let reportData = null;
+    
+    async function checkAuth() {
+        try {
+            const response = await fetch('/api/current-user');
+            const data = await response.json();
+            if (!data.authenticated || data.user.role !== 'teacher') {
+                window.location.href = '/ameo_kullanıcı_giriş';
+                return false;
+            }
+            return true;
+        } catch (error) {
+            window.location.href = '/ameo_kullanıcı_giriş';
+            return false;
+        }
+    }
+    
+    async function loadClasses() {
+        try {
+            const response = await fetch('/api/classes');
+            const data = await response.json();
+            
+            const select = document.getElementById('classSelect');
+            data.classes.forEach(cls => {
+                const option = document.createElement('option');
+                option.value = cls.name;
+                option.textContent = cls.name;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Classes load error:', error);
+        }
+    }
+    
+    async function updateExamOptions() {
+        const examSelect = document.getElementById('examSelect');
+        examSelect.innerHTML = '<option value="">-- Deneme Seçiniz --</option>';
+        
+        try {
+            for (let i = 1; i <= 50; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = `Deneme ${i}`;
+                examSelect.appendChild(option);
+            }
+        } catch (error) {
+            console.error('Exam load error:', error);
+        }
+    }
+    
+    async function loadReportData() {
+        const className = document.getElementById('classSelect').value;
+        const examNumber = document.getElementById('examSelect').value;
+        
+        if (!className || !examNumber) {
+            alert('Lütfen sınıf ve deneme seçiniz');
+            return;
+        }
+        
+        document.getElementById('loadingSpinner').style.display = 'block';
+        document.getElementById('reportResults').style.display = 'none';
+        document.getElementById('emptyState').style.display = 'none';
+        
+        try {
+            const response = await fetch(`/teacher/api/reports/data?class=${encodeURIComponent(className)}&exam=${examNumber}`);
+            const data = await response.json();
+            
+            if (data.success && data.students.length > 0) {
+                reportData = data;
+                displayReport(data);
+                document.getElementById('pdfBtn').disabled = false;
+            } else {
+                document.getElementById('emptyState').style.display = 'block';
+                document.getElementById('pdfBtn').disabled = true;
+            }
+        } catch (error) {
+            alert('Rapor yüklenirken hata oluştu: ' + error.message);
+            document.getElementById('pdfBtn').disabled = true;
+        } finally {
+            document.getElementById('loadingSpinner').style.display = 'none';
+        }
+    }
+    
+    function displayReport(data) {
+        const title = document.getElementById('reportTitle');
+        title.textContent = `${data.class_name} - Deneme ${data.exam_number} Sonuçları`;
+        
+        const tbody = document.getElementById('reportBody');
+        tbody.innerHTML = '';
+        
+        data.students.forEach(student => {
+            const row = tbody.insertRow();
+            let html = `<td class="student-name">${student.student_name}</td>`;
+            
+            // Her ders için 5 sütun: doğru, yanlış, net, sınıf sırası, okul sırası
+            const subjects = ['turkce', 'matematik', 'fen', 'sosyal', 'ingilizce', 'din'];
+            subjects.forEach(subject => {
+                const dogru = student[`${subject}_dogru`];
+                const yanlis = student[`${subject}_yanlis`];
+                const net = student[`${subject}_net`].toFixed(1);
+                const classRank = student[`${subject}_class_rank`];
+                const schoolRank = student[`${subject}_school_rank`];
+                
+                html += `
+                    <td>${dogru}</td>
+                    <td>${yanlis}</td>
+                    <td>${net}</td>
+                    <td class="rank-badge" style="background: #e0e7ff; color: #3730a3;">${classRank}</td>
+                    <td class="rank-badge" style="background: #dbeafe; color: #1e40af;">${schoolRank}</td>
+                `;
+            });
+            
+            html += `<td><strong>${Math.round(student.lgs_score)}</strong></td>`;
+            row.innerHTML = html;
+        });
+        
+        document.getElementById('reportResults').style.display = 'block';
+    }
+    
+    function downloadReportPDF() {
+        if (!reportData) return;
+        
+        const className = document.getElementById('classSelect').value;
+        const examNumber = document.getElementById('examSelect').value;
+        
+        // APK için: Token tabanlı yetkilendirme kullan (session cookie taşınmadığı için)
+        // reportData içinde pdf_token var - sunucu tarafında oluşturuldu
+        const token = reportData.pdf_token || '';
+        const downloadUrl = `/teacher/api/reports/pdf?class=${encodeURIComponent(className)}&exam=${examNumber}&token=${encodeURIComponent(token)}`;
+        
+        // Yeni sekmede aç
+        window.open(downloadUrl, '_blank');
+    }
+    
+    // Toplu Gelişim Modal
+    function openMultiExamModal() {
+        const existing = document.getElementById('dynamicMultiExamModal');
+        if (existing) existing.remove();
+        
+        const modal = document.createElement('div');
+        modal.id = 'dynamicMultiExamModal';
+        modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;justify-content:center;align-items:center;z-index:2147483647;';
+        modal.innerHTML = `
+            <div style="background:white;border-radius:16px;padding:24px;max-width:95%;width:1200px;max-height:90vh;overflow-y:auto;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                    <h2 style="margin:0;color:#1f2937;">📊 Toplu Sınav Gelişim Raporu</h2>
+                    <button onclick="closeMultiExamModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;">✕</button>
+                </div>
+                <div style="margin-bottom:20px;">
+                    <label style="font-weight:600;display:block;margin-bottom:8px;">Sınıf Seçin:</label>
+                    <select id="multiExamClassSelect" style="padding:10px;border:1px solid #d1d5db;border-radius:8px;min-width:200px;">
+                        <option value="">Sınıf Seçin</option>
+                        ${classes.map(c => '<option value="' + c.id + '">' + c.name + '</option>').join('')}
+                    </select>
+                    <button onclick="loadMultiExamProgress()" style="margin-left:12px;padding:10px 20px;background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:500;">
+                        Raporu Getir
+                    </button>
+                </div>
+                <div id="multiExamResults" style="background:#f9fafb;padding:16px;border-radius:8px;">
+                    <p style="color:#6b7280;text-align:center;">Sınıf seçip raporu getirin</p>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+    
+    function closeMultiExamModal() {
+        const modal = document.getElementById('dynamicMultiExamModal');
+        if (modal) modal.remove();
+    }
+    
+    function openOutcomeAnalyticsModal() {
+        const existing = document.getElementById('dynamicOutcomeAnalyticsModal');
+        if (existing) existing.remove();
+        
+        const modal = document.createElement('div');
+        modal.id = 'dynamicOutcomeAnalyticsModal';
+        modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;justify-content:center;align-items:center;z-index:2147483647;';
+        modal.innerHTML = `
+            <div style="background:white;border-radius:16px;padding:24px;max-width:95%;width:1200px;max-height:90vh;overflow-y:auto;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                    <h2 style="margin:0;color:#1f2937;">🎯 Kazanım Bazlı Analiz</h2>
+                    <button onclick="closeOutcomeAnalyticsModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;">✕</button>
+                </div>
+                <div style="margin-bottom:20px;">
+                    <label style="font-weight:600;display:block;margin-bottom:8px;">Sınıf Seçin:</label>
+                    <select id="analyticsClassSelect" style="padding:10px;border:1px solid #d1d5db;border-radius:8px;min-width:200px;">
+                        <option value="">Sınıf Seçin</option>
+                        ${classes.map(c => '<option value="' + c.id + '">' + c.name + '</option>').join('')}
+                    </select>
+                    <button onclick="loadOutcomeAnalytics()" style="margin-left:12px;padding:10px 20px;background:linear-gradient(135deg,#f59e0b,#d97706);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:500;">
+                        Analizi Getir
+                    </button>
+                </div>
+                <div id="analyticsResults" style="background:#f9fafb;padding:16px;border-radius:8px;">
+                    <p style="color:#6b7280;text-align:center;">Sınıf seçip analizi getirin</p>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+    
+    function closeOutcomeAnalyticsModal() {
+        const modal = document.getElementById('dynamicOutcomeAnalyticsModal');
+        if (modal) modal.remove();
+    }
+    
+    function populateMultiExamClasses() {
+        const select = document.getElementById('multiExamClassSelect');
+        select.innerHTML = '<option value="">Sınıf Seçin</option>';
+        classes.forEach(c => {
+            select.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+        });
+    }
+    
+    function populateAnalyticsClasses() {
+        const select = document.getElementById('analyticsClassSelect');
+        select.innerHTML = '<option value="">Sınıf Seçin</option>';
+        classes.forEach(c => {
+            select.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+        });
+    }
+    
+    async function loadMultiExamProgress() {
+        const classId = document.getElementById('multiExamClassSelect').value;
+        if (!classId) { alert('Lütfen sınıf seçin'); return; }
+        
+        const resultsDiv = document.getElementById('multiExamResults');
+        resultsDiv.innerHTML = '<p style="text-align: center;">Yükleniyor...</p>';
+        
+        try {
+            const response = await fetch('/admin/report-cards/api/multi-exam-progress', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ class_id: classId })
+            });
+            
+            const data = await response.json();
+            if (!response.ok) { resultsDiv.innerHTML = `<p style="color: #ef4444;">${data.error}</p>`; return; }
+            
+            let html = `<h3 style="margin-bottom: 16px;">Sınavlar: ${data.exam_names.join(' → ')}</h3>`;
+            html += '<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">';
+            html += '<thead><tr style="background: #3b82f6; color: white;"><th style="padding: 12px;">Öğrenci</th>';
+            data.exam_names.forEach(name => { html += `<th style="padding: 12px;">${name}<br><small>(Net)</small></th>`; });
+            html += '<th style="padding: 12px;">Gelişim</th></tr></thead><tbody>';
+            
+            data.students.sort((a, b) => b.net_change - a.net_change);
+            data.students.forEach((student, idx) => {
+                const rowBg = idx % 2 === 0 ? '#fff' : '#f9fafb';
+                html += `<tr style="background: ${rowBg};"><td style="padding: 10px; border: 1px solid #e5e7eb;">${student.student_name}</td>`;
+                data.exam_names.forEach(name => {
+                    const examData = student.exams[name];
+                    html += examData ? `<td style="padding: 10px; border: 1px solid #e5e7eb; text-align: center;"><strong>${examData.total_net}</strong><br><small>${examData.total_correct}D ${examData.total_wrong}Y</small></td>` : '<td style="padding: 10px; border: 1px solid #e5e7eb; text-align: center; color: #9ca3af;">-</td>';
+                });
+                const changeColor = student.net_change > 0 ? '#10b981' : (student.net_change < 0 ? '#ef4444' : '#6b7280');
+                html += `<td style="padding: 10px; border: 1px solid #e5e7eb; text-align: center; font-weight: 600; color: ${changeColor};">${student.net_change > 0 ? '+' : ''}${student.net_change}</td></tr>`;
+            });
+            html += '</tbody></table></div>';
+            resultsDiv.innerHTML = html;
+        } catch (error) { resultsDiv.innerHTML = `<p style="color: #ef4444;">Hata: ${error.message}</p>`; }
+    }
+    
+    async function loadOutcomeAnalytics() {
+        const classId = document.getElementById('analyticsClassSelect').value;
+        if (!classId) { alert('Lütfen sınıf seçin'); return; }
+        
+        const resultsDiv = document.getElementById('analyticsResults');
+        resultsDiv.innerHTML = '<p style="text-align: center;">Yükleniyor...</p>';
+        
+        try {
+            const response = await fetch('/admin/report-cards/api/outcome-analytics', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ class_id: classId })
+            });
+            
+            const data = await response.json();
+            if (!response.ok) { resultsDiv.innerHTML = `<p style="color: #ef4444;">${data.error}</p>`; return; }
+            
+            const subjectNames = {'turkce': 'Türkçe', 'matematik': 'Matematik', 'fen': 'Fen Bilimleri', 'inkilap': 'T.C. İnkılap Tarihi', 'din': 'Din Kültürü', 'ingilizce': 'İngilizce'};
+            
+            let html = '<div style="margin-bottom: 20px;"><h3>Ders Bazlı Özet</h3><div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px;">';
+            for (const [subject, totals] of Object.entries(data.subject_totals)) {
+                html += `<div style="background: white; padding: 16px; border-radius: 8px; border: 1px solid #e5e7eb;"><div style="font-weight: 600;">${subjectNames[subject] || subject}</div><div style="font-size: 1.5rem; font-weight: 700; color: #3b82f6;">${totals.average_accuracy}%</div><div style="font-size: 0.85rem; color: #6b7280;">${totals.total_correct}/${totals.total_questions} doğru</div></div>`;
+            }
+            html += '</div></div>';
+            
+            for (const [subject, outcomes] of Object.entries(data.by_subject)) {
+                html += `<div style="margin-bottom: 24px;"><h3>${subjectNames[subject] || subject}</h3><table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;"><thead><tr style="background: #f3f4f6;"><th style="padding: 10px; text-align: left;">Kazanım</th><th style="padding: 10px; text-align: center; width: 80px;">Soru</th><th style="padding: 10px; text-align: center; width: 80px;">Doğru</th><th style="padding: 10px; text-align: center; width: 80px;">Başarı</th></tr></thead><tbody>`;
+                outcomes.forEach((outcome, idx) => {
+                    const rowBg = idx % 2 === 0 ? '#fff' : '#f9fafb';
+                    const accuracyColor = outcome.accuracy >= 70 ? '#10b981' : (outcome.accuracy >= 50 ? '#f59e0b' : '#ef4444');
+                    html += `<tr style="background: ${rowBg};"><td style="padding: 10px; border: 1px solid #e5e7eb;"><strong>${outcome.outcome_code}</strong><br><small style="color: #6b7280;">${outcome.description || ''}</small></td><td style="padding: 10px; border: 1px solid #e5e7eb; text-align: center;">${outcome.total_questions}</td><td style="padding: 10px; border: 1px solid #e5e7eb; text-align: center;">${outcome.total_correct}</td><td style="padding: 10px; border: 1px solid #e5e7eb; text-align: center; font-weight: 600; color: ${accuracyColor};">${outcome.accuracy}%</td></tr>`;
+                });
+                html += '</tbody></table></div>';
+            }
+            if (data.total_outcomes === 0) html = '<p style="color: #6b7280; text-align: center;">Bu sınıf için kazanım verisi bulunamadı</p>';
+            resultsDiv.innerHTML = html;
+        } catch (error) { resultsDiv.innerHTML = `<p style="color: #ef4444;">Hata: ${error.message}</p>`; }
+    }
+    
+    window.onload = async function() {
+        if (await checkAuth()) {
+            loadClasses();
+            updateExamOptions();
+        }
+    };
+</script>
+
+<!-- Toplu Gelişim Modal -->
+<div id="multiExamModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 99999; justify-content: center; align-items: center;">
+    <div style="background: white; border-radius: 16px; padding: 24px; max-width: 95%; width: 1200px; max-height: 90vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="margin: 0; color: #1f2937;">📈 Toplu Gelişim Raporu</h2>
+            <button onclick="closeMultiExamModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">✕</button>
+        </div>
+        <div style="margin-bottom: 20px;">
+            <label style="font-weight: 600; display: block; margin-bottom: 8px;">Sınıf Seçin:</label>
+            <select id="multiExamClassSelect" style="padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; min-width: 200px;"><option value="">Sınıf Seçin</option></select>
+            <button onclick="loadMultiExamProgress()" class="btn" style="margin-left: 12px; background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white;">Raporu Getir</button>
+        </div>
+        <div id="multiExamResults" style="background: #f9fafb; padding: 16px; border-radius: 8px;"><p style="color: #6b7280; text-align: center;">Sınıf seçip raporu getirin</p></div>
+    </div>
+</div>
+
+<!-- Kazanım Analizi Modal -->
+<div id="outcomeAnalyticsModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 99999; justify-content: center; align-items: center;">
+    <div style="background: white; border-radius: 16px; padding: 24px; max-width: 95%; width: 1200px; max-height: 90vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="margin: 0; color: #1f2937;">🎯 Kazanım Bazlı Analiz</h2>
+            <button onclick="closeOutcomeAnalyticsModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">✕</button>
+        </div>
+        <div style="margin-bottom: 20px;">
+            <label style="font-weight: 600; display: block; margin-bottom: 8px;">Sınıf Seçin:</label>
+            <select id="analyticsClassSelect" style="padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; min-width: 200px;"><option value="">Sınıf Seçin</option></select>
+            <button onclick="loadOutcomeAnalytics()" class="btn" style="margin-left: 12px; background: linear-gradient(135deg, #f59e0b, #d97706); color: white;">Analizi Getir</button>
+        </div>
+        <div id="analyticsResults" style="background: #f9fafb; padding: 16px; border-radius: 8px;"><p style="color: #6b7280; text-align: center;">Sınıf seçip analizi getirin</p></div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,102 @@
+host https://acrobat.adobe.com
+renderingWorker_we.5b9720be3cf75edc2da8.js:2 rendering worker created
+vc-common-mp-chunk.js:2 Uncaught (in promise) undefined
+rejectGenAIAssistantButtonShownPromise @ vc-common-mp-chunk.js:2
+(anonymous) @ vc-common-mp-chunk.js:2
+Promise.catch
+GenAIManager.init @ vc-common-mp-chunk.js:2
+previewFile @ vc-common-mp-chunk.js:2
+await in previewFile
+initAction @ vc-common-mp-chunk.js:2
+await in initAction
+componentDidMount @ viewer-component-chunk.js:1
+lk @ dc-core.js:2
+jk @ dc-core.js:2
+ik @ dc-core.js:2
+Xk @ dc-core.js:2
+Qk @ dc-core.js:2
+Fk @ dc-core.js:2
+jg @ dc-core.js:2
+Sk @ dc-core.js:2
+rl @ dc-core.js:2
+sl @ dc-core.js:2
+i.render @ dc-core.js:2
+_renderComponent2 @ bootstrap.js:1
+await in _renderComponent2
+previewFile @ bootstrap.js:1
+ViewSDKClient._setupSDKView @ App.js:2
+(anonymous) @ App.js:2
+Promise.then
+ViewSDKClient.previewFile @ App.js:2
+previewFile @ App.js:2
+(anonymous) @ App.js:2
+Promise.then
+init @ App.js:2
+(anonymous) @ App.js:2
+sentryWrapped @ App.js:2
+setInterval
+(anonymous) @ App.js:2
+(anonymous) @ App.js:2
+(anonymous) @ App.js:2
+Rj @ dc-core.js:2
+Ik @ dc-core.js:2
+(anonymous) @ dc-core.js:2
+J @ dc-core.js:2
+R @ dc-core.js:2Understand this error
+2App.js:2 IntegrationStore.getIntegrationProvider: successful fetch, resolve to provider from providers
+Connecting to 'https://acrobat.adobe.com/dcpreviewdropin/4.2.0_2.1402.0/private/printHelper_main.bfbc2060.js.map' violates the following Content Security Policy directive: "default-src 'none'". The request has been blocked. Note that 'connect-src' was not explicitly set, so 'default-src' is used as a fallback.
+Understand this error
+Connecting to 'https://acrobat.adobe.com/dcpreviewdropin/4.2.0_2.1402.0/private/printHelper_main.bfbc2060.js.map' violates the following Content Security Policy directive: "default-src 'none'". The request has been blocked. Note that 'connect-src' was not explicitly set, so 'default-src' is used as a fallback.
+Understand this error
+App.js:2 Draggable items in a GridList must contain a <Button slot="drag"> element so that keyboard and screen reader users can drag them.
+(anonymous) @ App.js:2
+(anonymous) @ dc-spectrum-v3-core.js:2
+Rj @ dc-core.js:2
+Ik @ dc-core.js:2
+Fk @ dc-core.js:2
+jg @ dc-core.js:2
+mh @ dc-core.js:2
+Gi @ dc-core.js:2
+p @ dc-spectrum-v3-core.js:2
+await in p
+(anonymous) @ dc-spectrum-v3-core.js:2
+Rj @ dc-core.js:2
+Ik @ dc-core.js:2
+Sk @ dc-core.js:2
+i.flushSync @ dc-core.js:2
+(anonymous) @ dc-spectrum-v3-core.js:2
+(anonymous) @ dc-core.js:2
+(anonymous) @ dc-spectrum-v3-core.js:2Understand this warning
+3chrome-extension://e…-level/8/4/turkce:1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was receivedUnderstand this error
+sw.js:1 Uncaught (in promise) TypeError: Cannot read properties of undefined (reading 'find')
+    at sw.js:1:23034
+    at Array.forEach (<anonymous>)
+    at IDBRequest.getRequiredFilesData (sw.js:1:22981)
+(anonymous) @ sw.js:1
+getRequiredFilesData @ sw.js:1
+IndexedDB
+expireOldEntries @ sw.js:1
+await in expireOldEntries
+(anonymous) @ sw.js:1
+setTimeout
+handleChromeExtensionMessage @ sw.js:1
+onMessage @ sw.js:1Understand this error
+Framing 'https://commerce.adobe.com/' violates the following Content Security Policy directive: "frame-ancestors 'self' adobe.com *.acrobat.com *.adobe.com *.adobeprojectm.com *.aem.page *.aem.live *.adobeitc.com *.behance.net". The request has been blocked.
+Understand this error
+7The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.Understand this warning
+App.js:2  POST https://o4505393339695104.ingest.us.sentry.io/api/4509832126332928/envelope/?sentry_key=f5bcae2a94c1447a2d5c70bf7e73144f&sentry_version=7&sentry_client=sentry.javascript.browser%2F7.120.4 net::ERR_CONNECTION_TIMED_OUT
+makeRequest @ App.js:2
+(anonymous) @ App.js:2
+add @ App.js:2
+send @ App.js:2
+_sendEnvelope @ App.js:2
+sendSession @ App.js:2
+captureSession @ App.js:2
+_sendSessionUpdate @ App.js:2
+captureSession @ App.js:2
+startSessionTracking @ App.js:2
+init @ App.js:2
+loadSentry @ App.js:2
+(anonymous) @ App.js:2
+(anonymous) @ App.js:2
+(anonymous) @ App.js:2Understand this error

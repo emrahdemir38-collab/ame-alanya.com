@@ -1,0 +1,563 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Hata Karnesi{% endblock %}
+
+{% block content %}
+<style>
+    .page-container {
+        padding: 20px;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    
+    .page-header {
+        background: white;
+        padding: 25px 30px;
+        border-radius: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        margin-bottom: 20px;
+    }
+    
+    .page-title {
+        font-size: 1.8em;
+        color: #1f2937;
+        margin-bottom: 5px;
+    }
+    
+    .page-subtitle {
+        color: #6b7280;
+        font-size: 0.95em;
+    }
+    
+    .reports-grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    }
+    
+    .report-card {
+        background: white;
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    
+    .report-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+    }
+    
+    .report-title {
+        font-weight: 600;
+        font-size: 1.1rem;
+        color: #1f2937;
+    }
+    
+    .report-date {
+        font-size: 0.85rem;
+        color: #6b7280;
+    }
+    
+    .report-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+    
+    .stat-box {
+        background: #f9fafb;
+        padding: 12px;
+        border-radius: 8px;
+        text-align: center;
+    }
+    
+    .stat-value {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: #1f2937;
+    }
+    
+    .stat-label {
+        font-size: 0.75rem;
+        color: #6b7280;
+    }
+    
+    .checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        background: #f3f4f6;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+    
+    .checkbox-label input {
+        width: 18px;
+        height: 18px;
+    }
+    
+    .download-section {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        margin-bottom: 20px;
+    }
+    
+    .download-btn {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        color: white;
+        border: none;
+        padding: 14px 28px;
+        border-radius: 10px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .download-btn:hover {
+        opacity: 0.9;
+    }
+    
+    .download-btn:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        background: white;
+        border-radius: 16px;
+        color: #6b7280;
+    }
+    
+    .empty-icon {
+        font-size: 4rem;
+        margin-bottom: 16px;
+    }
+    
+    .comparison-btn {
+        background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+        color: white;
+        border: none;
+        padding: 14px 28px;
+        border-radius: 10px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-left: 12px;
+    }
+    
+    .comparison-btn:hover { opacity: 0.9; }
+    .comparison-btn:disabled { background: #9ca3af; cursor: not-allowed; }
+    
+    .comparison-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.6);
+        z-index: 99999;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+    }
+    
+    .comparison-content {
+        background: white;
+        border-radius: 16px;
+        max-width: 900px;
+        width: 100%;
+        max-height: 85vh;
+        overflow-y: auto;
+        padding: 24px;
+    }
+    
+    .stats-row {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+    }
+    
+    .stat-card {
+        flex: 1;
+        min-width: 120px;
+        padding: 16px;
+        border-radius: 12px;
+        text-align: center;
+    }
+    
+    .stat-card.improved { background: #d1fae5; border: 2px solid #10b981; }
+    .stat-card.regressed { background: #fee2e2; border: 2px solid #ef4444; }
+    .stat-card.still-wrong { background: #fef3c7; border: 2px solid #f59e0b; }
+    
+    .stat-card .number { font-size: 2rem; font-weight: 700; }
+    .stat-card.improved .number { color: #059669; }
+    .stat-card.regressed .number { color: #dc2626; }
+    .stat-card.still-wrong .number { color: #d97706; }
+    
+    .comparison-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    .comparison-table th { background: #f3f4f6; padding: 12px; text-align: left; font-size: 0.9rem; }
+    .comparison-table td { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 0.85rem; }
+    
+    .status-improved { color: #059669; font-weight: 600; }
+    .status-regressed { color: #dc2626; font-weight: 600; }
+    .status-still-wrong { color: #d97706; font-weight: 600; }
+    
+    .subject-section { margin-bottom: 24px; }
+    .subject-header { font-size: 1.1rem; font-weight: 600; color: #1f2937; margin-bottom: 8px; padding: 8px 12px; background: #f9fafb; border-radius: 8px; }
+</style>
+
+<div class="page-container">
+    <div class="page-header">
+        <h1 class="page-title">📊 Hata Karnesi</h1>
+        <p class="page-subtitle">Yanlış yaptığın soruları incele ve PDF olarak indir</p>
+    </div>
+    
+    <div class="download-section">
+        <h3 style="margin-bottom: 16px; color: #1f2937;">PDF Hata Karnesi İndir</h3>
+        <p style="color: #6b7280; margin-bottom: 16px;">Aşağıdan sınavları seçerek tüm yanlış yaptığın soruları tek bir PDF'te görebilirsin.</p>
+        
+        <div id="examSelection" style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
+            <p style="color: #9ca3af;">Yükleniyor...</p>
+        </div>
+        
+        <div style="display: flex; flex-wrap: wrap;">
+            <button class="download-btn" id="downloadBtn" onclick="downloadErrorReport()" disabled>
+                📥 Hata Karnesi İndir
+            </button>
+            <button class="comparison-btn" id="comparisonBtn" onclick="showComparison()" disabled>
+                📈 Gelişim Takibi
+            </button>
+        </div>
+        <p id="comparisonHint" style="color: #8b5cf6; font-size: 0.85rem; margin-top: 12px; display: none;">
+            2 sınav seçerek gelişiminizi karşılaştırabilirsiniz
+        </p>
+    </div>
+    
+    <div id="comparisonModal" class="comparison-modal" style="display: none;">
+        <div class="comparison-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="color: #1f2937; margin: 0;">📈 Gelişim Takibi</h2>
+                <button onclick="closeComparison()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">✕</button>
+            </div>
+            <div id="comparisonResult">Yükleniyor...</div>
+        </div>
+    </div>
+    
+    <!-- Kişisel Gelişim Grafiği -->
+    <div class="download-section" id="progressSection" style="display: none;">
+        <h3 style="margin-bottom: 16px; color: #1f2937;">📈 Gelişim Grafiğim</h3>
+        <div id="progressChart" style="overflow-x: auto;"></div>
+        <div id="progressStats" style="margin-top: 16px; display: flex; gap: 16px; flex-wrap: wrap;"></div>
+    </div>
+    
+    <h3 style="margin-bottom: 16px; color: #1f2937;">Sınav Sonuçlarım</h3>
+    
+    <div id="reportsGrid" class="reports-grid">
+        <div class="empty-state">
+            <div class="empty-icon">📋</div>
+            <h3>Yükleniyor...</h3>
+        </div>
+    </div>
+</div>
+
+<script>
+let myReports = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadMyReports();
+    loadMyProgress();
+});
+
+async function loadMyReports() {
+    try {
+        const response = await fetch('/admin/report-cards/student/my-reports');
+        myReports = await response.json();
+        
+        const grid = document.getElementById('reportsGrid');
+        const selection = document.getElementById('examSelection');
+        const downloadBtn = document.getElementById('downloadBtn');
+        
+        if (myReports.length === 0) {
+            grid.innerHTML = `
+                <div class="empty-state" style="grid-column: 1 / -1;">
+                    <div class="empty-icon">📋</div>
+                    <h3>Henüz karne yüklenmemiş</h3>
+                    <p>Öğretmenin sınav karnelerini yükledikçe burada görünecek</p>
+                </div>
+            `;
+            selection.innerHTML = '<p style="color: #9ca3af;">Henüz sınav kaydınız yok</p>';
+            return;
+        }
+        
+        grid.innerHTML = myReports.map(report => `
+            <div class="report-card">
+                <div class="report-header">
+                    <div class="report-title">${report.exam_name}</div>
+                    <div class="report-date">${formatDate(report.upload_date)}</div>
+                </div>
+                
+                <div class="report-stats">
+                    <div class="stat-box">
+                        <div class="stat-value" style="color: #10b981;">${report.total_correct || 0}</div>
+                        <div class="stat-label">Doğru</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" style="color: #ef4444;">${report.total_wrong || 0}</div>
+                        <div class="stat-label">Yanlış</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" style="color: #3b82f6;">${report.total_net || 0}</div>
+                        <div class="stat-label">Net</div>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 12px; font-size: 0.9rem; color: #6b7280;">
+                    <span>LGS: ${report.lgs_score || '-'}</span>
+                    <span>%${report.percentile || '-'}</span>
+                </div>
+            </div>
+        `).join('');
+        
+        selection.innerHTML = myReports.map(report => `
+            <label class="checkbox-label">
+                <input type="checkbox" class="report-checkbox" value="${report.id}" onchange="updateDownloadBtn()">
+                ${report.exam_name}
+            </label>
+        `).join('');
+        
+    } catch (error) {
+        console.error('Load reports error:', error);
+        document.getElementById('reportsGrid').innerHTML = `
+            <div class="empty-state" style="grid-column: 1 / -1;">
+                <div class="empty-icon">❌</div>
+                <h3>Yüklenirken hata oluştu</h3>
+            </div>
+        `;
+    }
+}
+
+function updateDownloadBtn() {
+    const selected = document.querySelectorAll('.report-checkbox:checked').length;
+    document.getElementById('downloadBtn').disabled = selected === 0;
+    document.getElementById('comparisonBtn').disabled = selected < 2;
+    document.getElementById('comparisonHint').style.display = (selected === 1) ? 'block' : 'none';
+}
+
+function closeComparison() {
+    document.getElementById('comparisonModal').style.display = 'none';
+}
+
+async function showComparison() {
+    const selectedIds = Array.from(document.querySelectorAll('.report-checkbox:checked')).map(cb => parseInt(cb.value));
+    
+    if (selectedIds.length < 2) {
+        alert('Karşılaştırma için en az 2 sınav seçin');
+        return;
+    }
+    
+    document.getElementById('comparisonModal').style.display = 'flex';
+    document.getElementById('comparisonResult').innerHTML = '<p style="text-align:center; padding: 40px;">Yükleniyor...</p>';
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/comparison-error-report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ report_card_ids: selectedIds })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            document.getElementById('comparisonResult').innerHTML = `<p style="color: #ef4444;">${data.error}</p>`;
+            return;
+        }
+        
+        const subjectNames = {
+            'turkce': 'Türkçe', 'matematik': 'Matematik', 'fen': 'Fen Bilimleri',
+            'inkilap': 'İnkılap Tarihi', 'din': 'Din Kültürü', 'ingilizce': 'İngilizce'
+        };
+        
+        let html = `
+            <p style="color: #6b7280; margin-bottom: 16px;">${data.first_exam} → ${data.last_exam} karşılaştırması</p>
+            <div class="stats-row">
+                <div class="stat-card improved">
+                    <div class="number">${data.stats.improved}</div>
+                    <div>Gelişti ✅</div>
+                </div>
+                <div class="stat-card regressed">
+                    <div class="number">${data.stats.regressed}</div>
+                    <div>Geriledi ⚠️</div>
+                </div>
+                <div class="stat-card still-wrong">
+                    <div class="number">${data.stats.still_wrong}</div>
+                    <div>Hala Yanlış ❌</div>
+                </div>
+            </div>
+        `;
+        
+        for (const [subject, items] of Object.entries(data.by_subject)) {
+            if (items.length === 0) continue;
+            html += `
+                <div class="subject-section">
+                    <div class="subject-header">${subjectNames[subject] || subject} (${items.length} soru)</div>
+                    <table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Soru</th>
+                                <th>${data.first_exam}</th>
+                                <th>${data.last_exam}</th>
+                                <th>Durum</th>
+                                <th>Kazanım</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            for (const item of items) {
+                const statusText = {
+                    'improved': '✅ Gelişti',
+                    'regressed': '⚠️ Geriledi', 
+                    'still_wrong': '❌ Hala Yanlış'
+                }[item.status] || item.status;
+                
+                const statusClass = 'status-' + item.status.replace('_', '-');
+                
+                html += `
+                    <tr>
+                        <td>${item.question_number}</td>
+                        <td>${item.first_correct ? '✓' : '✗'} ${item.first_answer || '-'}</td>
+                        <td>${item.last_correct ? '✓' : '✗'} ${item.last_answer || '-'}</td>
+                        <td class="${statusClass}">${statusText}</td>
+                        <td>${(item.outcome_text || '').substring(0, 30)}...</td>
+                    </tr>
+                `;
+            }
+            
+            html += '</tbody></table></div>';
+        }
+        
+        document.getElementById('comparisonResult').innerHTML = html;
+        
+    } catch (error) {
+        document.getElementById('comparisonResult').innerHTML = `<p style="color: #ef4444;">Hata: ${error.message}</p>`;
+    }
+}
+
+function downloadErrorReport() {
+    const selectedIds = Array.from(document.querySelectorAll('.report-checkbox:checked')).map(cb => cb.value);
+    
+    if (selectedIds.length === 0) {
+        alert('En az bir sınav seçin');
+        return;
+    }
+    
+    const btn = document.getElementById('downloadBtn');
+    btn.disabled = true;
+    btn.innerHTML = '⏳ PDF oluşturuluyor...';
+    
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/admin/report-cards/student/error-report-pdf';
+    form.target = '_blank';
+    
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'report_card_ids';
+    input.value = selectedIds.join(',');
+    form.appendChild(input);
+    
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+    
+    setTimeout(() => {
+        btn.disabled = false;
+        btn.innerHTML = '📥 Hata Karnesi İndir';
+        updateDownloadBtn();
+    }, 2000);
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+async function loadMyProgress() {
+    try {
+        const response = await fetch('/admin/report-cards/api/student-progress');
+        const data = await response.json();
+        
+        if (!response.ok || data.exams.length === 0) {
+            return;
+        }
+        
+        const section = document.getElementById('progressSection');
+        const chartDiv = document.getElementById('progressChart');
+        const statsDiv = document.getElementById('progressStats');
+        
+        section.style.display = 'block';
+        
+        let html = '<table style="width: 100%; border-collapse: collapse; min-width: 400px;">';
+        html += '<thead><tr style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white;">';
+        html += '<th style="padding: 12px; text-align: left;">Sınav</th>';
+        html += '<th style="padding: 12px; text-align: center;">Doğru</th>';
+        html += '<th style="padding: 12px; text-align: center;">Yanlış</th>';
+        html += '<th style="padding: 12px; text-align: center;">Net</th>';
+        html += '<th style="padding: 12px; text-align: center;">Başarı %</th>';
+        html += '</tr></thead><tbody>';
+        
+        data.exams.forEach((exam, idx) => {
+            const rowBg = idx % 2 === 0 ? '#ffffff' : '#f9fafb';
+            html += `<tr style="background: ${rowBg};">`;
+            html += `<td style="padding: 12px; border-bottom: 1px solid #e5e7eb; font-weight: 600;">${exam.exam_name}</td>`;
+            html += `<td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center; color: #10b981; font-weight: 600;">${exam.total_correct}</td>`;
+            html += `<td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center; color: #ef4444; font-weight: 600;">${exam.total_wrong}</td>`;
+            html += `<td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center; color: #3b82f6; font-weight: 700;">${exam.total_net}</td>`;
+            html += `<td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center;">${exam.success_rate}%</td>`;
+            html += '</tr>';
+        });
+        html += '</tbody></table>';
+        chartDiv.innerHTML = html;
+        
+        if (data.exams.length >= 2) {
+            const changeColor = data.net_change > 0 ? '#10b981' : (data.net_change < 0 ? '#ef4444' : '#6b7280');
+            const changeIcon = data.net_change > 0 ? '📈' : (data.net_change < 0 ? '📉' : '➡️');
+            const changeSign = data.net_change > 0 ? '+' : '';
+            
+            statsDiv.innerHTML = `
+                <div style="flex: 1; min-width: 150px; background: ${data.net_change >= 0 ? '#d1fae5' : '#fee2e2'}; padding: 16px; border-radius: 12px; text-align: center;">
+                    <div style="font-size: 2rem;">${changeIcon}</div>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: ${changeColor};">${changeSign}${data.net_change}</div>
+                    <div style="font-size: 0.85rem; color: #6b7280;">Net Değişimi</div>
+                </div>
+                <div style="flex: 1; min-width: 150px; background: ${data.success_change >= 0 ? '#dbeafe' : '#fef3c7'}; padding: 16px; border-radius: 12px; text-align: center;">
+                    <div style="font-size: 2rem;">${data.success_change >= 0 ? '✨' : '⚠️'}</div>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: #3b82f6;">${data.success_change > 0 ? '+' : ''}${data.success_change}%</div>
+                    <div style="font-size: 0.85rem; color: #6b7280;">Başarı Değişimi</div>
+                </div>
+            `;
+        }
+        
+    } catch (error) {
+        console.error('Progress load error:', error);
+    }
+}
+</script>
+{% endblock %}

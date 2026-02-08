@@ -1,0 +1,237 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Sınav Takvimi{% endblock %}
+
+{% block content %}
+<nav class="breadcrumb-nav">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/admin/dashboard">Ana Sayfa</a></li>
+        <li class="breadcrumb-item active">Sınav Takvimi</li>
+    </ol>
+</nav>
+
+<div style="max-width: 1000px; margin: 0 auto;">
+    <!-- Yeni Sınav Ekle Formu -->
+    <div style="background: white; border-radius: 10px; padding: 25px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+        <h2 style="margin-bottom: 20px; color: #374151;">📝 Yeni Sınav Ekle</h2>
+        
+        <div id="alert" style="display: none; padding: 12px; border-radius: 5px; margin-bottom: 15px;"></div>
+        
+        <form id="examForm">
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 500;">Sınav Adı</label>
+                <input type="text" id="examName" required 
+                    placeholder="Örn: TYT Deneme 5"
+                    style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 5px;">
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 500;">Tarih</label>
+                <input type="date" id="examDate" required 
+                    style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 5px;">
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 500;">Hangi Sınıflar Girecek?</label>
+                <div style="margin-bottom: 8px;">
+                    <button type="button" onclick="selectAllClasses()" 
+                        style="background: #10b981; color: white; padding: 6px 15px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em;">
+                        ✅ Tüm Sınıfları Seç
+                    </button>
+                    <button type="button" onclick="deselectAllClasses()" 
+                        style="background: #6b7280; color: white; padding: 6px 15px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em; margin-left: 8px;">
+                        ❌ Seçimi Temizle
+                    </button>
+                </div>
+                <select id="examClasses" multiple size="6" required
+                    style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 5px;">
+                    <option value="">Yükleniyor...</option>
+                </select>
+                <small style="color: #6b7280;">Birden fazla sınıf seçmek için Ctrl/Cmd tuşuna basılı tutun</small>
+            </div>
+            
+            <button type="submit" 
+                style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 30px; border: none; border-radius: 5px; font-weight: 500; cursor: pointer;">
+                ➕ Sınav Ekle
+            </button>
+        </form>
+    </div>
+
+    <!-- Sınav Listesi -->
+    <div style="background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+        <h2 style="margin-bottom: 20px; color: #374151;">📅 Kayıtlı Sınavlar</h2>
+        
+        <div id="examList">
+            <p style="text-align: center; color: #9ca3af; padding: 40px;">Yükleniyor...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+// Sınıfları yükle
+async function loadClasses() {
+    try {
+        const response = await fetch('/admin/api/classes');
+        const data = await response.json();
+        
+        const select = document.getElementById('examClasses');
+        select.innerHTML = '<option value="TÜMÜ">TÜMÜ</option>';
+        
+        if (data.classes && data.classes.length > 0) {
+            data.classes.forEach(cls => {
+                const option = document.createElement('option');
+                option.value = cls.class_name;
+                option.textContent = cls.class_name;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Sınıflar yüklenemedi:', error);
+        document.getElementById('examClasses').innerHTML = '<option value="">Yükleme hatası</option>';
+    }
+}
+
+// Sınavları yükle
+async function loadExams() {
+    try {
+        const response = await fetch('/api/exam-calendar/all');
+        const data = await response.json();
+        
+        const exams = data.exams || [];
+        const listDiv = document.getElementById('examList');
+        
+        if (exams.length === 0) {
+            listDiv.innerHTML = '<p style="text-align: center; color: #9ca3af; padding: 40px;">Henüz sınav eklenmemiş</p>';
+            return;
+        }
+        
+        // Tarihe göre sırala
+        exams.sort((a, b) => new Date(a.date) - new Date(b.date));
+        
+        let html = '<table style="width: 100%; border-collapse: collapse;">';
+        html += '<thead><tr style="background: #f9fafb; border-bottom: 2px solid #e5e7eb;">';
+        html += '<th style="padding: 12px; text-align: left;">Tarih</th>';
+        html += '<th style="padding: 12px; text-align: left;">Sınav Adı</th>';
+        html += '<th style="padding: 12px; text-align: left;">Sınıflar</th>';
+        html += '<th style="padding: 12px; text-align: center;">İşlem</th>';
+        html += '</tr></thead><tbody>';
+        
+        exams.forEach(exam => {
+            const dateObj = new Date(exam.date + 'T00:00:00');
+            const formattedDate = dateObj.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+            
+            html += '<tr style="border-bottom: 1px solid #e5e7eb;">';
+            html += `<td style="padding: 12px;">${formattedDate}</td>`;
+            html += `<td style="padding: 12px; font-weight: 500;">${exam.title || exam.description}</td>`;
+            html += `<td style="padding: 12px; color: #6b7280;">${exam.classes || '-'}</td>`;
+            html += `<td style="padding: 12px; text-align: center;">
+                <button onclick="deleteExam(${exam.id})" 
+                    style="background: #ef4444; color: white; padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer;">
+                    🗑️ Sil
+                </button>
+            </td>`;
+            html += '</tr>';
+        });
+        
+        html += '</tbody></table>';
+        listDiv.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Sınavlar yüklenemedi:', error);
+        document.getElementById('examList').innerHTML = 
+            '<p style="text-align: center; color: #ef4444; padding: 40px;">❌ Sınavlar yüklenirken hata oluştu</p>';
+    }
+}
+
+// Sınav ekle
+document.getElementById('examForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const name = document.getElementById('examName').value;
+    const date = document.getElementById('examDate').value;
+    const classesSelect = document.getElementById('examClasses');
+    const classes = Array.from(classesSelect.selectedOptions).map(opt => opt.value).join(', ');
+    
+    if (!classes) {
+        showAlert('Lütfen en az bir sınıf seçin', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/exam-calendar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                date: date,
+                description: name,
+                classes: classes
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showAlert('✅ Sınav başarıyla eklendi!', 'success');
+            document.getElementById('examForm').reset();
+            loadExams();
+        } else {
+            showAlert('❌ ' + (data.error || 'Sınav eklenemedi'), 'error');
+        }
+    } catch (error) {
+        console.error('Hata:', error);
+        showAlert('❌ Bağlantı hatası', 'error');
+    }
+});
+
+// Sınav sil
+async function deleteExam(id) {
+    if (!confirm('Bu sınavı silmek istediğinizden emin misiniz?')) return;
+    
+    try {
+        const response = await fetch(`/api/exam-calendar/${id}`, { method: 'DELETE' });
+        const data = await response.json();
+        
+        if (response.ok) {
+            showAlert('✅ Sınav silindi', 'success');
+            loadExams();
+        } else {
+            showAlert('❌ ' + (data.error || 'Silinemedi'), 'error');
+        }
+    } catch (error) {
+        showAlert('❌ Bağlantı hatası', 'error');
+    }
+}
+
+// Alert göster
+function showAlert(message, type) {
+    const alert = document.getElementById('alert');
+    alert.textContent = message;
+    alert.style.display = 'block';
+    alert.style.background = type === 'success' ? '#d1fae5' : '#fee2e2';
+    alert.style.color = type === 'success' ? '#065f46' : '#991b1b';
+    alert.style.border = `1px solid ${type === 'success' ? '#10b981' : '#ef4444'}`;
+    
+    setTimeout(() => { alert.style.display = 'none'; }, 3000);
+}
+
+// Tüm sınıfları seç
+function selectAllClasses() {
+    const select = document.getElementById('examClasses');
+    for (let option of select.options) {
+        option.selected = true;
+    }
+}
+
+// Seçimi temizle
+function deselectAllClasses() {
+    const select = document.getElementById('examClasses');
+    for (let option of select.options) {
+        option.selected = false;
+    }
+}
+
+// Sayfa yüklenince sınıfları ve sınavları getir
+loadClasses();
+loadExams();
+</script>
+{% endblock %}

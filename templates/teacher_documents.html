@@ -1,0 +1,802 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Dokümanlar{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/admin-modern.css">
+<style>
+    .page-header {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        color: white;
+        padding: 30px;
+        border-radius: 16px;
+        margin-bottom: 24px;
+    }
+    .page-header h1 { font-size: 1.8rem; margin-bottom: 8px; }
+    .page-header p { opacity: 0.9; }
+    
+    .categories-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+    
+    .category-card {
+        background: white;
+        border-radius: 16px;
+        padding: 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s;
+        border: 3px solid transparent;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    }
+    .category-card:hover { transform: translateY(-4px); box-shadow: 0 8px 25px rgba(0,0,0,0.12); }
+    .category-card.active { border-color: #6366f1; background: linear-gradient(135deg, rgba(99,102,241,0.1), rgba(139,92,246,0.1)); }
+    .category-icon { font-size: 2.5rem; margin-bottom: 10px; }
+    .category-name { font-weight: 700; color: #1f2937; margin-bottom: 4px; }
+    .category-count { font-size: 0.85rem; color: #6b7280; }
+    
+    .category-card.exam_samples { --cat-color: #ef4444; }
+    .category-card.worksheets { --cat-color: #f59e0b; }
+    .category-card.summaries { --cat-color: #10b981; }
+    .category-card.practice_exams { --cat-color: #3b82f6; }
+    .category-card.videos { --cat-color: #8b5cf6; }
+    .category-card.other { --cat-color: #6b7280; }
+    
+    .content-card {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        margin-bottom: 24px;
+    }
+    
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    .section-title { font-size: 1.2rem; font-weight: 700; color: #1f2937; }
+    
+    .btn-add {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .btn-add:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4); }
+    
+    .upload-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.6);
+        z-index: 1000;
+        padding: 20px;
+        overflow-y: auto;
+    }
+    .upload-modal.active { display: flex; align-items: flex-start; justify-content: center; padding-top: 50px; }
+    
+    .upload-container {
+        background: white;
+        border-radius: 20px;
+        width: 100%;
+        max-width: 600px;
+        padding: 30px;
+        animation: slideUp 0.3s ease;
+    }
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+    }
+    .modal-header h2 { font-size: 1.4rem; color: #1f2937; }
+    .modal-close {
+        background: #f3f4f6;
+        border: none;
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 1.2rem;
+    }
+    .modal-close:hover { background: #e5e7eb; }
+    
+    .form-group { margin-bottom: 20px; }
+    .form-group label { display: block; font-weight: 600; margin-bottom: 8px; color: #374151; }
+    .form-control {
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid #e5e7eb;
+        border-radius: 10px;
+        font-size: 1rem;
+        transition: all 0.2s;
+        box-sizing: border-box;
+    }
+    .form-control:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1); }
+    
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    
+    .category-select {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+    }
+    .category-option {
+        padding: 12px;
+        border: 2px solid #e5e7eb;
+        border-radius: 10px;
+        cursor: pointer;
+        text-align: center;
+        transition: all 0.2s;
+        font-size: 0.85rem;
+    }
+    .category-option:hover { border-color: #6366f1; }
+    .category-option.selected { border-color: #6366f1; background: rgba(99,102,241,0.1); }
+    .category-option .icon { font-size: 1.5rem; margin-bottom: 4px; display: block; }
+    
+    .type-selector { display: flex; gap: 12px; margin-bottom: 16px; }
+    .type-option {
+        flex: 1;
+        padding: 16px;
+        border: 2px solid #e5e7eb;
+        border-radius: 10px;
+        cursor: pointer;
+        text-align: center;
+        transition: all 0.2s;
+    }
+    .type-option:hover { border-color: #6366f1; }
+    .type-option.selected { border-color: #6366f1; background: rgba(99,102,241,0.1); }
+    .type-option .icon { font-size: 1.8rem; margin-bottom: 6px; }
+    .type-option .title { font-weight: 600; color: #374151; }
+    
+    .class-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 8px;
+    }
+    .class-checkbox {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 10px;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 0.9rem;
+    }
+    .class-checkbox:hover { border-color: #6366f1; }
+    .class-checkbox:has(input:checked) { border-color: #6366f1; background: rgba(99,102,241,0.1); }
+    .class-checkbox input { display: none; }
+    
+    .select-all-row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+    .select-btn {
+        padding: 8px 16px;
+        background: #f3f4f6;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.85rem;
+    }
+    .select-btn:hover { background: #e5e7eb; }
+    
+    .btn-submit {
+        width: 100%;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        color: white;
+        border: none;
+        padding: 14px;
+        border-radius: 10px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-top: 10px;
+    }
+    .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4); }
+    .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    
+    .filters-bar {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+    .filter-select {
+        padding: 10px 16px;
+        border: 2px solid #e5e7eb;
+        border-radius: 10px;
+        font-size: 0.9rem;
+        min-width: 150px;
+    }
+    .filter-select:focus { outline: none; border-color: #6366f1; }
+    .search-input {
+        flex: 1;
+        min-width: 200px;
+        padding: 10px 16px;
+        border: 2px solid #e5e7eb;
+        border-radius: 10px;
+        font-size: 0.9rem;
+    }
+    .search-input:focus { outline: none; border-color: #6366f1; }
+    
+    .documents-list { margin-top: 16px; }
+    
+    .document-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        background: #f9fafb;
+        border-radius: 12px;
+        margin-bottom: 12px;
+        transition: all 0.2s;
+    }
+    .document-item:hover { background: #f3f4f6; transform: translateX(4px); }
+    
+    .doc-info { display: flex; align-items: center; gap: 16px; flex: 1; }
+    .doc-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: white;
+    }
+    .doc-icon.pdf { background: linear-gradient(135deg, #ef4444, #dc2626); }
+    .doc-icon.link { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+    
+    .doc-details { flex: 1; }
+    .doc-title { font-weight: 700; color: #1f2937; margin-bottom: 4px; }
+    .doc-meta { font-size: 0.85rem; color: #6b7280; display: flex; gap: 12px; flex-wrap: wrap; }
+    .doc-meta span { display: flex; align-items: center; gap: 4px; }
+    
+    .doc-classes { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    .class-tag {
+        background: #e0e7ff;
+        color: #4f46e5;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    
+    .doc-actions { display: flex; gap: 8px; }
+    .btn-icon {
+        width: 38px;
+        height: 38px;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        transition: all 0.2s;
+    }
+    .btn-view { background: #dbeafe; color: #2563eb; }
+    .btn-view:hover { background: #bfdbfe; }
+    .btn-delete { background: #fee2e2; color: #dc2626; }
+    .btn-delete:hover { background: #fecaca; }
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #9ca3af;
+    }
+    .empty-state .icon { font-size: 4rem; margin-bottom: 16px; }
+    
+    .category-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    .category-badge.exam_samples { background: #fee2e2; color: #dc2626; }
+    .category-badge.worksheets { background: #fef3c7; color: #d97706; }
+    .category-badge.summaries { background: #d1fae5; color: #059669; }
+    .category-badge.practice_exams { background: #dbeafe; color: #2563eb; }
+    .category-badge.videos { background: #ede9fe; color: #7c3aed; }
+    .category-badge.other { background: #f3f4f6; color: #6b7280; }
+    
+    @media (max-width: 768px) {
+        .categories-grid { grid-template-columns: repeat(2, 1fr); }
+        .form-row { grid-template-columns: 1fr; }
+        .category-select { grid-template-columns: repeat(2, 1fr); }
+        .class-grid { grid-template-columns: repeat(4, 1fr); }
+        .filters-bar { flex-direction: column; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>📚 Dokümanlar</h1>
+    <p>Ders materyallerini kategorilere ayırarak paylaşın</p>
+</div>
+
+<div class="categories-grid" id="categoriesGrid">
+    <div class="category-card active" data-category="all" onclick="filterByCategory('all')">
+        <div class="category-icon">📂</div>
+        <div class="category-name">Tümü</div>
+        <div class="category-count" id="count-all">0 doküman</div>
+    </div>
+    <div class="category-card exam_samples" data-category="exam_samples" onclick="filterByCategory('exam_samples')">
+        <div class="category-icon">📝</div>
+        <div class="category-name">Yazılı Örnekleri</div>
+        <div class="category-count" id="count-exam_samples">0</div>
+    </div>
+    <div class="category-card worksheets" data-category="worksheets" onclick="filterByCategory('worksheets')">
+        <div class="category-icon">📄</div>
+        <div class="category-name">Çalışma Kağıtları</div>
+        <div class="category-count" id="count-worksheets">0</div>
+    </div>
+    <div class="category-card summaries" data-category="summaries" onclick="filterByCategory('summaries')">
+        <div class="category-icon">📋</div>
+        <div class="category-name">Konu Özetleri</div>
+        <div class="category-count" id="count-summaries">0</div>
+    </div>
+    <div class="category-card practice_exams" data-category="practice_exams" onclick="filterByCategory('practice_exams')">
+        <div class="category-icon">📊</div>
+        <div class="category-name">Deneme Sınavları</div>
+        <div class="category-count" id="count-practice_exams">0</div>
+    </div>
+    <div class="category-card videos" data-category="videos" onclick="filterByCategory('videos')">
+        <div class="category-icon">🎬</div>
+        <div class="category-name">Ders Videoları</div>
+        <div class="category-count" id="count-videos">0</div>
+    </div>
+</div>
+
+<div class="content-card">
+    <div class="section-header">
+        <div class="section-title" id="sectionTitle">Tüm Dokümanlar</div>
+        <button class="btn-add" onclick="openUploadModal()">
+            <span>➕</span> Yeni Doküman Ekle
+        </button>
+    </div>
+    
+    <div class="filters-bar">
+        <select class="filter-select" id="subjectFilter" onchange="applyFilters()">
+            <option value="">Tüm Dersler</option>
+            <option value="turkce">Türkçe</option>
+            <option value="matematik">Matematik</option>
+            <option value="fen">Fen Bilimleri</option>
+            <option value="sosyal">Sosyal Bilgiler</option>
+            <option value="ingilizce">İngilizce</option>
+            <option value="din">Din Kültürü</option>
+        </select>
+        <select class="filter-select" id="gradeFilter" onchange="applyFilters()">
+            <option value="">Tüm Sınıflar</option>
+            <option value="5">5. Sınıflar</option>
+            <option value="6">6. Sınıflar</option>
+            <option value="7">7. Sınıflar</option>
+            <option value="8">8. Sınıflar</option>
+        </select>
+        <input type="text" class="search-input" id="searchInput" placeholder="Doküman ara..." oninput="applyFilters()">
+    </div>
+    
+    <div class="documents-list" id="documentsList">
+        <div class="empty-state">
+            <div class="icon">📂</div>
+            <p>Yükleniyor...</p>
+        </div>
+    </div>
+</div>
+
+<div class="upload-modal" id="uploadModal">
+    <div class="upload-container">
+        <div class="modal-header">
+            <h2>📤 Yeni Doküman Ekle</h2>
+            <button class="modal-close" onclick="closeUploadModal()">✕</button>
+        </div>
+        
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div class="form-group">
+                <label>Kategori Seçin</label>
+                <div class="category-select">
+                    <div class="category-option selected" data-cat="exam_samples" onclick="selectCategory('exam_samples')">
+                        <span class="icon">📝</span>Yazılı Örneği
+                    </div>
+                    <div class="category-option" data-cat="worksheets" onclick="selectCategory('worksheets')">
+                        <span class="icon">📄</span>Çalışma Kağıdı
+                    </div>
+                    <div class="category-option" data-cat="summaries" onclick="selectCategory('summaries')">
+                        <span class="icon">📋</span>Konu Özeti
+                    </div>
+                    <div class="category-option" data-cat="practice_exams" onclick="selectCategory('practice_exams')">
+                        <span class="icon">📊</span>Deneme Sınavı
+                    </div>
+                    <div class="category-option" data-cat="videos" onclick="selectCategory('videos')">
+                        <span class="icon">🎬</span>Ders Videosu
+                    </div>
+                    <div class="category-option" data-cat="other" onclick="selectCategory('other')">
+                        <span class="icon">📎</span>Diğer
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Başlık</label>
+                <input type="text" class="form-control" id="docTitle" placeholder="Doküman başlığı" required>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Ders</label>
+                    <select class="form-control" id="docSubject">
+                        <option value="">Seçiniz</option>
+                        <option value="turkce">Türkçe</option>
+                        <option value="matematik">Matematik</option>
+                        <option value="fen">Fen Bilimleri</option>
+                        <option value="sosyal">Sosyal Bilgiler</option>
+                        <option value="ingilizce">İngilizce</option>
+                        <option value="din">Din Kültürü</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Açıklama (opsiyonel)</label>
+                    <input type="text" class="form-control" id="docDescription" placeholder="Kısa açıklama">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Dosya Türü</label>
+                <div class="type-selector">
+                    <div class="type-option selected" data-type="pdf" onclick="selectType('pdf')">
+                        <div class="icon">📁</div>
+                        <div class="title">PDF Yükle</div>
+                    </div>
+                    <div class="type-option" data-type="link" onclick="selectType('link')">
+                        <div class="icon">🔗</div>
+                        <div class="title">Link Ekle</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group" id="pdfSection">
+                <label>PDF Dosyası</label>
+                <input type="file" class="form-control" id="pdfFile" accept=".pdf">
+            </div>
+            
+            <div class="form-group" id="linkSection" style="display: none;">
+                <label>Bağlantı URL</label>
+                <input type="url" class="form-control" id="linkUrl" placeholder="https://...">
+            </div>
+            
+            <div class="form-group">
+                <label>Hedef Sınıflar</label>
+                <div class="select-all-row">
+                    <button type="button" class="select-btn" onclick="selectGrade(5)">5. Sınıflar</button>
+                    <button type="button" class="select-btn" onclick="selectGrade(6)">6. Sınıflar</button>
+                    <button type="button" class="select-btn" onclick="selectGrade(7)">7. Sınıflar</button>
+                    <button type="button" class="select-btn" onclick="selectGrade(8)">8. Sınıflar</button>
+                    <button type="button" class="select-btn" onclick="selectAll()">Tümü</button>
+                </div>
+                <div class="class-grid" id="classGrid"></div>
+            </div>
+            
+            <button type="submit" class="btn-submit" id="submitBtn">Dokümanı Ekle</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const classes = ['5A', '5B', '5C', '5D', '5E', '6A', '6B', '6C', '6D', '6E', '7A', '7B', '7C', '7D', '7E', '8A', '8B', '8C', '8D', '8E'];
+const categoryNames = {
+    'exam_samples': 'Yazılı Örneği',
+    'worksheets': 'Çalışma Kağıdı',
+    'summaries': 'Konu Özeti',
+    'practice_exams': 'Deneme Sınavı',
+    'videos': 'Ders Videosu',
+    'other': 'Diğer'
+};
+const subjectNames = {
+    'turkce': 'Türkçe',
+    'matematik': 'Matematik',
+    'fen': 'Fen Bilimleri',
+    'sosyal': 'Sosyal Bilgiler',
+    'ingilizce': 'İngilizce',
+    'din': 'Din Kültürü'
+};
+
+let selectedCategory = 'exam_samples';
+let selectedType = 'pdf';
+let currentFilter = 'all';
+let allDocuments = [];
+
+function renderClassGrid() {
+    document.getElementById('classGrid').innerHTML = classes.map(cls => `
+        <label class="class-checkbox">
+            <input type="checkbox" name="target_classes" value="${cls}">
+            <span>${cls}</span>
+        </label>
+    `).join('');
+}
+
+function selectGrade(grade) {
+    const checkboxes = document.querySelectorAll('#classGrid input');
+    checkboxes.forEach(cb => {
+        if (cb.value.startsWith(grade)) cb.checked = true;
+    });
+}
+
+function selectAll() {
+    const checkboxes = document.querySelectorAll('#classGrid input');
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    checkboxes.forEach(cb => cb.checked = !allChecked);
+}
+
+function selectCategory(cat) {
+    selectedCategory = cat;
+    document.querySelectorAll('.category-option').forEach(opt => {
+        opt.classList.toggle('selected', opt.dataset.cat === cat);
+    });
+}
+
+function selectType(type) {
+    selectedType = type;
+    document.querySelectorAll('.type-option').forEach(opt => {
+        opt.classList.toggle('selected', opt.dataset.type === type);
+    });
+    document.getElementById('pdfSection').style.display = type === 'pdf' ? 'block' : 'none';
+    document.getElementById('linkSection').style.display = type === 'link' ? 'block' : 'none';
+}
+
+function openUploadModal() {
+    document.getElementById('uploadModal').classList.add('active');
+}
+
+function closeUploadModal() {
+    document.getElementById('uploadModal').classList.remove('active');
+}
+
+function filterByCategory(cat) {
+    currentFilter = cat;
+    document.querySelectorAll('.category-card').forEach(card => {
+        card.classList.toggle('active', card.dataset.category === cat);
+    });
+    
+    const titles = {
+        'all': 'Tüm Dokümanlar',
+        'exam_samples': 'Yazılı Örnekleri',
+        'worksheets': 'Çalışma Kağıtları',
+        'summaries': 'Konu Özetleri',
+        'practice_exams': 'Deneme Sınavları',
+        'videos': 'Ders Videoları'
+    };
+    document.getElementById('sectionTitle').textContent = titles[cat] || 'Dokümanlar';
+    applyFilters();
+}
+
+function applyFilters() {
+    const subject = document.getElementById('subjectFilter').value;
+    const grade = document.getElementById('gradeFilter').value;
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    
+    let filtered = allDocuments;
+    
+    if (currentFilter !== 'all') {
+        filtered = filtered.filter(d => d.category === currentFilter);
+    }
+    if (subject) {
+        filtered = filtered.filter(d => d.subject === subject);
+    }
+    if (grade) {
+        filtered = filtered.filter(d => {
+            const classes = typeof d.target_classes === 'string' ? JSON.parse(d.target_classes) : d.target_classes;
+            return classes.some(c => c.startsWith(grade));
+        });
+    }
+    if (search) {
+        filtered = filtered.filter(d => 
+            d.title.toLowerCase().includes(search) || 
+            (d.description && d.description.toLowerCase().includes(search))
+        );
+    }
+    
+    renderDocuments(filtered);
+}
+
+async function loadDocuments() {
+    try {
+        const res = await fetch('/api/teacher/documents');
+        allDocuments = await res.json();
+        updateCounts();
+        applyFilters();
+    } catch (err) {
+        console.error('Documents loading error:', err);
+    }
+}
+
+function updateCounts() {
+    const counts = { all: allDocuments.length };
+    Object.keys(categoryNames).forEach(cat => counts[cat] = 0);
+    
+    allDocuments.forEach(d => {
+        if (counts[d.category] !== undefined) counts[d.category]++;
+    });
+    
+    document.getElementById('count-all').textContent = `${counts.all} doküman`;
+    Object.keys(categoryNames).forEach(cat => {
+        const el = document.getElementById(`count-${cat}`);
+        if (el) el.textContent = counts[cat] || 0;
+    });
+}
+
+function renderDocuments(docs) {
+    const container = document.getElementById('documentsList');
+    
+    if (docs.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="icon">📂</div>
+                <p>Bu kategoride doküman bulunmuyor</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = docs.map(d => {
+        const targetClasses = typeof d.target_classes === 'string' ? JSON.parse(d.target_classes) : d.target_classes;
+        const date = new Date(d.created_at).toLocaleDateString('tr-TR');
+        const category = d.category || 'exam_samples';
+        const subject = d.subject ? subjectNames[d.subject] : '';
+        
+        return `
+            <div class="document-item">
+                <div class="doc-info">
+                    <div class="doc-icon ${d.sample_type}">${d.sample_type === 'pdf' ? '📁' : '🔗'}</div>
+                    <div class="doc-details">
+                        <div class="doc-title">${d.title}</div>
+                        <div class="doc-meta">
+                            <span class="category-badge ${category}">${categoryNames[category] || category}</span>
+                            ${subject ? `<span>📚 ${subject}</span>` : ''}
+                            <span>📅 ${date}</span>
+                            <span>👁️ ${d.view_count || 0}</span>
+                        </div>
+                        <div class="doc-classes">
+                            ${targetClasses.slice(0, 5).map(c => `<span class="class-tag">${c}</span>`).join('')}
+                            ${targetClasses.length > 5 ? `<span class="class-tag">+${targetClasses.length - 5}</span>` : ''}
+                        </div>
+                    </div>
+                </div>
+                <div class="doc-actions">
+                    ${d.sample_type === 'pdf' 
+                        ? `<button class="btn-icon btn-view" onclick="window.open('${d.file_path}', '_blank')" title="Görüntüle">👁️</button>`
+                        : `<button class="btn-icon btn-view" onclick="window.open('${d.link_url}', '_blank')" title="Linke Git">🔗</button>`
+                    }
+                    <button class="btn-icon btn-delete" onclick="deleteDocument(${d.id})" title="Sil">🗑️</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function deleteDocument(id) {
+    if (!confirm('Bu dokümanı silmek istediğinizden emin misiniz?')) return;
+    
+    try {
+        const res = await fetch(`/api/teacher/documents/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        
+        if (data.success) {
+            loadDocuments();
+        } else {
+            alert(data.error || 'Silme hatası');
+        }
+    } catch (err) {
+        alert('Bağlantı hatası');
+    }
+}
+
+document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Yükleniyor...';
+    
+    const formData = new FormData();
+    formData.append('title', document.getElementById('docTitle').value);
+    formData.append('description', document.getElementById('docDescription').value);
+    formData.append('category', selectedCategory);
+    formData.append('subject', document.getElementById('docSubject').value);
+    formData.append('sample_type', selectedType);
+    
+    if (selectedType === 'pdf') {
+        const file = document.getElementById('pdfFile').files[0];
+        if (!file) {
+            alert('Lütfen bir PDF dosyası seçin');
+            btn.disabled = false;
+            btn.textContent = 'Dokümanı Ekle';
+            return;
+        }
+        formData.append('file', file);
+    } else {
+        const linkUrl = document.getElementById('linkUrl').value;
+        if (!linkUrl) {
+            alert('Lütfen bir URL girin');
+            btn.disabled = false;
+            btn.textContent = 'Dokümanı Ekle';
+            return;
+        }
+        formData.append('link_url', linkUrl);
+    }
+    
+    const selectedClasses = Array.from(document.querySelectorAll('#classGrid input:checked')).map(cb => cb.value);
+    if (selectedClasses.length === 0) {
+        alert('Lütfen en az bir sınıf seçin');
+        btn.disabled = false;
+        btn.textContent = 'Dokümanı Ekle';
+        return;
+    }
+    selectedClasses.forEach(cls => formData.append('target_classes', cls));
+    
+    try {
+        const res = await fetch('/api/teacher/documents', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+            document.getElementById('uploadForm').reset();
+            document.querySelectorAll('#classGrid input').forEach(cb => cb.checked = false);
+            selectType('pdf');
+            selectCategory('exam_samples');
+            closeUploadModal();
+            loadDocuments();
+        } else {
+            alert(data.error || 'Ekleme hatası');
+        }
+    } catch (err) {
+        alert('Bağlantı hatası');
+    }
+    
+    btn.disabled = false;
+    btn.textContent = 'Dokümanı Ekle';
+});
+
+document.getElementById('uploadModal').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('uploadModal')) closeUploadModal();
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeUploadModal();
+});
+
+renderClassGrid();
+loadDocuments();
+</script>
+{% endblock %}

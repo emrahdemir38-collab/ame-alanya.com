@@ -1,0 +1,148 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Ders Çalışma Programı{% endblock %}
+
+{% block content %}
+<nav class="breadcrumb-nav">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/student/dashboard">Ana Sayfa</a></li>
+        <li class="breadcrumb-item active">Ders Çalışma Programı</li>
+    </ol>
+</nav>
+
+<style>
+    .plan-container { max-width: 900px; margin: 0 auto; }
+    .card { background: white; border-radius: 12px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 20px; }
+    .card-title { font-size: 1.3em; font-weight: 600; color: #1f2937; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+    
+    .plan-list { display: flex; flex-direction: column; gap: 15px; }
+    .plan-item { background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 12px; padding: 20px; border-left: 4px solid #3b82f6; transition: all 0.3s; }
+    .plan-item:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2); }
+    
+    .plan-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
+    .plan-title { font-weight: 600; color: #1e40af; font-size: 1.15em; }
+    .plan-date { color: #6b7280; font-size: 0.9em; display: flex; align-items: center; gap: 5px; }
+    
+    .plan-info { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 15px; }
+    .plan-badge { display: inline-flex; align-items: center; gap: 5px; background: white; color: #374151; padding: 6px 12px; border-radius: 20px; font-size: 0.85em; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .plan-badge.teacher { background: #fef3c7; color: #92400e; }
+    .plan-badge.target { background: #e0e7ff; color: #4338ca; }
+    
+    .plan-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn { padding: 10px 20px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-size: 0.95em; }
+    .btn-view { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; }
+    .btn-view:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4); }
+    .btn-download { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; }
+    .btn-download:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4); }
+    
+    .empty-state { text-align: center; padding: 60px 20px; }
+    .empty-state-icon { font-size: 4em; margin-bottom: 20px; opacity: 0.7; }
+    .empty-state-text { color: #6b7280; font-size: 1.1em; }
+    .empty-state-subtext { color: #9ca3af; font-size: 0.95em; margin-top: 10px; }
+    
+    .loading { text-align: center; padding: 40px; color: #6b7280; }
+    .loading-spinner { font-size: 2em; animation: spin 1s linear infinite; display: inline-block; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    
+    @media (max-width: 768px) {
+        .plan-header { flex-direction: column; }
+        .plan-actions { width: 100%; }
+        .btn { flex: 1; justify-content: center; }
+    }
+</style>
+
+<div class="plan-container">
+    <div class="card">
+        <h2 class="card-title">📚 Çalışma Programlarım</h2>
+        
+        <div id="planList" class="plan-list">
+            <div class="loading">
+                <div class="loading-spinner">⏳</div>
+                <p>Yükleniyor...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadPlans();
+});
+
+async function loadPlans() {
+    const container = document.getElementById('planList');
+    
+    try {
+        const res = await fetch('/api/student/study-plan-pdfs');
+        const plans = await res.json();
+        
+        if (!Array.isArray(plans) || plans.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📭</div>
+                    <div class="empty-state-text">Henüz çalışma programı atanmamış</div>
+                    <div class="empty-state-subtext">Öğretmeniniz size çalışma programı atadığında burada görünecek</div>
+                </div>
+            `;
+            return;
+        }
+        
+        container.innerHTML = '';
+        plans.forEach(plan => {
+            const date = new Date(plan.created_at).toLocaleString('tr-TR', {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            
+            const targetText = plan.target_type === 'class' 
+                ? `${plan.target_class} Sınıfı` 
+                : 'Size Özel';
+            
+            const planHtml = `
+                <div class="plan-item">
+                    <div class="plan-header">
+                        <div class="plan-title">${plan.title}</div>
+                        <div class="plan-date">📅 ${date}</div>
+                    </div>
+                    <div class="plan-info">
+                        <span class="plan-badge teacher">👨‍🏫 ${plan.teacher_name}</span>
+                        <span class="plan-badge target">🎯 ${targetText}</span>
+                    </div>
+                    <div class="plan-actions">
+                        <button class="btn btn-view" onclick="viewFile('${plan.file_path}')">
+                            👁️ Görüntüle
+                        </button>
+                        <button class="btn btn-download" onclick="downloadFile('${plan.file_path}')">
+                            📥 İndir
+                        </button>
+                    </div>
+                </div>
+            `;
+            container.innerHTML += planHtml;
+        });
+    } catch (error) {
+        console.error('Planlar yüklenemedi:', error);
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">❌</div>
+                <div class="empty-state-text">Yüklenirken hata oluştu</div>
+                <div class="empty-state-subtext">Lütfen sayfayı yenileyin</div>
+            </div>
+        `;
+    }
+}
+
+function viewFile(filePath) {
+    const cleanPath = filePath.replace(/^\/storage\//, '').replace(/^\//, '');
+    window.open(`/view-file/${cleanPath}`, '_blank');
+}
+
+function downloadFile(filePath) {
+    const cleanPath = filePath.replace(/^\/storage\//, '').replace(/^\//, '');
+    window.open(`/download-file/${cleanPath}`, '_blank');
+}
+</script>
+{% endblock %}

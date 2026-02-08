@@ -1,0 +1,262 @@
+{% set breadcrumbs = [{'text': 'Sistem Ayarları', 'url': ''}] %}
+{% extends "base_dashboard.html" %}
+
+{% block title %}Sistem Ayarları{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/admin-modern.css">
+<style>
+    .dashboard-content {
+        padding: 24px 28px;
+    }
+    
+    .settings-section {
+        background: white;
+        border-radius: var(--radius-xl);
+        padding: 24px;
+        margin-bottom: 20px;
+        box-shadow: var(--shadow-md);
+        border: 1px solid var(--gray-100);
+    }
+    
+    .settings-section h2 {
+        color: var(--gray-800);
+        font-size: 1.2rem;
+        margin-bottom: 20px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid var(--gray-100);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+    }
+    
+    .stat-item {
+        background: var(--gray-50);
+        padding: 20px;
+        border-radius: var(--radius-lg);
+        border-left: 4px solid var(--primary-500);
+        transition: all var(--transition-fast);
+    }
+    
+    .stat-item:hover {
+        background: white;
+        box-shadow: var(--shadow-sm);
+    }
+    
+    .stat-item label {
+        display: block;
+        color: var(--gray-500);
+        font-size: 0.85rem;
+        margin-bottom: 8px;
+    }
+    
+    .stat-item .value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: var(--gray-800);
+    }
+    
+    .stat-item.warning {
+        border-left-color: var(--warning-500);
+    }
+    
+    .stat-item.success {
+        border-left-color: var(--success-500);
+    }
+    
+    .stat-item.info {
+        border-left-color: var(--info-500);
+    }
+    
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 0;
+        border-bottom: 1px solid var(--gray-100);
+    }
+    
+    .info-row:last-child {
+        border-bottom: none;
+    }
+    
+    .info-row label {
+        font-weight: 500;
+        color: var(--gray-600);
+    }
+    
+    .info-row .value {
+        color: var(--gray-800);
+        font-family: 'SF Mono', 'Consolas', monospace;
+        font-size: 0.9rem;
+        background: var(--gray-50);
+        padding: 6px 12px;
+        border-radius: var(--radius-md);
+    }
+    
+    .info-row .value.success {
+        background: var(--success-100);
+        color: var(--success-700);
+    }
+    
+    @media (max-width: 768px) {
+        .dashboard-content {
+            padding: 16px;
+        }
+        
+        .info-row {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-content">
+    <div class="page-header-modern">
+        <h1>⚙️ Sistem Ayarları</h1>
+        <p>Sistem yapılandırmasını ve istatistiklerini görüntüleyin</p>
+    </div>
+
+    <div id="loading" style="text-align: center; padding: 60px 20px; color: var(--gray-400);">
+        <div class="loading-spinner" style="margin: 0 auto 16px;"></div>
+        <p>Ayarlar yükleniyor...</p>
+    </div>
+    
+    <div id="settingsContent" style="display:none">
+        <div class="settings-section">
+            <h2>📊 Kullanıcı İstatistikleri</h2>
+            <div class="stat-grid">
+                <div class="stat-item">
+                    <label>Toplam Kullanıcı</label>
+                    <div class="value" id="totalUsers">-</div>
+                </div>
+                <div class="stat-item warning">
+                    <label>Yöneticiler</label>
+                    <div class="value" id="adminCount">-</div>
+                </div>
+                <div class="stat-item info">
+                    <label>Öğretmenler</label>
+                    <div class="value" id="teacherCount">-</div>
+                </div>
+                <div class="stat-item success">
+                    <label>Öğrenciler</label>
+                    <div class="value" id="studentCount">-</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <h2>🏫 Sınıf & İçerik</h2>
+            <div class="stat-grid">
+                <div class="stat-item">
+                    <label>Toplam Sınıf</label>
+                    <div class="value" id="classCount">-</div>
+                </div>
+                <div class="stat-item info">
+                    <label>Sınavlar</label>
+                    <div class="value" id="examCount">-</div>
+                </div>
+                <div class="stat-item warning">
+                    <label>Ödevler</label>
+                    <div class="value" id="assignmentCount">-</div>
+                </div>
+                <div class="stat-item success">
+                    <label>Duyurular</label>
+                    <div class="value" id="announcementCount">-</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <h2>🗄️ Veritabanı Bilgileri</h2>
+            <div class="info-row">
+                <label>Host:</label>
+                <div class="value" id="dbHost">-</div>
+            </div>
+            <div class="info-row">
+                <label>Veritabanı:</label>
+                <div class="value" id="dbName">-</div>
+            </div>
+            <div class="info-row">
+                <label>Port:</label>
+                <div class="value" id="dbPort">-</div>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <h2>📁 Dosya Sistemi</h2>
+            <div class="info-row">
+                <label>Upload Dizini:</label>
+                <div class="value" id="uploadDir">-</div>
+            </div>
+            <div class="info-row">
+                <label>İzin Verilen Dosya Tipleri:</label>
+                <div class="value" id="allowedExtensions">-</div>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <h2>🔒 Güvenlik</h2>
+            <div class="info-row">
+                <label>Session Lifetime:</label>
+                <div class="value">24 saat</div>
+            </div>
+            <div class="info-row">
+                <label>Session Cookie HttpOnly:</label>
+                <div class="value success">Aktif ✓</div>
+            </div>
+            <div class="info-row">
+                <label>Password Hashing:</label>
+                <div class="value success">pbkdf2:sha256 ✓</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function loadSettings() {
+        try {
+            const response = await fetch('/api/admin/settings');
+            const data = await response.json();
+            
+            document.getElementById('totalUsers').textContent = data.users.total;
+            document.getElementById('adminCount').textContent = data.users.admin;
+            document.getElementById('teacherCount').textContent = data.users.teacher;
+            document.getElementById('studentCount').textContent = data.users.student;
+            
+            document.getElementById('classCount').textContent = data.classes;
+            document.getElementById('examCount').textContent = data.content.exams;
+            document.getElementById('assignmentCount').textContent = data.content.assignments;
+            document.getElementById('announcementCount').textContent = data.content.announcements;
+            
+            document.getElementById('dbHost').textContent = data.database.host;
+            document.getElementById('dbName').textContent = data.database.database;
+            document.getElementById('dbPort').textContent = data.database.port;
+            
+            document.getElementById('uploadDir').textContent = data.upload_dir;
+            document.getElementById('allowedExtensions').textContent = data.allowed_extensions;
+            
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('settingsContent').style.display = 'block';
+        } catch (error) {
+            document.getElementById('loading').innerHTML = `
+                <div style="font-size: 3rem; margin-bottom: 16px;">😕</div>
+                <p>Yükleme hatası: ${error.message}</p>
+            `;
+        }
+    }
+    
+    loadSettings();
+</script>
+{% endblock %}

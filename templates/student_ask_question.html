@@ -1,0 +1,380 @@
+{% set breadcrumbs = [{'text': 'Soru Sor', 'url': ''}] %}
+{% extends "base_dashboard.html" %}
+
+{% block title %}Soru Sor{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/admin-modern.css">
+<style>
+    .dashboard-content {
+        padding: 24px 28px;
+    }
+    
+    .form-card {
+        background: white;
+        border-radius: var(--radius-xl);
+        padding: 32px;
+        margin-bottom: 32px;
+        box-shadow: var(--shadow-lg);
+        border: 1px solid var(--gray-100);
+    }
+    
+    .form-card h2 {
+        color: var(--primary-600);
+        margin-bottom: 24px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .question-card {
+        background: white;
+        border-radius: var(--radius-xl);
+        padding: 24px;
+        margin-bottom: 20px;
+        box-shadow: var(--shadow-lg);
+        border: 1px solid var(--gray-100);
+        border-left: 4px solid var(--primary-500);
+        transition: all var(--transition-fast);
+    }
+    
+    .question-card:hover {
+        box-shadow: var(--shadow-xl);
+    }
+    
+    .question-card.answered {
+        border-left-color: var(--success-500);
+    }
+    
+    .form-group {
+        margin-bottom: 24px;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 10px;
+        font-weight: 600;
+        color: var(--gray-700);
+    }
+    
+    .form-group select, 
+    .form-group textarea, 
+    .form-group input {
+        width: 100%;
+        padding: 14px 16px;
+        border: 2px solid var(--gray-200);
+        border-radius: var(--radius-lg);
+        font-size: 1em;
+        transition: all var(--transition-fast);
+        font-family: inherit;
+    }
+    
+    .form-group select:focus,
+    .form-group textarea:focus,
+    .form-group input:focus {
+        outline: none;
+        border-color: var(--primary-500);
+        box-shadow: 0 0 0 3px var(--primary-100);
+    }
+    
+    .file-upload-area {
+        border: 2px dashed var(--gray-300);
+        border-radius: var(--radius-lg);
+        padding: 28px;
+        text-align: center;
+        background: var(--gray-50);
+        transition: all var(--transition-fast);
+    }
+    
+    .file-upload-area:hover {
+        border-color: var(--primary-400);
+        background: var(--primary-50);
+    }
+    
+    .file-upload-area p {
+        color: var(--gray-600);
+        margin-bottom: 12px;
+    }
+    
+    .file-upload-area input[type="file"] {
+        margin-top: 12px;
+    }
+    
+    .file-info {
+        margin-top: 12px;
+        color: var(--gray-500);
+        font-size: 0.9em;
+    }
+    
+    .section-title {
+        color: var(--gray-800);
+        margin-bottom: 24px;
+        font-size: 1.3em;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .question-text {
+        color: var(--gray-700);
+        line-height: 1.6;
+        margin-bottom: 16px;
+    }
+    
+    .question-meta {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        color: var(--gray-500);
+        font-size: 0.9em;
+        margin-bottom: 16px;
+    }
+    
+    .question-meta span {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    .answer-box {
+        background: var(--success-50);
+        border-left: 3px solid var(--success-500);
+        padding: 16px 20px;
+        border-radius: 0 var(--radius-md) var(--radius-md) 0;
+        margin-top: 16px;
+    }
+    
+    .answer-box strong {
+        color: var(--success-700);
+        display: block;
+        margin-bottom: 8px;
+    }
+    
+    .answer-box p {
+        color: var(--gray-700);
+        line-height: 1.6;
+    }
+    
+    .pending-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--warning-100);
+        color: var(--warning-700);
+        padding: 6px 14px;
+        border-radius: var(--radius-full);
+        font-weight: 600;
+        font-size: 0.85em;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--gray-400);
+    }
+    
+    .empty-state-icon {
+        font-size: 4em;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-content">
+    <div class="page-header-modern">
+        <h1>💬 Öğretmene Soru Sor</h1>
+        <p>Anlamadığınız konuları öğretmenlerinize sorabilirsiniz</p>
+    </div>
+
+    <div class="form-card">
+        <h2>✏️ Yeni Soru Sor</h2>
+        <form id="questionForm" enctype="multipart/form-data">
+            <div class="form-group">
+                <label>Öğretmen Seç *</label>
+                <select id="teacherSelect" required>
+                    <option value="">Bir öğretmen seçiniz...</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Sorunuz *</label>
+                <textarea id="questionText" rows="5" placeholder="Sorunuzu buraya yazınız..." required></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label>Dosya Ekle (Opsiyonel)</label>
+                <div class="file-upload-area">
+                    <p>📎 Fotoğraf, PDF, Word veya Excel dosyası yükleyebilirsiniz</p>
+                    <input type="file" id="fileInput" name="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx">
+                    <div class="file-info" id="fileInfo"></div>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-success" style="font-size: 1.1em; padding: 14px 32px;">
+                📤 Soru Gönder
+            </button>
+        </form>
+    </div>
+
+    <h2 class="section-title">📋 Sorularım</h2>
+    <div id="questionsList">
+        <div style="text-align: center; padding: 40px; color: var(--gray-400);">
+            <div class="loading-spinner" style="margin: 0 auto 16px;"></div>
+            <p>Sorular yükleniyor...</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function showToast(message, type = 'info') {
+        const container = document.querySelector('.toast-container') || createToastContainer();
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.innerHTML = `
+            <span style="font-size: 1.2rem;">${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
+            <span style="flex: 1;">${message}</span>
+        `;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 4000);
+    }
+
+    function createToastContainer() {
+        const container = document.createElement('div');
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+        return container;
+    }
+
+    async function loadTeachers() {
+        try {
+            const response = await fetch('/api/teachers');
+            const data = await response.json();
+            const select = document.getElementById('teacherSelect');
+            select.innerHTML = '<option value="">Bir öğretmen seçiniz...</option>';
+            data.teachers.forEach(t => {
+                select.innerHTML += `<option value="${t.id}">${t.full_name}</option>`;
+            });
+        } catch (error) {
+            console.error('Öğretmenler yüklenemedi:', error);
+        }
+    }
+
+    async function loadQuestions() {
+        try {
+            const response = await fetch('/student/my-questions');
+            const data = await response.json();
+            const container = document.getElementById('questionsList');
+            
+            if (!data.questions || data.questions.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">💬</div>
+                        <p>Henüz soru sormamışsınız</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = '';
+            data.questions.forEach(q => {
+                const card = document.createElement('div');
+                card.className = `question-card ${q.answer ? 'answered' : ''}`;
+                
+                const createdAt = new Date(q.created_at).toLocaleString('tr-TR', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                card.innerHTML = `
+                    <div class="question-meta">
+                        <span>👨‍🏫 ${q.teacher_name || 'Öğretmen'}</span>
+                        <span>📅 ${createdAt}</span>
+                        ${!q.answer ? '<span class="pending-badge">⏳ Cevap Bekleniyor</span>' : ''}
+                    </div>
+                    <div class="question-text">${q.question}</div>
+                    ${q.file_path ? `
+                        <a href="/view-file/${q.file_path}" target="_blank" class="btn btn-info" style="margin-bottom: 16px;">
+                            📎 Ek Dosyayı Görüntüle
+                        </a>
+                    ` : ''}
+                    ${q.answer ? `
+                        <div class="answer-box">
+                            <strong>✅ Öğretmen Cevabı:</strong>
+                            <p>${q.answer}</p>
+                        </div>
+                    ` : ''}
+                `;
+                container.appendChild(card);
+            });
+        } catch (error) {
+            document.getElementById('questionsList').innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">😕</div>
+                    <p style="color: var(--error-500);">Sorular yüklenirken hata oluştu</p>
+                </div>
+            `;
+        }
+    }
+
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        const fileInfo = document.getElementById('fileInfo');
+        if (file) {
+            fileInfo.innerHTML = `<span style="color: var(--success-600);">✓ Seçilen: ${file.name}</span>`;
+        } else {
+            fileInfo.innerHTML = '';
+        }
+    });
+
+    document.getElementById('questionForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const teacherId = document.getElementById('teacherSelect').value;
+        const questionText = document.getElementById('questionText').value;
+        const fileInput = document.getElementById('fileInput');
+        
+        if (!teacherId || !questionText.trim()) {
+            showToast('Lütfen öğretmen seçin ve sorunuzu yazın', 'error');
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('teacher_id', teacherId);
+        formData.append('question', questionText);
+        if (fileInput.files[0]) {
+            formData.append('file', fileInput.files[0]);
+        }
+        
+        try {
+            const response = await fetch('/student/ask-question', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.json();
+            
+            if (result.success) {
+                showToast('Sorunuz başarıyla gönderildi!', 'success');
+                document.getElementById('questionForm').reset();
+                document.getElementById('fileInfo').innerHTML = '';
+                loadQuestions();
+            } else {
+                showToast('Hata: ' + result.error, 'error');
+            }
+        } catch (error) {
+            showToast('Soru gönderilirken hata oluştu', 'error');
+        }
+    });
+
+    loadTeachers();
+    loadQuestions();
+</script>
+{% endblock %}

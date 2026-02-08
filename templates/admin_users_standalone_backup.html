@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kullanıcı Yönetimi - AMEO Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 { font-size: 1.5em; }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: opacity 0.3s;
+        }
+        .btn:hover { opacity: 0.8; }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-success { background: #10b981; color: white; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-secondary { background: #6b7280; color: white; }
+        .container {
+            max-width: 1400px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        .toolbar {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .users-table {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        th {
+            background: #f9fafb;
+            font-weight: 600;
+            color: #374151;
+        }
+        tr:hover { background: #f9fafb; }
+        .badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+        .badge-admin { background: #fef3c7; color: #92400e; }
+        .badge-teacher { background: #dbeafe; color: #1e40af; }
+        .badge-student { background: #d1fae5; color: #065f46; }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        .modal-content {
+            background: white;
+            max-width: 500px;
+            margin: 50px auto;
+            padding: 30px;
+            border-radius: 15px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #374151;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6b7280;
+        }
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+            max-width: 400px;
+            position: relative;
+        }
+        .search-box input {
+            width: 100%;
+            padding: 10px 40px 10px 15px;
+            border: 1px solid #d1d5db;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        .search-box input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .search-icon {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9ca3af;
+            pointer-events: none;
+        }
+        .no-results {
+            text-align: center;
+            padding: 40px;
+            color: #6b7280;
+            font-size: 1.1em;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>👥 Kullanıcı Yönetimi</h1>
+        <button class="btn btn-secondary" onclick="window.location.href='/admin/dashboard'">← Panel</button>
+    </div>
+
+    <div class="container">
+        <div class="toolbar">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="🔍 İsim, soyisim veya kullanıcı adı ara..." oninput="filterUsers()">
+                <span class="search-icon">⌨️</span>
+            </div>
+            <button class="btn btn-primary" onclick="showCreateModal()">+ Yeni Kullanıcı</button>
+            <button class="btn btn-success" onclick="document.getElementById('excelFile').click()">📊 Excel ile İçe Aktar</button>
+            <input type="file" id="excelFile" accept=".xlsx,.xls" style="display:none" onchange="uploadExcel(this)">
+            <button class="btn btn-secondary" onclick="downloadSampleExcel()">📥 Örnek Excel İndir</button>
+            <button class="btn btn-danger" id="deleteSelectedBtn" onclick="deleteSelectedUsers()" style="display:none">🗑️ Seçilenleri Sil (<span id="selectedCount">0</span>)</button>
+        </div>
+
+        <div class="users-table">
+            <div id="loading" class="loading">Yükleniyor...</div>
+            <table id="usersTable" style="display:none">
+                <thead>
+                    <tr>
+                        <th style="width: 40px;">
+                            <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this.checked)" style="cursor: pointer;">
+                        </th>
+                        <th>ID</th>
+                        <th>Kullanıcı Adı</th>
+                        <th>Ad Soyad</th>
+                        <th>Rol</th>
+                        <th>Sınıf</th>
+                        <th>İşlemler</th>
+                    </tr>
+                </thead>
+                <tbody id="usersBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="createModal" class="modal">
+        <div class="modal-content">
+            <h2>Yeni Kullanıcı Oluştur</h2>
+            <form id="createForm">
+                <div class="form-group">
+                    <label>Kullanıcı Adı *</label>
+                    <input type="text" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label>Şifre *</label>
+                    <input type="password" name="password" required>
+                </div>
+                <div class="form-group">
+                    <label>Ad Soyad *</label>
+                    <input type="text" name="full_name" required>
+                </div>
+                <div class="form-group">
+                    <label>Rol *</label>
+                    <select name="role" required onchange="toggleClassField(this.value)">
+                        <option value="">Seçiniz...</option>
+                        <option value="teacher">Öğretmen</option>
+                        <option value="student">Öğrenci</option>
+                    </select>
+                </div>
+                <div class="form-group" id="classGroup" style="display:none">
+                    <label>Sınıf (Sadece Öğrenci)</label>
+                    <select name="class_name" id="classSelect"></select>
+                </div>
+                <div style="display:flex; gap:10px; margin-top:20px">
+                    <button type="submit" class="btn btn-primary" style="flex:1">Oluştur</button>
+                    <button type="button" class="btn btn-secondary" style="flex:1" onclick="closeModal()">İptal</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let users = [];
+        let filteredUsers = [];
+
+        async function loadUsers() {
+            try {
+                const response = await fetch('/api/admin/users');
+                const data = await response.json();
+                users = data.users || [];
+                filteredUsers = users;
+                renderUsers();
+            } catch (error) {
+                document.getElementById('loading').textContent = 'Yükleme hatası: ' + error.message;
+            }
+        }
+
+        function filterUsers() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
+            
+            if (!searchTerm) {
+                filteredUsers = users;
+            } else {
+                filteredUsers = users.filter(user => {
+                    const username = (user.username || '').toLowerCase();
+                    const fullName = (user.full_name || '').toLowerCase();
+                    const className = (user.class_name || '').toLowerCase();
+                    
+                    return username.includes(searchTerm) || 
+                           fullName.includes(searchTerm) || 
+                           className.includes(searchTerm);
+                });
+            }
+            
+            renderUsers();
+        }
+
+        function renderUsers() {
+            const tbody = document.getElementById('usersBody');
+            tbody.innerHTML = '';
+            
+            if (filteredUsers.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="no-results">🔍 Aradığınız kriterlere uygun kullanıcı bulunamadı.</td></tr>';
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('usersTable').style.display = 'table';
+                return;
+            }
+            
+            filteredUsers.forEach(user => {
+                const tr = document.createElement('tr');
+                const roleClass = user.role === 'admin' ? 'badge-admin' : 
+                                 user.role === 'teacher' ? 'badge-teacher' : 'badge-student';
+                tr.innerHTML = `
+                    <td>
+                        ${user.role !== 'admin' ? `<input type="checkbox" class="user-checkbox" data-user-id="${user.id}" onchange="updateSelectedCount()" style="cursor: pointer;">` : ''}
+                    </td>
+                    <td>${user.id}</td>
+                    <td>${user.username}</td>
+                    <td>${user.full_name}</td>
+                    <td><span class="badge ${roleClass}">${user.role}</span></td>
+                    <td>${user.class_name || '-'}</td>
+                    <td>
+                        <button class="btn btn-success" style="padding:5px 15px; font-size:0.9em; margin-right: 5px;" onclick="impersonateUser(${user.id}, '${user.full_name}')">🔑 Kullanıcıya Bağlan</button>
+                        ${user.role !== 'admin' ? `<button class="btn btn-danger" style="padding:5px 15px; font-size:0.9em" onclick="deleteUser(${user.id})">Sil</button>` : ''}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('usersTable').style.display = 'table';
+            updateSelectedCount();
+        }
+
+        function toggleSelectAll(checked) {
+            const checkboxes = document.querySelectorAll('.user-checkbox');
+            checkboxes.forEach(cb => cb.checked = checked);
+            updateSelectedCount();
+        }
+
+        function updateSelectedCount() {
+            const selected = document.querySelectorAll('.user-checkbox:checked');
+            const count = selected.length;
+            document.getElementById('selectedCount').textContent = count;
+            document.getElementById('deleteSelectedBtn').style.display = count > 0 ? 'inline-block' : 'none';
+            
+            const selectAllCheckbox = document.getElementById('selectAll');
+            const allCheckboxes = document.querySelectorAll('.user-checkbox');
+            selectAllCheckbox.checked = allCheckboxes.length > 0 && selected.length === allCheckboxes.length;
+        }
+
+        async function deleteSelectedUsers() {
+            const selected = Array.from(document.querySelectorAll('.user-checkbox:checked'))
+                .map(cb => parseInt(cb.dataset.userId));
+            
+            if (selected.length === 0) {
+                alert('Lütfen silmek için kullanıcı seçiniz!');
+                return;
+            }
+            
+            const confirmMsg = `${selected.length} kullanıcıyı silmek istediğinize emin misiniz?\n\n⚠️ Bu işlem geri alınamaz!\n⚠️ Kullanıcılara ait tüm veriler (sınavlar, ödevler, duyurular) silinecektir!`;
+            
+            if (!confirm(confirmMsg)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/admin/users/delete-bulk', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_ids: selected })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Partial failure veya full success kontrolü
+                    const hasErrors = result.errors && (typeof result.errors === 'number' ? result.errors > 0 : result.errors.length > 0);
+                    
+                    if (hasErrors) {
+                        const errorCount = typeof result.errors === 'number' ? result.errors : result.errors.length;
+                        alert(`⚠️ Kısmi başarı:\n\n${result.message}\n\n📊 Özet:\n✅ Silinen: ${result.deleted}\n❌ Hata: ${errorCount}\n\nDetaylar için console'u kontrol edin.`);
+                        console.log('Toplu silme sonuç:', result);
+                    } else {
+                        alert(`✅ ${result.deleted} kullanıcı başarıyla silindi!`);
+                    }
+                    document.getElementById('selectAll').checked = false;
+                    loadUsers();
+                } else {
+                    alert('❌ Hata: ' + result.error);
+                }
+            } catch (error) {
+                alert('Silme işlemi sırasında hata oluştu: ' + error.message);
+            }
+        }
+
+        function showCreateModal() {
+            loadClasses();
+            document.getElementById('createModal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('createModal').style.display = 'none';
+            document.getElementById('createForm').reset();
+        }
+
+        function toggleClassField(role) {
+            document.getElementById('classGroup').style.display = role === 'student' ? 'block' : 'none';
+        }
+
+        async function loadClasses() {
+            try {
+                const response = await fetch('/admin/classes');
+                const data = await response.json();
+                const select = document.getElementById('classSelect');
+                select.innerHTML = '<option value="">Sınıf Seçiniz...</option>';
+                data.classes.forEach(cls => {
+                    select.innerHTML += `<option value="${cls.name}">${cls.name}</option>`;
+                });
+            } catch (error) {
+                console.error('Sınıflar yüklenemedi:', error);
+            }
+        }
+
+        document.getElementById('createForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+            
+            try {
+                const response = await fetch('/api/admin/users/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    alert('Kullanıcı başarıyla oluşturuldu!');
+                    closeModal();
+                    loadUsers();
+                } else {
+                    alert('Hata: ' + (result.error || 'Kullanıcı oluşturulamadı'));
+                }
+            } catch (error) {
+                alert('Bağlantı hatası: ' + error.message);
+            }
+        });
+
+        async function impersonateUser(userId, fullName) {
+            if (!confirm(`${fullName} kullanıcısı olarak sisteme giriş yapılacak. Devam edilsin mi?`)) return;
+            
+            try {
+                const response = await fetch(`/api/admin/impersonate/${userId}`, { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(result.message);
+                    window.location.href = result.redirect;
+                } else {
+                    alert('Hata: ' + (result.error || 'Bağlanılamadı'));
+                }
+            } catch (error) {
+                alert('Bağlantı hatası: ' + error.message);
+            }
+        }
+
+        async function deleteUser(userId) {
+            if (!confirm('Bu kullanıcıyı silmek istediğinizden emin misiniz?')) return;
+            
+            try {
+                const response = await fetch(`/api/admin/users/${userId}`, { method: 'DELETE' });
+                const result = await response.json();
+                if (result.success) {
+                    alert('Kullanıcı silindi');
+                    loadUsers();
+                } else {
+                    alert('Hata: ' + (result.error || 'Silinemedi'));
+                }
+            } catch (error) {
+                alert('Bağlantı hatası: ' + error.message);
+            }
+        }
+
+        async function uploadExcel(input) {
+            const file = input.files[0];
+            if (!file) return;
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                const response = await fetch('/api/admin/users/upload-excel', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    alert(`Başarılı! ${result.created_count} kullanıcı oluşturuldu.`);
+                    loadUsers();
+                } else {
+                    alert('Hata: ' + (result.error || 'Excel yüklenemedi'));
+                }
+            } catch (error) {
+                alert('Yükleme hatası: ' + error.message);
+            }
+            input.value = '';
+        }
+
+        function downloadSampleExcel() {
+            window.location.href = '/api/admin/sample-excel';
+        }
+
+        loadUsers();
+    </script>
+</body>
+</html>

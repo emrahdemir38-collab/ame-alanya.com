@@ -1,0 +1,103 @@
+Kodular is unable to compile this project.
+The compiler error output was
+[ReadBuildInfo] Starting Task
+[ReadBuildInfo] Task succeeded in 0.006 seconds
+[LoadComponentInfo] Starting Task
+[LoadComponentInfo] INFO: Generating assets...
+[LoadComponentInfo] Component assets needed, n = 7
+[LoadComponentInfo] INFO: Generating activities...
+[LoadComponentInfo] Component activities needed, n = 0
+[LoadComponentInfo] Component activity metadata needed, n = 0
+[LoadComponentInfo] INFO: Generating broadcast receivers...
+[LoadComponentInfo] INFO: Generating libraries...
+[LoadComponentInfo] Libraries needed, n = 11
+[LoadComponentInfo] Component metadata needed, n = 0
+[LoadComponentInfo] INFO: Generating Android minimum SDK...
+[LoadComponentInfo] INFO: Generating native libraries...
+[LoadComponentInfo] Native Libraries needed, n = 0
+[LoadComponentInfo] INFO: Generating permissions...
+[LoadComponentInfo] usesLocation = True
+[LoadComponentInfo] Permissions needed, n = 8
+[LoadComponentInfo] Component xmls needed, n = 0
+[LoadComponentInfo] INFO: Generating component broadcast receivers...
+[LoadComponentInfo] Task succeeded in 0.009 seconds
+[CheckDeprecatedComponents] Starting Task
+[CheckDeprecatedComponents] Task succeeded in 0.024 seconds
+[CheckComponentRequirements] Starting Task
+[CheckComponentRequirements] Task succeeded in 0.0 seconds
+[VerifyExtensions] Starting Task
+[VerifyExtensions] Task succeeded in 0.0 seconds
+[GenerateBuildId] Starting Task
+[GenerateBuildId] INFO: Skipping Build ID generation for App with no required components.
+[GenerateBuildId] Task succeeded in 0.0 seconds
+[RetrieveGamAdUnit] Starting Task
+[RetrieveGamAdUnit] INFO: Skipping Ad Unit ID retrieval for app with no required components.
+[RetrieveGamAdUnit] Task succeeded in 0.0 seconds
+[PrepareAppIcon] Starting Task
+[PrepareAppIcon] INFO: Creating mipmap dirs...
+[PrepareAppIcon] INFO: Generating icons...
+[PrepareAppIcon] Generating icons for mipmap-mdpi
+[PrepareAppIcon] Generating icons for mipmap-hdpi
+[PrepareAppIcon] Generating icons for mipmap-xhdpi
+[PrepareAppIcon] Generating icons for mipmap-xxhdpi
+[PrepareAppIcon] Generating icons for mipmap-xxxhdpi
+[PrepareAppIcon] Task succeeded in 0.377 seconds
+[XmlConfig] Starting Task
+[XmlConfig] INFO: Creating animation xml
+[XmlConfig] Creating zoom_enter.xml
+[XmlConfig] Creating fadeout.xml
+[XmlConfig] Creating slide_v_exit.xml
+[XmlConfig] Creating fadein.xml
+[XmlConfig] Creating zoom_exit.xml
+[XmlConfig] Creating slide_v_enter.xml
+[XmlConfig] Creating zoom_exit_reverse.xml
+[XmlConfig] Creating slide_v_enter_reverse.xml
+[XmlConfig] Creating zoom_enter_reverse.xml
+[XmlConfig] Creating slide_enter_reverse.xml
+[XmlConfig] Creating slide_exit.xml
+[XmlConfig] Creating hold.xml
+[XmlConfig] Creating slide_enter.xml
+[XmlConfig] Creating slide_v_exit_reverse.xml
+[XmlConfig] Creating slide_exit_reverse.xml
+[XmlConfig] INFO: Creating colors xml
+[XmlConfig] INFO: Creating styles xml
+[XmlConfig] INFO: Creating provider_path xml
+[XmlConfig] INFO: Creating network_security_config xml
+[XmlConfig] INFO: Generating adaptive icon file
+[XmlConfig] INFO: Generating round adaptive icon file
+[XmlConfig] INFO: Generating adaptive icon background file
+[XmlConfig] INFO: Creating fragment xml
+[XmlConfig] INFO: Creating listview xml
+[XmlConfig] INFO: Creating listview-21 xml
+[XmlConfig] INFO: Creating drawable xml
+[XmlConfig] INFO: Creating drawable-21 xml
+[XmlConfig] INFO: Creating strings xml
+[XmlConfig] Task succeeded in 0.003 seconds
+[CreateManifest] Starting Task
+[CreateManifest] INFO: Reading project specs...
+[CreateManifest] VCode: 2
+[CreateManifest] VName: 1.0
+[CreateManifest] Custom Package Name: io.kodular.emrahdemir38.AMEO
+[CreateManifest] Min SDK 21
+[CreateManifest] INFO: Writing screen 'io.kodular.emrahdemir38.AMEO.Screen1'
+[CreateManifest] Task succeeded in 0.0 seconds
+[AttachNativeLibs] Starting Task
+[AttachNativeLibs] Task succeeded in 0.0 seconds
+[AttachAarLibs] Starting Task
+[AttachAarLibs] Task succeeded in 0.067 seconds
+[AttachCompAssets] Starting Task
+[AttachCompAssets] Task succeeded in 0.005 seconds
+[MergeResources] Starting Task
+[MergeResources] Task succeeded in 0.064 seconds
+[SetupLibs] Starting Task
+[SetupLibs] Task succeeded in 0.0 seconds
+[RunAapt] Starting Task
+[RunAapt] Task succeeded in 0.951 seconds
+[GenerateClasses] Starting Task
+[GenerateClasses] INFO: Source File: io/kodular/emrahdemir38/AMEO/Screen1.yail
+[GenerateClasses] ERROR: Kawa compile has failed.
+(compiling io/kodular/emrahdemir38/AMEO/Screen1.yail to io.kodular.emrahdemir38.AMEO.Screen1)
+ERROR: io/kodular/emrahdemir38/AMEO/Screen1.yail line 85: call to 'set-and-coerce-property!' has too few arguments (3; must be 4)
+[GenerateClasses] ERROR: Can't find class file for Screen 'Screen1'
+[GenerateClasses] Task errored in 0.754 seconds
+.

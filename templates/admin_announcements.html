@@ -1,0 +1,544 @@
+{% set breadcrumbs = [{'text': 'Duyurular', 'url': ''}] %}
+{% extends "base_dashboard.html" %}
+
+{% block title %}Duyuru Yönetimi{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/admin-modern.css">
+<style>
+    .dashboard-content {
+        padding: 24px 28px;
+    }
+    
+    .announcement-card {
+        background: white;
+        border-radius: var(--radius-xl);
+        padding: 24px;
+        margin-bottom: 20px;
+        box-shadow: var(--shadow-md);
+        border: 1px solid var(--gray-100);
+        transition: all var(--transition-normal);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .announcement-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 4px;
+        height: 100%;
+        background: linear-gradient(180deg, var(--primary-500), var(--info-500));
+    }
+    
+    .announcement-card:hover {
+        box-shadow: var(--shadow-lg);
+    }
+    
+    .announcement-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 16px;
+    }
+    
+    .announcement-title-wrap {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    
+    .announcement-title {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--gray-800);
+    }
+    
+    .announcement-content {
+        color: var(--gray-600);
+        line-height: 1.7;
+        margin-bottom: 16px;
+    }
+    
+    .announcement-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        padding-top: 16px;
+        border-top: 1px solid var(--gray-100);
+        font-size: 0.85rem;
+        color: var(--gray-500);
+    }
+    
+    .checkbox-group-modern {
+        border: 2px solid var(--gray-200);
+        border-radius: var(--radius-lg);
+        padding: 16px;
+        max-height: 200px;
+        overflow-y: auto;
+        background: var(--gray-50);
+    }
+    
+    .checkbox-group-modern label {
+        display: flex;
+        align-items: center;
+        padding: 8px 12px;
+        margin: 4px 0;
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        transition: background var(--transition-fast);
+    }
+    
+    .checkbox-group-modern label:hover {
+        background: white;
+    }
+    
+    .checkbox-group-modern input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        margin-right: 10px;
+    }
+    
+    .target-type-options {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+    
+    .target-option {
+        flex: 1;
+        min-width: 150px;
+        padding: 16px;
+        border: 2px solid var(--gray-200);
+        border-radius: var(--radius-lg);
+        background: white;
+        cursor: pointer;
+        text-align: center;
+        transition: all var(--transition-fast);
+    }
+    
+    .target-option:hover {
+        border-color: var(--primary-300);
+        background: var(--primary-50);
+    }
+    
+    .target-option.selected {
+        border-color: var(--primary-500);
+        background: var(--primary-50);
+    }
+    
+    .target-option input {
+        display: none;
+    }
+    
+    .target-option-icon {
+        font-size: 1.5rem;
+        margin-bottom: 8px;
+    }
+    
+    .target-option-text {
+        font-weight: 600;
+        color: var(--gray-700);
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 80px 20px;
+        background: white;
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow-md);
+    }
+    
+    .empty-state-icon {
+        font-size: 4rem;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+    
+    .empty-state h3 {
+        color: var(--gray-600);
+        margin-bottom: 8px;
+    }
+    
+    .empty-state p {
+        color: var(--gray-400);
+    }
+    
+    @media (max-width: 768px) {
+        .dashboard-content {
+            padding: 16px;
+        }
+        
+        .target-type-options {
+            flex-direction: column;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-content">
+    <div class="page-header-modern">
+        <h1>📢 Duyuru Yönetimi</h1>
+        <p>Öğretmen, öğrenci ve genel duyuruları yönetin</p>
+        <div class="page-header-actions">
+            <button class="btn btn-primary" onclick="showCreateModal()">
+                <span>➕</span> Yeni Duyuru
+            </button>
+        </div>
+    </div>
+
+    <div id="announcementsList"></div>
+</div>
+
+<!-- Create Announcement Modal -->
+<div id="createModal" class="modal-overlay" onclick="if(event.target === this) closeModal()">
+    <div class="modal-modern" style="max-width: 640px;">
+        <div class="modal-header">
+            <h2>📢 Yeni Duyuru Oluştur</h2>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <form id="createForm" enctype="multipart/form-data">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label required">Başlık</label>
+                    <input type="text" name="title" class="form-input" required placeholder="Duyuru başlığı...">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label required">İçerik</label>
+                    <textarea name="content" class="form-textarea" required placeholder="Duyuru içeriğini yazın..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label required">Duyuru Hedefi</label>
+                    <div class="target-type-options">
+                        <label class="target-option selected" onclick="selectTargetType(this, 'teachers')">
+                            <input type="radio" name="target_type" value="teachers" checked>
+                            <div class="target-option-icon">👨‍🏫</div>
+                            <div class="target-option-text">Öğretmenler</div>
+                        </label>
+                        <label class="target-option" onclick="selectTargetType(this, 'students')">
+                            <input type="radio" name="target_type" value="students">
+                            <div class="target-option-icon">👨‍🎓</div>
+                            <div class="target-option-text">Öğrenciler</div>
+                        </label>
+                        <label class="target-option" onclick="selectTargetType(this, 'public')">
+                            <input type="radio" name="target_type" value="public">
+                            <div class="target-option-icon">🌐</div>
+                            <div class="target-option-text">Ana Sayfa</div>
+                        </label>
+                    </div>
+                    
+                    <div id="teacherSelection">
+                        <label class="form-label">Hedef Öğretmenler</label>
+                        <div class="checkbox-group-modern" id="teacherCheckboxes">
+                            <p style="color: var(--gray-500); padding: 16px;">Yükleniyor...</p>
+                        </div>
+                    </div>
+                    
+                    <div id="studentSelection" style="display: none;">
+                        <label class="form-label">Hedef Sınıflar</label>
+                        <div class="checkbox-group-modern" id="classCheckboxes">
+                            <p style="color: var(--gray-500); padding: 16px;">Yükleniyor...</p>
+                        </div>
+                    </div>
+                    
+                    <div id="publicInfo" style="display: none;">
+                        <div class="alert alert-success">
+                            <span class="alert-icon">ℹ️</span>
+                            <span>Bu duyuru ana sayfada tüm ziyaretçilere gösterilecektir.</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Dosya Ekle (Opsiyonel)</label>
+                    <input type="file" name="file" class="form-input" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+                    <span class="form-helper">PDF, Word veya resim dosyası yükleyebilirsiniz</span>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Bağlantı / Link (Opsiyonel)</label>
+                    <input type="url" name="video_url" class="form-input" placeholder="https://example.com veya https://youtube.com/...">
+                    <span class="form-helper">YouTube videosu veya herhangi bir internet sitesi linki ekleyebilirsiniz</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">İptal</button>
+                <button type="submit" class="btn btn-success">Duyuru Yayınla</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function showToast(message, type = 'info') {
+        const container = document.querySelector('.toast-container') || createToastContainer();
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.innerHTML = `
+            <span style="font-size: 1.2rem;">${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
+            <span style="flex: 1;">${message}</span>
+        `;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 4000);
+    }
+
+    function createToastContainer() {
+        const container = document.createElement('div');
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+        return container;
+    }
+
+    async function loadAnnouncements() {
+        try {
+            const response = await fetch('/admin/announcements/list');
+            const data = await response.json();
+            const container = document.getElementById('announcementsList');
+            
+            if (!data.announcements || data.announcements.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📢</div>
+                        <h3>Henüz duyuru yok</h3>
+                        <p>Yeni bir duyuru oluşturmak için yukarıdaki butonu kullanın</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = '';
+            data.announcements.forEach(a => {
+                const card = document.createElement('div');
+                card.className = 'announcement-card';
+                
+                let typeLabel = '';
+                let badgeClass = 'badge-primary';
+                if (a.announcement_type === 'public') {
+                    typeLabel = '🌐 Ana Sayfa';
+                    badgeClass = 'badge-success';
+                } else {
+                    typeLabel = '👨‍🏫 Öğretmenler';
+                }
+                
+                let formattedDate = 'Tarih yok';
+                if (a.created_at) {
+                    const isoTimestamp = a.created_at.replace(' ', 'T') + (a.created_at.includes('Z') ? '' : 'Z');
+                    formattedDate = new Date(isoTimestamp).toLocaleString('tr-TR', {
+                        timeZone: 'Europe/Istanbul',
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                }
+                
+                card.innerHTML = `
+                    <div class="announcement-header">
+                        <div class="announcement-title-wrap">
+                            <span class="announcement-title">${a.title}</span>
+                            <span class="badge ${badgeClass}">${typeLabel}</span>
+                        </div>
+                        <button class="btn btn-sm btn-danger" onclick="deleteAnnouncement(${a.id}, '${a.announcement_type}')">🗑️ Sil</button>
+                    </div>
+                    <div class="announcement-content">${a.content}</div>
+                    <div class="announcement-meta">
+                        <span>🎯 ${a.target_teachers || (a.announcement_type === 'public' ? 'Tüm ziyaretçiler' : 'Tüm öğretmenler')}</span>
+                        ${a.file_path ? '<span style="color: var(--success-600);">📎 Dosya eklendi</span>' : ''}
+                        ${a.video_url ? '<span style="color: var(--primary-600);">🎥 Video eklendi</span>' : ''}
+                        <span>📅 ${formattedDate}</span>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        } catch (error) {
+            console.error('Duyurular yüklenemedi:', error);
+            document.getElementById('announcementsList').innerHTML = `
+                <div class="alert alert-error">
+                    <span class="alert-icon">❌</span>
+                    <span>Duyurular yüklenirken hata oluştu</span>
+                </div>
+            `;
+        }
+    }
+    
+    function selectTargetType(element, type) {
+        document.querySelectorAll('.target-option').forEach(opt => opt.classList.remove('selected'));
+        element.classList.add('selected');
+        element.querySelector('input').checked = true;
+        toggleTargetSelection();
+    }
+    
+    function toggleTargetSelection() {
+        const targetType = document.querySelector('input[name="target_type"]:checked').value;
+        const teacherSelection = document.getElementById('teacherSelection');
+        const studentSelection = document.getElementById('studentSelection');
+        const publicInfo = document.getElementById('publicInfo');
+        
+        teacherSelection.style.display = 'none';
+        studentSelection.style.display = 'none';
+        publicInfo.style.display = 'none';
+        
+        if (targetType === 'teachers') {
+            teacherSelection.style.display = 'block';
+        } else if (targetType === 'students') {
+            studentSelection.style.display = 'block';
+            loadClasses();
+        } else if (targetType === 'public') {
+            publicInfo.style.display = 'block';
+        }
+    }
+    
+    async function loadClasses() {
+        try {
+            const response = await fetch('/admin/classes');
+            const data = await response.json();
+            const container = document.getElementById('classCheckboxes');
+            container.innerHTML = '';
+            
+            if (!data.classes || data.classes.length === 0) {
+                container.innerHTML = '<p style="color: var(--error-500);">Sınıf bulunamadı</p>';
+                return;
+            }
+            
+            const selectAll = document.createElement('label');
+            selectAll.style.borderBottom = '1px solid var(--gray-200)';
+            selectAll.style.marginBottom = '8px';
+            selectAll.style.paddingBottom = '8px';
+            selectAll.innerHTML = '<input type="checkbox" id="selectAllClasses" onchange="toggleAllClasses(this)"><strong>Tümünü Seç</strong>';
+            container.appendChild(selectAll);
+            
+            data.classes.forEach(cls => {
+                const label = document.createElement('label');
+                label.innerHTML = `<input type="checkbox" name="target_classes[]" value="${cls.name}" class="class-checkbox">${cls.name}`;
+                container.appendChild(label);
+            });
+        } catch (error) {
+            console.error('Sınıflar yüklenemedi:', error);
+            document.getElementById('classCheckboxes').innerHTML = '<p style="color: var(--error-500);">Hata oluştu</p>';
+        }
+    }
+    
+    async function showCreateModal() {
+        document.getElementById('createModal').classList.add('show');
+        
+        try {
+            const response = await fetch('/api/admin/users');
+            const data = await response.json();
+            const container = document.getElementById('teacherCheckboxes');
+            container.innerHTML = '';
+            
+            const teachers = data.users.filter(u => u.role === 'teacher');
+            
+            if (teachers.length === 0) {
+                container.innerHTML = '<p style="color: var(--error-500);">Öğretmen bulunamadı</p>';
+                return;
+            }
+            
+            const selectAll = document.createElement('label');
+            selectAll.style.borderBottom = '1px solid var(--gray-200)';
+            selectAll.style.marginBottom = '8px';
+            selectAll.style.paddingBottom = '8px';
+            selectAll.innerHTML = '<input type="checkbox" id="selectAllTeachers" onchange="toggleAllTeachers(this)"><strong>Tümünü Seç</strong>';
+            container.appendChild(selectAll);
+            
+            teachers.forEach(teacher => {
+                const label = document.createElement('label');
+                label.innerHTML = `<input type="checkbox" name="target_teachers[]" value="${teacher.username}" class="teacher-checkbox">${teacher.username} (${teacher.full_name || 'İsimsiz'})`;
+                container.appendChild(label);
+            });
+        } catch (error) {
+            console.error('Öğretmenler yüklenemedi:', error);
+            document.getElementById('teacherCheckboxes').innerHTML = '<p style="color: var(--error-500);">Hata oluştu</p>';
+        }
+    }
+    
+    function toggleAllClasses(checkbox) {
+        document.querySelectorAll('.class-checkbox').forEach(cb => cb.checked = checkbox.checked);
+    }
+    
+    function toggleAllTeachers(checkbox) {
+        document.querySelectorAll('.teacher-checkbox').forEach(cb => cb.checked = checkbox.checked);
+    }
+    
+    function closeModal() {
+        document.getElementById('createModal').classList.remove('show');
+        document.getElementById('createForm').reset();
+        document.querySelectorAll('.target-option').forEach((opt, i) => {
+            opt.classList.toggle('selected', i === 0);
+        });
+        toggleTargetSelection();
+    }
+    
+    document.getElementById('createForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const targetType = document.querySelector('input[name="target_type"]:checked').value;
+        
+        let endpoint = '/admin/announcements/create';
+        
+        if (targetType === 'public') {
+            endpoint = '/admin/announcements/create-public';
+        } else if (targetType === 'students') {
+            endpoint = '/teacher/announcements/create';
+        }
+        
+        try {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok || result.success) {
+                showToast('Duyuru başarıyla oluşturuldu!', 'success');
+                closeModal();
+                loadAnnouncements();
+            } else {
+                showToast('Hata: ' + (result.error || 'Bilinmeyen hata'), 'error');
+            }
+        } catch (error) {
+            console.error('Duyuru oluşturulamadı:', error);
+            showToast('Duyuru oluşturulurken hata oluştu', 'error');
+        }
+    });
+    
+    async function deleteAnnouncement(announcementId, announcementType) {
+        if (!confirm('Bu duyuruyu silmek istediğinizden emin misiniz?')) {
+            return;
+        }
+        
+        try {
+            let endpoint = `/admin/announcements/${announcementId}`;
+            if (announcementType === 'public') {
+                endpoint = `/admin/public-announcements/${announcementId}`;
+            }
+            
+            const response = await fetch(endpoint, {
+                method: 'DELETE'
+            });
+            
+            const result = await response.json();
+            if (result.success) {
+                showToast('Duyuru silindi!', 'success');
+                loadAnnouncements();
+            } else {
+                showToast('Hata: ' + (result.error || 'Duyuru silinemedi'), 'error');
+            }
+        } catch (error) {
+            showToast('Bağlantı hatası: ' + error.message, 'error');
+        }
+    }
+    
+    loadAnnouncements();
+</script>
+{% endblock %}

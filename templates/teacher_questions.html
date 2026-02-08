@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Öğrenci Soruları - AMEO</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f5f7fa; }
+        .header { background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%); color: white; padding: 15px 30px; display: flex; justify-content: space-between; }
+        .btn-secondary { background: #6b7280; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
+        .container { max-width: 1400px; margin: 20px auto; padding: 0 20px; }
+        .question-card { background: white; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .answer-box { margin-top: 15px; padding-top: 15px; border-top: 2px solid #e5e7eb; }
+        .btn-primary { background: #2563eb; color: white; padding: 8px 16px; border: none; border-radius: 5px; cursor: pointer; }
+        .btn-danger { background: #ef4444; color: white; padding: 8px 16px; border: none; border-radius: 5px; cursor: pointer; margin-left: 10px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>💬 Öğrenci Soruları</h1>
+        <button class="btn-secondary" onclick="window.location.href='/teacher/dashboard'">← Panel</button>
+    </div>
+    <div class="container"><div id="questionsList"></div></div>
+
+    <script>
+        async function loadQuestions() {
+            try {
+                const response = await fetch('/teacher/api/questions');
+                const data = await response.json();
+                const container = document.getElementById('questionsList');
+                
+                if (!data.questions || data.questions.length === 0) {
+                    container.innerHTML = '<div style="text-align:center; padding:40px; color:#6b7280;">Henüz soru yok</div>';
+                    return;
+                }
+                
+                container.innerHTML = '';
+                data.questions.forEach(q => {
+                    const card = document.createElement('div');
+                    card.className = 'question-card';
+                    const fileButton = q.file_path ? `
+                        <a href="/uploads/${q.file_path}" target="_blank" style="display:inline-block; margin:10px 0; padding:8px 15px; background:#3b82f6; color:white; border-radius:5px; text-decoration:none; font-weight:500;">
+                            🔍 Öğrenci Dosyasını Tam Ekranda Aç
+                        </a>
+                    ` : '';
+                    
+                    card.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; align-items:start;">
+                            <h3>${q.student_name} - ${new Date(q.created_at).toLocaleString('tr-TR')}</h3>
+                            <button class="btn-danger" onclick="deleteQuestion(${q.id})">🗑️ Sil</button>
+                        </div>
+                        <p style="margin:10px 0; color:#333;"><strong>Soru:</strong> ${q.question_text}</p>
+                        ${fileButton}
+                        ${q.answer_text ? `<div class="answer-box"><p style="color:#10b981;"><strong>Cevabınız:</strong> ${q.answer_text}</p><p style="font-size:0.85em; color:#6b7280;">${new Date(q.answered_at).toLocaleString('tr-TR')}</p></div>` : `
+                            <div class="answer-box">
+                                <textarea id="answer-${q.id}" placeholder="Cevabınızı yazın..." style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:5px; min-height:80px;"></textarea>
+                                <button class="btn-primary" style="margin-top:10px;" onclick="answerQuestion(${q.id})">Cevapla</button>
+                            </div>
+                        `}
+                    `;
+                    container.appendChild(card);
+                });
+            } catch (error) {
+                console.error('Sorular yüklenirken hata:', error);
+                document.getElementById('questionsList').innerHTML = '<div style="text-align:center; padding:40px; color:#dc2626;">Sorular yüklenirken hata oluştu</div>';
+            }
+        }
+
+        async function answerQuestion(questionId) {
+            const answer = document.getElementById(`answer-${questionId}`).value.trim();
+            if (!answer) { alert('Lütfen cevap yazın'); return; }
+            
+            try {
+                const response = await fetch(`/teacher/questions/${questionId}/answer`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ answer_text: answer })
+                });
+                const result = await response.json();
+                if (result.success) { 
+                    alert('✅ Cevap gönderildi'); 
+                    loadQuestions(); 
+                } else { 
+                    alert('❌ Hata: ' + result.error); 
+                }
+            } catch (error) {
+                console.error('Cevap gönderilirken hata:', error);
+                alert('❌ Bağlantı hatası');
+            }
+        }
+
+        async function deleteQuestion(questionId) {
+            if (!confirm('Bu soruyu silmek istediğinizden emin misiniz?')) return;
+            
+            try {
+                const response = await fetch(`/teacher/questions/${questionId}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+                if (result.success) {
+                    alert('✅ Soru silindi');
+                    loadQuestions();
+                } else {
+                    const errorMsg = response.status === 403 ? 'Yetkiniz yok' : (result.error || 'Soru silinemedi');
+                    alert('❌ Hata: ' + errorMsg);
+                }
+            } catch (error) {
+                console.error('Soru silinirken hata:', error);
+                alert('❌ Bağlantı hatası');
+            }
+        }
+
+        loadQuestions();
+    </script>
+</body>
+</html>

@@ -1,0 +1,318 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Debug & Log Paneli - AMEO{% endblock %}
+
+{% block extra_css %}
+<style>
+    .debug-container {
+        padding: 20px;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+    .debug-header {
+        background: linear-gradient(135deg, #1e3a5f 0%, #667eea 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+    }
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    .stat-card {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+    .stat-card h3 {
+        font-size: 2em;
+        color: #667eea;
+        margin: 0;
+    }
+    .stat-card p {
+        color: #666;
+        margin: 5px 0 0;
+    }
+    .section {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    .section h2 {
+        color: #1e3a5f;
+        border-bottom: 2px solid #667eea;
+        padding-bottom: 10px;
+        margin-top: 0;
+    }
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9em;
+    }
+    .data-table th, .data-table td {
+        padding: 10px;
+        border: 1px solid #ddd;
+        text-align: left;
+    }
+    .data-table th {
+        background: #f5f5f5;
+        font-weight: 600;
+    }
+    .data-table tr:hover {
+        background: #f9f9f9;
+    }
+    .status-completed { color: #28a745; font-weight: bold; }
+    .status-processing { color: #ffc107; font-weight: bold; }
+    .status-failed { color: #dc3545; font-weight: bold; }
+    .error-text {
+        color: #dc3545;
+        font-size: 0.85em;
+        max-width: 400px;
+        word-break: break-word;
+    }
+    .refresh-btn {
+        background: #667eea;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        cursor: pointer;
+        margin-left: 10px;
+    }
+    .refresh-btn:hover {
+        background: #5a6fd6;
+    }
+    .correct { color: #28a745; }
+    .wrong { color: #dc3545; }
+    .timestamp {
+        font-size: 0.8em;
+        color: #888;
+    }
+    #autoRefresh {
+        margin-right: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="debug-container">
+    <div class="debug-header">
+        <h1>Debug & Log Paneli</h1>
+        <p>Production veritabani durumu ve hatalari</p>
+        <label>
+            <input type="checkbox" id="autoRefresh"> Otomatik Yenile (30sn)
+        </label>
+        <button class="refresh-btn" onclick="location.reload()">Yenile</button>
+        <span class="timestamp">Son guncelleme: {{ now().strftime('%H:%M:%S') if now else 'N/A' }}</span>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>{{ stats.total_exams or 0 }}</h3>
+            <p>Toplam Sinav</p>
+        </div>
+        <div class="stat-card">
+            <h3>{{ stats.status_counts.get('completed', 0) }}</h3>
+            <p>Tamamlanan</p>
+        </div>
+        <div class="stat-card">
+            <h3>{{ stats.status_counts.get('processing', 0) }}</h3>
+            <p>Isleniyor</p>
+        </div>
+        <div class="stat-card">
+            <h3>{{ stats.status_counts.get('failed', 0) }}</h3>
+            <p>Hatali</p>
+        </div>
+        <div class="stat-card">
+            <h3>{{ stats.total_students or 0 }}</h3>
+            <p>Toplam Ogrenci</p>
+        </div>
+        <div class="stat-card">
+            <h3>{{ stats.total_answers or 0 }}</h3>
+            <p>Toplam Cevap</p>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Dosya Sistemi Durumu</h2>
+        <p><strong>Upload Klasoru:</strong> {{ 'VAR' if upload_folder_exists else 'YOK!' }} (uploads/report_cards)</p>
+        <p><strong>Lokal PDF Dosyalari:</strong> {{ upload_folder_files|length }} adet</p>
+        <p><strong>Object Storage PDF:</strong> {{ storage_pdf_count or 0 }} adet</p>
+        {% if upload_folder_files %}
+        <details>
+            <summary>Lokal dosyalari goster</summary>
+            <ul>
+            {% for f in upload_folder_files %}
+                <li>{{ f }}</li>
+            {% endfor %}
+            </ul>
+        </details>
+        {% endif %}
+        {% if storage_pdf_files %}
+        <details>
+            <summary>Object Storage dosyalari goster</summary>
+            <ul>
+            {% for f in storage_pdf_files %}
+                <li>{{ f }}</li>
+            {% endfor %}
+            </ul>
+        </details>
+        {% endif %}
+    </div>
+
+    <div class="section">
+        <h2>Son Sinavlar (20)</h2>
+        <button class="refresh-btn" onclick="reprocessAll()" style="margin-bottom:10px">Tum Bekleyenleri Yeniden Isle</button>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Sinav Adi</th>
+                    <th>Sinif</th>
+                    <th>Durum</th>
+                    <th>PDF</th>
+                    <th>Ogrenci</th>
+                    <th>Beklenen</th>
+                    <th>Islenen</th>
+                    <th>Hata</th>
+                    <th>Tarih</th>
+                    <th>Islem</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for exam in recent_exams %}
+                <tr>
+                    <td>{{ exam.id }}</td>
+                    <td>{{ exam.exam_name or '-' }}</td>
+                    <td>{{ exam.class_name or '-' }}</td>
+                    <td class="status-{{ exam.parse_status }}">{{ exam.parse_status }}</td>
+                    <td>
+                        {% if exam.local_exists %}
+                            <span style="color:green" title="{{ exam.pdf_filename }}">Lokal</span>
+                        {% elif exam.storage_exists %}
+                            <span style="color:blue" title="{{ exam.pdf_storage_path }}">Storage</span>
+                        {% else %}
+                            <span style="color:red">YOK!</span>
+                        {% endif %}
+                        <br><small style="color:#888;font-size:0.7em">{{ (exam.pdf_storage_path or exam.pdf_filename or '-')[-30:] }}</small>
+                    </td>
+                    <td>{{ exam.student_count or 0 }}</td>
+                    <td>{{ exam.expected_student_count or 0 }}</td>
+                    <td>{{ exam.processed_student_count or 0 }}</td>
+                    <td class="error-text">{{ (exam.parse_error or '-')[:80] }}</td>
+                    <td class="timestamp">{{ exam.created_at.strftime('%d/%m %H:%M') if exam.created_at else '-' }}</td>
+                    <td>
+                        <button onclick="reprocessOne({{ exam.id }})" style="padding:3px 8px;cursor:pointer">Yenile</button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="11">Sinav bulunamadi</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if errors %}
+    <div class="section">
+        <h2>Hatalar ({{ errors|length }})</h2>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Sinav</th>
+                    <th>Hata Mesaji</th>
+                    <th>Tarih</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for err in errors %}
+                <tr>
+                    <td>{{ err.id }}</td>
+                    <td>{{ err.exam_name or '-' }}</td>
+                    <td class="error-text">{{ err.parse_error }}</td>
+                    <td class="timestamp">{{ err.created_at.strftime('%d/%m %H:%M') if err.created_at else '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <div class="section">
+        <h2>Son Okunan Cevaplar (50)</h2>
+        <p>Regex'in dogru calisip calismadigini kontrol edin:</p>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Ogrenci</th>
+                    <th>Sinav</th>
+                    <th>Ders</th>
+                    <th>Soru</th>
+                    <th>Dogru</th>
+                    <th>Ogrenci</th>
+                    <th>Sonuc</th>
+                    <th>Kazanim Kodu</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ans in sample_outcomes %}
+                <tr>
+                    <td>{{ ans.student_name[:20] }}...</td>
+                    <td>{{ (ans.exam_name or '-')[:15] }}...</td>
+                    <td>{{ ans.subject }}</td>
+                    <td>{{ ans.question_number }}</td>
+                    <td><strong>{{ ans.correct_answer }}</strong></td>
+                    <td><strong>{{ ans.student_answer or '-' }}</strong></td>
+                    <td class="{{ 'correct' if ans.is_correct else 'wrong' }}">
+                        {{ '+' if ans.is_correct else '-' }}
+                    </td>
+                    <td>{{ ans.outcome_code or '-' }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="8">Cevap bulunamadi - PDF'leri yeniden isleyin</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+let autoRefreshInterval;
+document.getElementById('autoRefresh').addEventListener('change', function() {
+    if (this.checked) {
+        autoRefreshInterval = setInterval(() => location.reload(), 30000);
+    } else {
+        clearInterval(autoRefreshInterval);
+    }
+});
+
+function reprocessOne(id) {
+    if (!confirm('Bu sinavi yeniden islemek istiyor musunuz?')) return;
+    fetch('/admin/report-cards/api/reprocess/' + id, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            alert(data.message || data.error || 'Islem baslatildi');
+            location.reload();
+        })
+        .catch(e => alert('Hata: ' + e));
+}
+
+function reprocessAll() {
+    if (!confirm('Tum bekleyen sinavlari yeniden islemek istiyor musunuz?')) return;
+    fetch('/admin/report-cards/api/reprocess-all', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            alert(data.message || data.error || 'Islem baslatildi');
+            location.reload();
+        })
+        .catch(e => alert('Hata: ' + e));
+}
+</script>
+{% endblock %}

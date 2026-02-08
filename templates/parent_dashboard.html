@@ -1,0 +1,314 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Veli Dashboard{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/admin-modern.css">
+<style>
+    .dashboard-content { padding: 24px 28px; }
+    .parent-card {
+        background: white;
+        border-radius: var(--radius-xl);
+        padding: 28px;
+        box-shadow: var(--shadow-lg);
+        border: 1px solid var(--gray-100);
+        margin-bottom: 24px;
+    }
+    .parent-card h3 {
+        color: var(--gray-800);
+        font-weight: 700;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .parent-card h3 span { font-size: 1.4em; }
+    .child-selector {
+        width: 100%;
+        padding: 14px 16px;
+        border: 2px solid var(--gray-200);
+        border-radius: var(--radius-lg);
+        font-size: 1em;
+        transition: all var(--transition-fast);
+    }
+    .child-selector:focus {
+        outline: none;
+        border-color: var(--primary-500);
+        box-shadow: 0 0 0 3px var(--primary-100);
+    }
+    .exam-item, .assignment-item {
+        padding: 16px;
+        background: var(--gray-50);
+        border-radius: var(--radius-lg);
+        margin-bottom: 12px;
+        border-left: 4px solid var(--primary-500);
+    }
+    .message-box textarea {
+        width: 100%;
+        padding: 14px;
+        border: 2px solid var(--gray-200);
+        border-radius: var(--radius-lg);
+        min-height: 100px;
+        resize: vertical;
+        font-family: inherit;
+    }
+    .message-item {
+        padding: 16px;
+        background: var(--gray-50);
+        border-radius: var(--radius-lg);
+        margin-bottom: 12px;
+    }
+    .message-item.from-teacher {
+        border-left: 4px solid var(--success-500);
+        background: var(--success-50);
+    }
+    .message-item.from-parent {
+        border-left: 4px solid var(--primary-500);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-content">
+    <div class="page-header-modern">
+        <h1>👨‍👩‍👧 Veli Dashboard</h1>
+        <p>Çocuklarınızın akademik takibini yapın</p>
+    </div>
+
+    <div class="parent-card">
+        <h3><span>👦</span> Çocuk Seç</h3>
+        <select id="childSelector" class="child-selector">
+            <option value="">Yükleniyor...</option>
+        </select>
+    </div>
+    
+    <div id="childDataContainer" style="display: none;">
+        <div class="parent-card">
+            <h3><span>📝</span> Sınavlar</h3>
+            <div id="examsContainer">
+                <div style="text-align: center; padding: 20px; color: var(--gray-400);">
+                    <div class="loading-spinner" style="margin: 0 auto 12px;"></div>
+                    Yükleniyor...
+                </div>
+            </div>
+        </div>
+        
+        <div class="parent-card">
+            <h3><span>📚</span> Ödevler</h3>
+            <div id="assignmentsContainer">
+                <div style="text-align: center; padding: 20px; color: var(--gray-400);">
+                    <div class="loading-spinner" style="margin: 0 auto 12px;"></div>
+                    Yükleniyor...
+                </div>
+            </div>
+        </div>
+        
+        <div class="parent-card">
+            <h3><span>💬</span> Öğretmen Mesajları</h3>
+            <div class="message-box" style="margin-bottom: 20px;">
+                <textarea id="newMessage" placeholder="Öğretmene mesaj yazın..."></textarea>
+                <button onclick="sendMessage()" class="btn btn-primary" style="margin-top: 12px;">
+                    📤 Mesaj Gönder
+                </button>
+            </div>
+            <div id="messagesContainer">
+                <div style="text-align: center; padding: 20px; color: var(--gray-400);">
+                    <div class="loading-spinner" style="margin: 0 auto 12px;"></div>
+                    Yükleniyor...
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let selectedChild = null;
+
+// Load children on page load
+document.addEventListener('DOMContentLoaded', () => {
+    loadChildren();
+    loadMessages();
+});
+
+async function loadChildren() {
+    try {
+        const response = await fetch('/api/parent/children');
+        const data = await response.json();
+        
+        const selector = document.getElementById('childSelector');
+        if (data.children && data.children.length > 0) {
+            selector.innerHTML = '<option value="">Seçiniz...</option>';
+            data.children.forEach(child => {
+                const option = document.createElement('option');
+                option.value = child.id;
+                option.textContent = `${child.name} (${child.class})`;
+                selector.appendChild(option);
+            });
+            
+            selector.addEventListener('change', (e) => {
+                if (e.target.value) {
+                    selectedChild = parseInt(e.target.value);
+                    loadChildData();
+                } else {
+                    document.getElementById('childDataContainer').style.display = 'none';
+                }
+            });
+        } else {
+            selector.innerHTML = '<option value="">Kayıtlı çocuk bulunamadı</option>';
+        }
+    } catch (error) {
+        console.error('Load children error:', error);
+        document.getElementById('childSelector').innerHTML = '<option value="">Yükleme hatası</option>';
+    }
+}
+
+async function loadChildData() {
+    document.getElementById('childDataContainer').style.display = 'block';
+    loadExams();
+    loadAssignments();
+}
+
+async function loadExams() {
+    if (!selectedChild) return;
+    
+    try {
+        const response = await fetch(`/api/parent/child/${selectedChild}/exams`);
+        const data = await response.json();
+        
+        const container = document.getElementById('examsContainer');
+        if (data.exams && data.exams.length > 0) {
+            let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+            data.exams.forEach(exam => {
+                const score = exam.score ? exam.score.toFixed(1) : '-';
+                const scoreColor = exam.score >= 70 ? '#10b981' : exam.score >= 50 ? '#f59e0b' : '#ef4444';
+                html += `
+                    <div style="padding: 15px; background: #f9fafb; border-radius: 8px; border-left: 4px solid ${scoreColor};">
+                        <div style="font-weight: 600; color: #1f2937; margin-bottom: 5px;">${exam.title}</div>
+                        <div style="font-size: 0.9em; color: #6b7280;">
+                            Puan: <span style="color: ${scoreColor}; font-weight: 600;">${score}/${exam.question_count * 5}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = '<div style="text-align: center; padding: 20px; color: #9ca3af;">Henüz sınav yok</div>';
+        }
+    } catch (error) {
+        console.error('Load exams error:', error);
+        document.getElementById('examsContainer').innerHTML = '<div style="text-align: center; padding: 20px; color: #ef4444;">Yükleme hatası</div>';
+    }
+}
+
+async function loadAssignments() {
+    if (!selectedChild) return;
+    
+    try {
+        const response = await fetch(`/api/parent/child/${selectedChild}/assignments`);
+        const data = await response.json();
+        
+        const container = document.getElementById('assignmentsContainer');
+        if (data.assignments && data.assignments.length > 0) {
+            let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+            data.assignments.forEach(assignment => {
+                const statusMap = {
+                    'submitted': '✅ Teslim Edildi',
+                    'graded': '✅ Değerlendirildi',
+                    'not_submitted': '⏳ Teslim Edilmedi'
+                };
+                const statusColor = assignment.status === 'graded' ? '#10b981' : assignment.status === 'submitted' ? '#3b82f6' : '#9ca3af';
+                html += `
+                    <div style="padding: 15px; background: #f9fafb; border-radius: 8px; border-left: 4px solid ${statusColor};">
+                        <div style="font-weight: 600; color: #1f2937; margin-bottom: 5px;">${assignment.title}</div>
+                        <div style="font-size: 0.9em; color: #6b7280;">
+                            Durum: <span style="color: ${statusColor};">${statusMap[assignment.status]}</span>
+                            ${assignment.grade ? ` • Not: ${assignment.grade}` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = '<div style="text-align: center; padding: 20px; color: #9ca3af;">Henüz ödev yok</div>';
+        }
+    } catch (error) {
+        console.error('Load assignments error:', error);
+        document.getElementById('assignmentsContainer').innerHTML = '<div style="text-align: center; padding: 20px; color: #ef4444;">Yükleme hatası</div>';
+    }
+}
+
+async function loadMessages() {
+    try {
+        const response = await fetch('/api/parent/messages');
+        const data = await response.json();
+        
+        const container = document.getElementById('messagesContainer');
+        if (data.messages && data.messages.length > 0) {
+            let html = '<div style="display: flex; flex-direction: column; gap: 15px;">';
+            data.messages.forEach(msg => {
+                html += `
+                    <div style="padding: 15px; background: #f9fafb; border-radius: 8px;">
+                        <div style="font-weight: 600; color: #1f2937; margin-bottom: 5px;">
+                            ${msg.student_name} (${msg.class_name})
+                        </div>
+                        <div style="font-size: 0.9em; color: #6b7280; margin-bottom: 10px;">
+                            <strong>Mesajınız:</strong> ${msg.message}
+                        </div>
+                        ${msg.teacher_response ? `
+                            <div style="padding: 10px; background: white; border-radius: 6px; border-left: 3px solid #10b981;">
+                                <strong style="color: #10b981;">Öğretmen Yanıtı:</strong><br>
+                                ${msg.teacher_response}
+                            </div>
+                        ` : '<div style="color: #f59e0b; font-size: 0.85em;">⏳ Yanıt bekleniyor</div>'}
+                    </div>
+                `;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = '<div style="text-align: center; padding: 20px; color: #9ca3af;">Henüz mesaj yok</div>';
+        }
+    } catch (error) {
+        console.error('Load messages error:', error);
+        document.getElementById('messagesContainer').innerHTML = '<div style="text-align: center; padding: 20px; color: #ef4444;">Yükleme hatası</div>';
+    }
+}
+
+async function sendMessage() {
+    if (!selectedChild) {
+        alert('Lütfen önce bir çocuk seçin');
+        return;
+    }
+    
+    const messageText = document.getElementById('newMessage').value.trim();
+    if (!messageText) {
+        alert('Lütfen bir mesaj yazın');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/parent/send-message', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                student_id: selectedChild,
+                message: messageText
+            })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            document.getElementById('newMessage').value = '';
+            loadMessages();
+            alert('✅ Mesaj gönderildi');
+        } else {
+            alert('❌ Hata: ' + (result.error || 'Bilinmeyen hata'));
+        }
+    } catch (error) {
+        alert('❌ Bağlantı hatası: ' + error.message);
+    }
+}
+</script>
+{% endblock %}

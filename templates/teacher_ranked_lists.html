@@ -1,0 +1,268 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Sıralı Liste - Öğretmen{% endblock %}
+
+{% block breadcrumb %}
+<span class="breadcrumb-item">Öğretmen</span>
+<span class="breadcrumb-separator">/</span>
+<span class="breadcrumb-item active">Sıralı Liste</span>
+{% endblock %}
+
+{% block content %}
+<style>
+    .ranked-container {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+    .ranked-card {
+        background: white;
+        border-radius: 16px;
+        padding: 32px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        margin-bottom: 24px;
+    }
+    .ranked-card h2 {
+        color: #1f2937;
+        margin-bottom: 24px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .form-group {
+        margin-bottom: 20px;
+    }
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: #374151;
+    }
+    .form-group select {
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid #e5e7eb;
+        border-radius: 10px;
+        font-size: 1rem;
+        transition: all 0.2s;
+    }
+    .form-group select:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+    }
+    .btn-download {
+        width: 100%;
+        padding: 16px;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+    }
+    .btn-download:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    }
+    .btn-download:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+    }
+    .info-box {
+        background: #f0f9ff;
+        border: 1px solid #bae6fd;
+        border-radius: 10px;
+        padding: 16px;
+        margin-bottom: 24px;
+        color: #0369a1;
+        font-size: 0.9rem;
+    }
+    .info-box strong {
+        display: block;
+        margin-bottom: 8px;
+    }
+    .download-options {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 20px;
+        margin-top: 24px;
+    }
+    .download-option {
+        background: #f9fafb;
+        border: 2px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 24px;
+        text-align: center;
+        transition: all 0.3s;
+    }
+    .download-option:hover {
+        border-color: #667eea;
+        background: #f0f5ff;
+    }
+    .download-option h3 {
+        color: #374151;
+        margin-bottom: 12px;
+        font-size: 1.1rem;
+    }
+    .download-option p {
+        color: #6b7280;
+        font-size: 0.9rem;
+        margin-bottom: 16px;
+    }
+    .download-option .icon {
+        font-size: 2.5rem;
+        margin-bottom: 12px;
+    }
+</style>
+
+<div class="ranked-container">
+    <div class="ranked-card">
+        <h2><span style="font-size: 1.5rem;">📋</span> Deneme Sınavı Sıralı Liste</h2>
+        
+        <div class="info-box">
+            <strong>Bilgi</strong>
+            Bu sayfadan deneme sınavı sonuçlarına göre okul geneli veya sınıf bazlı sıralı liste PDF'i indirebilirsiniz.
+        </div>
+        
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Deneme Numarası</label>
+                <select id="examNumber">
+                    <option value="">Seçiniz...</option>
+                    <option value="1">1. Deneme</option>
+                    <option value="2">2. Deneme</option>
+                    <option value="3">3. Deneme</option>
+                    <option value="4">4. Deneme</option>
+                    <option value="5">5. Deneme</option>
+                    <option value="6">6. Deneme</option>
+                    <option value="7">7. Deneme</option>
+                    <option value="8">8. Deneme</option>
+                    <option value="9">9. Deneme</option>
+                    <option value="10">10. Deneme</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Sınıf Seviyesi</label>
+                <select id="gradeLevel">
+                    <option value="">Tüm Seviyeler</option>
+                    <option value="5">5. Sınıflar</option>
+                    <option value="6">6. Sınıflar</option>
+                    <option value="7">7. Sınıflar</option>
+                    <option value="8">8. Sınıflar</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="download-options">
+            <div class="download-option">
+                <div class="icon">🏫</div>
+                <h3>Okul Geneli Sıralama</h3>
+                <p>Tüm öğrencilerin puana göre sıralaması</p>
+                <button class="btn-download" onclick="downloadRankedList('school')">
+                    <span>📥</span> PDF İndir
+                </button>
+            </div>
+            
+            <div class="download-option">
+                <div class="icon">📚</div>
+                <h3>Şube Bazlı Sıralama</h3>
+                <p>Her sınıfın kendi içindeki sıralaması</p>
+                <button class="btn-download" onclick="downloadRankedList('class')">
+                    <span>📥</span> PDF İndir
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="ranked-card">
+        <h2><span style="font-size: 1.5rem;">📊</span> Başarısız Soru Raporu</h2>
+        
+        <div class="info-box">
+            <strong>Bilgi</strong>
+            Optik sınav sonuçlarına göre %50'nin altında başarı oranına sahip soruların listesini indirebilirsiniz.
+        </div>
+        
+        <div class="form-group">
+            <label>Optik Sınav Seçin</label>
+            <select id="opticalExamSelect">
+                <option value="">Yükleniyor...</option>
+            </select>
+        </div>
+        
+        <button class="btn-download" onclick="downloadFailedQuestions()" style="max-width: 400px;">
+            <span>📥</span> Başarısız Sorular PDF
+        </button>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadOpticalExams();
+});
+
+async function loadOpticalExams() {
+    try {
+        const response = await fetch('/api/admin/optical/exams');
+        if (response.ok) {
+            const data = await response.json();
+            const select = document.getElementById('opticalExamSelect');
+            select.innerHTML = '<option value="">Seçiniz...</option>';
+            
+            if (data.exams && data.exams.length > 0) {
+                data.exams.forEach(exam => {
+                    const option = document.createElement('option');
+                    option.value = exam.id;
+                    option.textContent = `${exam.exam_name} - ${exam.grade_level}. Sınıflar`;
+                    select.appendChild(option);
+                });
+            } else {
+                select.innerHTML = '<option value="">Optik sınav bulunamadı</option>';
+            }
+        }
+    } catch (error) {
+        console.error('Optik sınavlar yüklenemedi:', error);
+    }
+}
+
+function downloadRankedList(type) {
+    const examNumber = document.getElementById('examNumber').value;
+    const gradeLevel = document.getElementById('gradeLevel').value;
+    
+    if (!examNumber) {
+        alert('Lütfen deneme numarası seçin');
+        return;
+    }
+    
+    let url = `/api/teacher/ranked-list/${examNumber}/pdf?type=${type}`;
+    if (gradeLevel) {
+        url += `&grade_level=${gradeLevel}`;
+    }
+    
+    window.open(url, '_blank');
+}
+
+function downloadFailedQuestions() {
+    const examId = document.getElementById('opticalExamSelect').value;
+    
+    if (!examId) {
+        alert('Lütfen optik sınav seçin');
+        return;
+    }
+    
+    window.open(`/api/admin/optical/exams/${examId}/failed-questions`, '_blank');
+}
+</script>
+{% endblock %}

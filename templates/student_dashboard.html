@@ -1,0 +1,346 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Öğrenci Dashboard{% endblock %}
+
+{% block widget_controls %}
+<!-- Widget Control Toolbar (Task #10) -->
+<div class="widget-toolbar" style="margin: 0 20px 20px;">
+    <div class="widget-toolbar-title">🎯 Dashboard'ınızı özelleştirin - Widget'ları sürükleyerek yeniden sıralayın</div>
+    <div class="widget-toolbar-actions">
+        <button class="widget-btn widget-btn-secondary" onclick="WidgetManager.openVisibilityModal()">
+            👁️ Göster/Gizle
+        </button>
+        <button class="widget-btn widget-btn-secondary" onclick="WidgetManager.resetToDefaults()">
+            🔄 Sıfırla
+        </button>
+        <button class="widget-btn widget-btn-primary" id="widgetSaveBtn" onclick="WidgetManager.savePreferences()">
+            💾 Kaydet
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header (Static - Not a widget) -->
+<div class="page-header" style="background: white; padding: 25px 30px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin: 0 20px 30px;">
+    <h1 style="font-size: 1.8em; color: #1f2937; margin-bottom: 5px;">👨‍🎓 Öğrenci Dashboard</h1>
+    <p style="color: #6b7280; font-size: 0.95em;">Dersler, ödevler ve sınavlarım</p>
+</div>
+
+<!-- Widget Grid (Drag-and-drop enabled) -->
+<div class="widget-grid" id="widgetGrid">
+    <!-- Widget 1: Exams (Large) -->
+    <div class="widget-card widget-large" data-widget-id="exams">
+        <div class="widget-header">
+            <div class="widget-title">📝 Sınavlarım</div>
+            <div class="widget-drag-handle">⋮⋮</div>
+        </div>
+        <div class="widget-content">
+            <div onclick="window.location.href='/student/exams'" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; color: white;">
+                <div style="font-size: 3em; margin-bottom: 15px;">📝</div>
+                <h3 style="margin-bottom: 10px; font-size: 1.2em;">Sınavları Görüntüle</h3>
+                <p style="font-size: 0.9em; opacity: 0.9;">Sınavları görüntüle ve cevapla</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Widget 2: Assignments (Large) -->
+    <div class="widget-card widget-large" data-widget-id="assignments">
+        <div class="widget-header">
+            <div class="widget-title">📚 Ödevlerim</div>
+            <div class="widget-drag-handle">⋮⋮</div>
+        </div>
+        <div class="widget-content">
+            <div onclick="window.location.href='/student/assignments'" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; color: white;">
+                <div style="font-size: 3em; margin-bottom: 15px;">📚</div>
+                <h3 style="margin-bottom: 10px; font-size: 1.2em;">Ödev Teslim Et</h3>
+                <p style="font-size: 0.9em; opacity: 0.9;">Ödev teslim et ve notları gör</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Widget 3: Announcements (Large) -->
+    <div class="widget-card widget-large" data-widget-id="announcements">
+        <div class="widget-header">
+            <div class="widget-title">📢 Duyurular</div>
+            <div class="widget-drag-handle">⋮⋮</div>
+        </div>
+        <div class="widget-content">
+            <div onclick="window.location.href='/student/announcements'" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; color: white;">
+                <div style="font-size: 3em; margin-bottom: 15px;">📢</div>
+                <h3 style="margin-bottom: 10px; font-size: 1.2em;">Duyuruları Oku</h3>
+                <p style="font-size: 0.9em; opacity: 0.9;">Öğretmen duyurularını oku</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Widget 4: Ask Question (Large) -->
+    <div class="widget-card widget-large" data-widget-id="ask-question">
+        <div class="widget-header">
+            <div class="widget-title">💬 Soru Sor</div>
+            <div class="widget-drag-handle">⋮⋮</div>
+        </div>
+        <div class="widget-content">
+            <div onclick="window.location.href='/student/ask-question-page'" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; color: white;">
+                <div style="font-size: 3em; margin-bottom: 15px;">💬</div>
+                <h3 style="margin-bottom: 10px; font-size: 1.2em;">Öğretmene Sor</h3>
+                <p style="font-size: 0.9em; opacity: 0.9;">Öğretmene soru sor</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Widget 5: Surveys (Large) -->
+    <div class="widget-card widget-large" data-widget-id="surveys">
+        <div class="widget-header">
+            <div class="widget-title">📋 Anketler</div>
+            <div class="widget-drag-handle">⋮⋮</div>
+        </div>
+        <div class="widget-content">
+            <div onclick="window.location.href='/student/surveys'" style="background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; color: white;">
+                <div style="font-size: 3em; margin-bottom: 15px;">📋</div>
+                <h3 style="margin-bottom: 10px; font-size: 1.2em;">Anketleri Görüntüle</h3>
+                <p style="font-size: 0.9em; opacity: 0.9;">Anketleri cevapla ve sonuçları gör</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Widget 7: Badges (Medium - Gamification) -->
+    <div class="widget-card widget-medium" data-widget-id="badges">
+        <div class="widget-header">
+            <div class="widget-title">🏅 Rozetlerim</div>
+            <div class="widget-drag-handle">⋮⋮</div>
+        </div>
+        <div class="widget-content">
+            <div id="badgesContainer" style="min-height: 100px;">
+                <div style="text-align: center; padding: 20px; color: #9ca3af;">
+                    Yükleniyor...
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Widget 7: Leaderboard (Medium - Gamification) -->
+    <div class="widget-card widget-medium" data-widget-id="leaderboard">
+        <div class="widget-header">
+            <div class="widget-title">📊 Lider Tablosu</div>
+            <div class="widget-drag-handle">⋮⋮</div>
+        </div>
+        <div class="widget-content">
+            <div id="leaderboardClass" style="font-size: 0.85em; color: #6b7280; margin-bottom: 10px;"></div>
+            <div id="leaderboardContainer" style="min-height: 100px;">
+                <div style="text-align: center; padding: 20px; color: #9ca3af;">
+                    Yükleniyor...
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Widget 8: Upcoming Exams (Large) -->
+    <div class="widget-card widget-large" data-widget-id="upcoming-exams">
+        <div class="widget-header">
+            <div class="widget-title">📅 Yaklaşan Sınavlarım</div>
+            <div class="widget-drag-handle">⋮⋮</div>
+        </div>
+        <div class="widget-content">
+            <div id="upcomingExamsStudent" style="min-height: 80px;">
+                <p style="text-align: center; color: #9ca3af; padding: 20px;">Yükleniyor...</p>
+            </div>
+            <div style="text-align: center; margin-top: 15px;">
+                <a href="/student/exam-calendar" style="color: #3b82f6; text-decoration: none; font-size: 0.9em;">Tüm Sınavları Gör →</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Gamification API calls (Task #7)
+async function loadBadges() {
+    try {
+        const response = await fetch('/api/student/badges', { credentials: 'same-origin' });
+        if (response.status === 401) {
+            window.location.href = '/ameo_kullanıcı_giriş';
+            return;
+        }
+        const data = await response.json();
+        
+        const container = document.getElementById('badgesContainer');
+        if (data.badges && data.badges.length > 0) {
+            let html = '<div style="display: grid; gap: 10px;">';
+            data.badges.forEach(badge => {
+                const desc = badge.description && badge.description !== 'None' ? badge.description : '';
+                html += `
+                    <div style="padding: 12px; background: #f9fafb; border-radius: 8px; display: flex; align-items: center; gap: 12px;">
+                        <span style="font-size: 1.8em;">🏅</span>
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; color: #1f2937;">${badge.title || 'Rozet'}</div>
+                            ${desc ? `<div style="font-size: 0.85em; color: #6b7280;">${desc}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = '<div style="text-align: center; padding: 30px; color: #9ca3af;">Henüz rozet kazanmadınız. Sınavlara katılın ve ödevlerinizi tamamlayın!</div>';
+        }
+    } catch (error) {
+        console.error('Badges load error:', error);
+        document.getElementById('badgesContainer').innerHTML = '<div style="text-align: center; padding: 20px; color: #ef4444;">Yüklenemedi</div>';
+    }
+}
+
+async function loadLeaderboard() {
+    try {
+        const response = await fetch('/api/student/leaderboard', { credentials: 'same-origin' });
+        if (response.status === 401) {
+            window.location.href = '/ameo_kullanıcı_giriş';
+            return;
+        }
+        const data = await response.json();
+        
+        const container = document.getElementById('leaderboardContainer');
+        const classLabel = document.getElementById('leaderboardClass');
+        
+        if (data.class_name) {
+            classLabel.textContent = `Sınıf: ${data.class_name}`;
+        }
+        
+        if (data.has_leadership && data.first_place_count > 0) {
+            let html = `
+                <div style="text-align: center; padding: 20px;">
+                    <div style="font-size: 4em; margin-bottom: 10px;">🏆</div>
+                    <div style="font-size: 1.5em; font-weight: 700; color: #d97706; margin-bottom: 5px;">
+                        ${data.first_place_count} Defa Sınav Liderliği
+                    </div>
+                    <div style="font-size: 0.95em; color: #6b7280; margin-bottom: 15px;">
+                        Tebrikler ${data.student_name}!
+                    </div>
+                    <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 15px;">
+                        <div style="background: #f0fdf4; padding: 10px 15px; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 1.3em; font-weight: 700; color: #16a34a;">${data.avg_lgs}</div>
+                            <div style="font-size: 0.8em; color: #6b7280;">Ortalama</div>
+                        </div>
+                        <div style="background: #eff6ff; padding: 10px 15px; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 1.3em; font-weight: 700; color: #2563eb;">${data.max_lgs}</div>
+                            <div style="font-size: 0.8em; color: #6b7280;">En Yüksek</div>
+                        </div>
+                        <div style="background: #fef3c7; padding: 10px 15px; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 1.3em; font-weight: 700; color: #d97706;">${data.exam_count}</div>
+                            <div style="font-size: 0.8em; color: #6b7280;">Deneme</div>
+                        </div>
+                    </div>
+            `;
+            
+            if (data.first_place_exams && data.first_place_exams.length > 0) {
+                html += `<div style="text-align: left; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
+                    <div style="font-size: 0.85em; color: #6b7280; margin-bottom: 8px;">Son Liderlikler:</div>`;
+                data.first_place_exams.forEach(exam => {
+                    html += `<div style="font-size: 0.9em; color: #374151; padding: 4px 0;">🥇 ${exam.exam} - ${exam.score} puan</div>`;
+                });
+                html += '</div>';
+            }
+            
+            html += '</div>';
+            container.innerHTML = html;
+        } else if (data.exam_count > 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 20px;">
+                    <div style="font-size: 2.5em; margin-bottom: 10px;">📊</div>
+                    <div style="font-size: 1.1em; color: #374151; margin-bottom: 10px;">
+                        Henüz sınav liderliğin yok
+                    </div>
+                    <div style="font-size: 0.9em; color: #6b7280; margin-bottom: 15px;">
+                        Ortalaman: <strong>${data.avg_lgs}</strong> • En Yüksek: <strong>${data.max_lgs}</strong>
+                    </div>
+                    <div style="font-size: 0.85em; color: #9ca3af;">
+                        Çalışmaya devam et, liderlik seni bekliyor!
+                    </div>
+                </div>
+            `;
+        } else {
+            container.innerHTML = '<div style="text-align: center; padding: 30px; color: #9ca3af;">Henüz deneme sınavına katılmadın. Deneme sınavlarına katılarak liderlik kazan!</div>';
+        }
+    } catch (error) {
+        console.error('Leaderboard load error:', error);
+        document.getElementById('leaderboardContainer').innerHTML = '<div style="text-align: center; padding: 20px; color: #ef4444;">Yüklenemedi</div>';
+    }
+}
+
+// Load upcoming exams (student-specific)
+async function loadUpcomingExamsStudent() {
+    try {
+        const response = await fetch('/api/exam-calendar/all', { credentials: 'same-origin' });
+        if (response.status === 401) {
+            window.location.href = '/ameo_kullanıcı_giriş';
+            return;
+        }
+        const data = await response.json();
+        const exams = data.exams || [];
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        // Backend zaten sınıf seviyesi filtreleme yapıyor, sadece tarih ve sıralamaya bakıyoruz
+        const myExams = exams
+            .filter(exam => {
+                const examDate = new Date(exam.date + 'T00:00:00');
+                return examDate >= today;
+            })
+            .sort((a, b) => new Date(a.date) - new Date(b.date))
+            .slice(0, 3);
+        
+        const container = document.getElementById('upcomingExamsStudent');
+        
+        if (myExams.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #9ca3af; padding: 20px;">Yaklaşan sınavın bulunmuyor</p>';
+            return;
+        }
+        
+        let html = '<div style="display: flex; flex-direction: column; gap: 12px;">';
+        
+        myExams.forEach(exam => {
+            const dateObj = new Date(exam.date + 'T00:00:00');
+            const formattedDate = dateObj.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' });
+            const diffDays = Math.ceil((dateObj - today) / (1000 * 60 * 60 * 24));
+            
+            let badge = '';
+            if (diffDays === 0) badge = '<span style="background: #ef4444; color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.8em; font-weight: 600;">BUGÜN</span>';
+            else if (diffDays === 1) badge = '<span style="background: #f59e0b; color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.8em; font-weight: 600;">YARIN</span>';
+            else if (diffDays <= 7) badge = `<span style="background: #f59e0b; color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.8em; font-weight: 600;">${diffDays} GÜN KALDI</span>`;
+            else badge = `<span style="background: #10b981; color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.8em; font-weight: 600;">${diffDays} gün sonra</span>`;
+            
+            html += `
+                <div style="border-left: 4px solid #3b82f6; padding: 12px 15px; background: #f9fafb; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="font-weight: 600; color: #111827; margin-bottom: 4px;">${exam.description || exam.title}</div>
+                        <div style="font-size: 0.9em; color: #6b7280;">${formattedDate}</div>
+                    </div>
+                    ${badge}
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        container.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Sınavlar yüklenemedi:', error);
+        document.getElementById('upcomingExamsStudent').innerHTML = 
+            '<p style="text-align: center; color: #ef4444; padding: 20px;">Yükleme hatası</p>';
+    }
+}
+
+// Initialize Widget System + Load Data
+document.addEventListener('DOMContentLoaded', async () => {
+    // Initialize widget system
+    await WidgetManager.init('student');
+    
+    // Load gamification data
+    loadBadges();
+    loadLeaderboard();
+    loadUpcomingExamsStudent();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,661 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Karne Analizi{% endblock %}
+
+{% block content %}
+<style>
+    .page-container {
+        padding: 20px;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    
+    .page-header {
+        background: white;
+        padding: 25px 30px;
+        border-radius: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        margin-bottom: 20px;
+    }
+    
+    .page-title {
+        font-size: 1.8em;
+        color: #1f2937;
+        margin-bottom: 5px;
+    }
+    
+    .page-subtitle {
+        color: #6b7280;
+        font-size: 0.95em;
+    }
+    
+    .exams-section {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        margin-bottom: 20px;
+    }
+    
+    .section-title {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #1f2937;
+        margin-bottom: 16px;
+    }
+    
+    .exam-card {
+        background: #f9fafb;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+        border: 1px solid #e5e7eb;
+    }
+    
+    .exam-card:hover {
+        border-color: #3b82f6;
+    }
+    
+    .exam-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+    }
+    
+    .exam-name {
+        font-weight: 600;
+        color: #1f2937;
+    }
+    
+    .exam-stats {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 12px;
+    }
+    
+    .stat {
+        text-align: center;
+    }
+    
+    .stat-value {
+        font-size: 1.2rem;
+        font-weight: 700;
+    }
+    
+    .stat-label {
+        font-size: 0.75rem;
+        color: #6b7280;
+    }
+    
+    .correct { color: #10b981; }
+    .wrong { color: #ef4444; }
+    .blank { color: #6b7280; }
+    .net { color: #3b82f6; }
+    
+    .exam-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    
+    .action-btn {
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        cursor: pointer;
+        border: none;
+        color: white;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    .btn-outcome { background: linear-gradient(135deg, #f59e0b, #d97706); }
+    .btn-error { background: linear-gradient(135deg, #ef4444, #dc2626); }
+    .btn-pdf { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #6b7280;
+    }
+    
+    .result-section {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        margin-top: 20px;
+        display: none;
+    }
+    
+    .result-section.active {
+        display: block;
+    }
+    
+    .close-btn {
+        float: right;
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: #6b7280;
+    }
+    
+    .outcome-grid {
+        display: grid;
+        gap: 16px;
+    }
+    
+    .subject-block {
+        background: #f9fafb;
+        padding: 16px;
+        border-radius: 12px;
+    }
+    
+    .subject-title {
+        font-weight: 600;
+        color: #2563eb;
+        margin-bottom: 12px;
+    }
+    
+    .outcome-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .outcome-table th, .outcome-table td {
+        padding: 8px;
+        text-align: left;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .outcome-table th {
+        background: #f3f4f6;
+        font-size: 0.8rem;
+    }
+    
+    .error-list {
+        list-style: none;
+        padding: 0;
+    }
+    
+    .error-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 12px;
+        background: #fef2f2;
+        border-radius: 6px;
+        margin-bottom: 6px;
+        font-size: 0.9rem;
+    }
+</style>
+
+<div class="page-container">
+    <div class="page-header">
+        <h1 class="page-title">📄 Karne Analizi</h1>
+        <p class="page-subtitle">Optik sınav sonuçlarınızı ve kazanım analizinizi görüntüleyin</p>
+        <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
+            <button class="action-btn" style="background: linear-gradient(135deg, #6366f1, #4f46e5);" onclick="openMultiExamModal()">
+                📊 Çoklu Sınav Analizi
+            </button>
+            <button class="action-btn" style="background: linear-gradient(135deg, #10b981, #059669);" onclick="openProgressModal()">
+                📈 Gelişim Raporu
+            </button>
+        </div>
+    </div>
+    
+    <div class="exams-section">
+        <h2 class="section-title">Sınavlarınız</h2>
+        <div id="examsList">
+            <div class="empty-state">Yükleniyor...</div>
+        </div>
+    </div>
+    
+    <div id="outcomeResult" class="result-section">
+        <button class="close-btn" onclick="closeResult('outcomeResult')">&times;</button>
+        <h2 class="section-title">🎯 Kazanım Analizi</h2>
+        <div id="outcomeContent"></div>
+    </div>
+    
+    <div id="errorResult" class="result-section">
+        <button class="close-btn" onclick="closeResult('errorResult')">&times;</button>
+        <h2 class="section-title">❌ Hata Karnesi</h2>
+        <div id="errorContent"></div>
+    </div>
+</div>
+
+<script>
+let myExams = [];
+
+document.addEventListener('DOMContentLoaded', loadMyExams);
+
+async function loadMyExams() {
+    const container = document.getElementById('examsList');
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/student-my-exams');
+        if (!response.ok) throw new Error('API hatası');
+        
+        myExams = await response.json();
+        
+        if (myExams.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div style="font-size: 3rem; margin-bottom: 16px;">📋</div>
+                    <h3>Henüz sınav kaydınız bulunmuyor</h3>
+                    <p>Optik sınav sonuçları yüklendiğinde burada görünecek</p>
+                </div>
+            `;
+            return;
+        }
+        
+        container.innerHTML = myExams.map(exam => `
+            <div class="exam-card">
+                <div class="exam-header">
+                    <span class="exam-name">${exam.exam_name}</span>
+                    <span style="color: #6b7280; font-size: 0.85rem;">${exam.class_name}</span>
+                </div>
+                <div class="exam-stats">
+                    <div class="stat">
+                        <div class="stat-value correct">${exam.total_correct || 0}</div>
+                        <div class="stat-label">Doğru</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value wrong">${exam.total_wrong || 0}</div>
+                        <div class="stat-label">Hatalı</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value blank">${exam.total_blank || 0}</div>
+                        <div class="stat-label">Boş</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value net">${exam.total_net?.toFixed(2) || 0}</div>
+                        <div class="stat-label">Net</div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        
+    } catch (error) {
+        console.error('Yükleme hatası:', error);
+        container.innerHTML = '<div class="empty-state" style="color: #dc2626;">Yüklenirken hata oluştu</div>';
+    }
+}
+
+function closeResult(id) {
+    document.getElementById(id).classList.remove('active');
+}
+
+async function showOutcome(resultId) {
+    // Hata karnesini kapat
+    document.getElementById('errorResult').classList.remove('active');
+    document.getElementById('errorContent').innerHTML = '';
+    
+    const section = document.getElementById('outcomeResult');
+    const content = document.getElementById('outcomeContent');
+    
+    section.classList.add('active');
+    content.innerHTML = '<div style="text-align: center; padding: 20px;">Yükleniyor...</div>';
+    
+    try {
+        const response = await fetch(`/admin/report-cards/api/student-outcome-analysis/${resultId}`);
+        const data = await response.json();
+        
+        if (data.error) {
+            content.innerHTML = `<p style="color: #dc2626;">${data.error}</p>`;
+            return;
+        }
+        
+        let html = `<p style="margin-bottom: 16px;"><strong>Öğrenci:</strong> ${data.student_name} | <strong>Sınav:</strong> ${data.exam_name}</p>`;
+        html += '<div class="outcome-grid">';
+        
+        for (const [subject, outcomes] of Object.entries(data.outcome_data || {})) {
+            html += `<div class="subject-block">
+                <div class="subject-title">${subject}</div>
+                <table class="outcome-table">
+                    <thead><tr><th>Kazanım</th><th>D</th><th>Y</th><th>B</th><th>%</th></tr></thead>
+                    <tbody>`;
+            
+            for (const [outcome, stats] of Object.entries(outcomes)) {
+                const successRate = stats.success_rate || 0;
+                const rateClass = successRate >= 80 ? 'correct' : (successRate >= 50 ? '' : 'wrong');
+                html += `<tr>
+                    <td>${outcome}</td>
+                    <td class="correct">${stats.correct}</td>
+                    <td class="wrong">${stats.wrong}</td>
+                    <td class="blank">${stats.blank}</td>
+                    <td class="${rateClass}" style="font-weight: bold;">%${successRate}</td>
+                </tr>`;
+            }
+            
+            html += '</tbody></table></div>';
+        }
+        
+        html += '</div>';
+        content.innerHTML = html;
+        
+    } catch (error) {
+        content.innerHTML = '<p style="color: #dc2626;">Yüklenirken hata oluştu</p>';
+    }
+}
+
+async function showErrors(resultId) {
+    // Kazanım analizini kapat
+    document.getElementById('outcomeResult').classList.remove('active');
+    document.getElementById('outcomeContent').innerHTML = '';
+    
+    const section = document.getElementById('errorResult');
+    const content = document.getElementById('errorContent');
+    
+    section.classList.add('active');
+    content.innerHTML = '<div style="text-align: center; padding: 20px;">Yükleniyor...</div>';
+    
+    try {
+        const response = await fetch(`/admin/report-cards/api/student-error-details/${resultId}`);
+        const data = await response.json();
+        
+        if (data.error) {
+            content.innerHTML = `<p style="color: #dc2626;">${data.error}</p>`;
+            return;
+        }
+        
+        let html = `<p style="margin-bottom: 16px;">
+            <strong>Öğrenci:</strong> ${data.student_name} | 
+            <strong>Toplam:</strong> <span class="correct">${data.total_correct}D</span> / 
+            <span class="wrong">${data.total_wrong}Y</span> / 
+            <span class="blank">${data.total_blank}B</span>
+        </p>`;
+        
+        html += '<div class="outcome-grid">';
+        
+        for (const [subject, errors] of Object.entries(data.error_data || {})) {
+            html += `<div class="subject-block">
+                <div class="subject-title" style="color: #dc2626;">${subject} (${errors.length} hata)</div>
+                <ul class="error-list">`;
+            
+            for (const err of errors) {
+                const statusIcon = err.status === 'wrong' ? '❌' : '⬜';
+                html += `<li class="error-item">
+                    <span><strong>S${err.question_no}:</strong> ${err.outcome || '-'}</span>
+                    <span>${statusIcon} ${err.student_answer || '-'} → ${err.correct_answer}</span>
+                </li>`;
+            }
+            
+            html += '</ul></div>';
+        }
+        
+        html += '</div>';
+        content.innerHTML = html;
+        
+    } catch (error) {
+        content.innerHTML = '<p style="color: #dc2626;">Yüklenirken hata oluştu</p>';
+    }
+}
+
+function downloadErrorPdf(resultId) {
+    window.open(`/admin/report-cards/api/student-error-pdf/${resultId}`, '_blank');
+}
+
+function downloadOutcomePdf(resultId) {
+    window.open(`/admin/report-cards/api/student-outcome-pdf/${resultId}`, '_blank');
+}
+
+function openMultiExamModal() {
+    if (myExams.length === 0) {
+        alert('Henüz sınav kaydınız bulunmuyor');
+        return;
+    }
+    
+    const existing = document.getElementById('multiExamModal');
+    if (existing) existing.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'multiExamModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;justify-content:center;align-items:center;z-index:9999;';
+    modal.innerHTML = `
+        <div style="background:white;border-radius:16px;padding:24px;max-width:800px;width:95%;max-height:90vh;overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <h2 style="font-size:1.3rem;color:#1f2937;">📊 Çoklu Sınav Analizi</h2>
+                <button onclick="closeMultiModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;">&times;</button>
+            </div>
+            <div style="margin-bottom:20px;">
+                <label style="font-weight:600;display:block;margin-bottom:8px;">Sınavları seçin (birden fazla seçebilirsiniz):</label>
+                <div style="max-height:200px;overflow-y:auto;border:1px solid #d1d5db;border-radius:8px;padding:12px;background:#f9fafb;">
+                    ${myExams.map(e => `
+                        <label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;">
+                            <input type="checkbox" class="multi-exam-cb" value="${e.result_id}">
+                            <span>${e.exam_name} (D:${e.total_correct} Y:${e.total_wrong} B:${e.total_blank})</span>
+                        </label>
+                    `).join('')}
+                </div>
+            </div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;">
+                <button class="action-btn btn-outcome" onclick="loadMultiOutcome()">🎯 Kazanım Analizi</button>
+                <button class="action-btn btn-error" onclick="loadMultiError()">❌ Hata Karnesi</button>
+                <button class="action-btn btn-pdf" id="multiOutcomePdfBtn" style="display:none;" onclick="downloadMultiOutcomePdf()">📄 Kazanım PDF</button>
+                <button class="action-btn btn-pdf" id="multiErrorPdfBtn" style="display:none;background:#dc2626;" onclick="downloadMultiErrorPdf()">📄 Hata PDF</button>
+            </div>
+            <div id="multiResults" style="background:#f9fafb;padding:16px;border-radius:8px;">
+                <p style="color:#6b7280;text-align:center;">Sınavları seçip analiz butonuna tıklayın</p>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function closeMultiModal() {
+    const modal = document.getElementById('multiExamModal');
+    if (modal) modal.remove();
+}
+
+async function loadMultiOutcome() {
+    const selected = Array.from(document.querySelectorAll('.multi-exam-cb:checked')).map(cb => cb.value);
+    if (selected.length === 0) { alert('Lütfen en az bir sınav seçin'); return; }
+    
+    const resultsDiv = document.getElementById('multiResults');
+    resultsDiv.innerHTML = '<div style="text-align:center;padding:20px;">Yükleniyor...</div>';
+    document.getElementById('multiOutcomePdfBtn').style.display = 'none';
+    document.getElementById('multiErrorPdfBtn').style.display = 'none';
+    
+    try {
+        const response = await fetch(`/admin/report-cards/api/my-multi-outcome?result_ids=${selected.join(',')}`);
+        const data = await response.json();
+        
+        if (data.error) { resultsDiv.innerHTML = `<p style="color:#dc2626;">${data.error}</p>`; return; }
+        
+        if (!data.outcome_data || Object.keys(data.outcome_data).length === 0) {
+            resultsDiv.innerHTML = '<p style="color:#6b7280;text-align:center;">Kazanım verisi bulunamadı</p>';
+            return;
+        }
+        
+        let html = '<div class="outcome-grid">';
+        for (const [subject, outcomes] of Object.entries(data.outcome_data)) {
+            html += `<div class="subject-block">
+                <div class="subject-title">${subject}</div>
+                <table class="outcome-table">
+                    <thead><tr><th>Kazanım</th><th>Doğru</th><th>Hatalı</th><th>Boş</th><th>%</th></tr></thead>
+                    <tbody>`;
+            for (const [outcome, stats] of Object.entries(outcomes)) {
+                const rate = stats.success_rate || 0;
+                const cls = rate >= 80 ? 'correct' : (rate >= 50 ? '' : 'wrong');
+                html += `<tr><td>${outcome}</td><td class="correct">${stats.correct}</td><td class="wrong">${stats.wrong}</td><td class="blank">${stats.blank}</td><td class="${cls}" style="font-weight:bold;">%${rate}</td></tr>`;
+            }
+            html += '</tbody></table></div>';
+        }
+        html += '</div>';
+        resultsDiv.innerHTML = html;
+        document.getElementById('multiOutcomePdfBtn').style.display = 'inline-flex';
+    } catch (error) {
+        resultsDiv.innerHTML = '<p style="color:#dc2626;">Yüklenirken hata oluştu</p>';
+    }
+}
+
+async function loadMultiError() {
+    const selected = Array.from(document.querySelectorAll('.multi-exam-cb:checked')).map(cb => cb.value);
+    if (selected.length === 0) { alert('Lütfen en az bir sınav seçin'); return; }
+    
+    const resultsDiv = document.getElementById('multiResults');
+    resultsDiv.innerHTML = '<div style="text-align:center;padding:20px;">Yükleniyor...</div>';
+    document.getElementById('multiOutcomePdfBtn').style.display = 'none';
+    document.getElementById('multiErrorPdfBtn').style.display = 'none';
+    
+    try {
+        const response = await fetch(`/admin/report-cards/api/my-multi-error?result_ids=${selected.join(',')}`);
+        const data = await response.json();
+        
+        if (data.error) { resultsDiv.innerHTML = `<p style="color:#dc2626;">${data.error}</p>`; return; }
+        
+        let html = `<div style="background:#fef2f2;padding:16px;border-radius:12px;margin-bottom:20px;">
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;text-align:center;">
+                <div><div class="stat-value correct" style="font-size:1.5rem;">${data.totals?.correct || 0}</div><div style="color:#6b7280;">Doğru</div></div>
+                <div><div class="stat-value wrong" style="font-size:1.5rem;">${data.totals?.wrong || 0}</div><div style="color:#6b7280;">Hatalı</div></div>
+                <div><div class="stat-value blank" style="font-size:1.5rem;">${data.totals?.blank || 0}</div><div style="color:#6b7280;">Boş</div></div>
+                <div><div class="stat-value net" style="font-size:1.5rem;">${(data.totals?.net || 0).toFixed(2)}</div><div style="color:#6b7280;">Net</div></div>
+            </div>
+        </div>`;
+        
+        html += '<div class="outcome-grid">';
+        for (const [subjectKey, subjectData] of Object.entries(data.errors_by_subject || {})) {
+            html += `<div class="subject-block">
+                <div class="subject-title" style="color:#dc2626;">${subjectData.subject_label} (${subjectData.errors.length} hata)</div>
+                <table class="outcome-table" style="margin-top: 8px;">
+                    <thead><tr><th>Sınav</th><th>Soru</th><th>Durum</th><th>Cevap</th></tr></thead>
+                    <tbody>`;
+            for (const err of subjectData.errors) {
+                const statusText = err.status === 'wrong' ? 'Hatalı' : 'Boş';
+                const statusColor = err.status === 'wrong' ? '#ef4444' : '#6b7280';
+                html += `<tr>
+                    <td style="font-size: 0.85rem;">${err.exam_name || '-'}</td>
+                    <td style="text-align: center;">${err.question_number}. Soru</td>
+                    <td style="color: ${statusColor}; font-weight: 600;">${statusText}</td>
+                    <td>${err.student_answer || '-'} → ${err.correct_answer}</td>
+                </tr>`;
+            }
+            html += '</tbody></table></div>';
+        }
+        html += '</div>';
+        resultsDiv.innerHTML = html;
+        document.getElementById('multiErrorPdfBtn').style.display = 'inline-flex';
+    } catch (error) {
+        resultsDiv.innerHTML = '<p style="color:#dc2626;">Yüklenirken hata oluştu</p>';
+    }
+}
+
+function downloadMultiOutcomePdf() {
+    const selected = Array.from(document.querySelectorAll('.multi-exam-cb:checked')).map(cb => cb.value);
+    if (selected.length === 0) { alert('Lütfen en az bir sınav seçin'); return; }
+    window.open(`/admin/report-cards/api/my-multi-outcome-pdf?result_ids=${selected.join(',')}`, '_blank');
+}
+
+function downloadMultiErrorPdf() {
+    const selected = Array.from(document.querySelectorAll('.multi-exam-cb:checked')).map(cb => cb.value);
+    if (selected.length === 0) { alert('Lütfen en az bir sınav seçin'); return; }
+    window.open(`/admin/report-cards/api/my-multi-error-pdf?result_ids=${selected.join(',')}`, '_blank');
+}
+
+function openProgressModal() {
+    if (myExams.length < 2) {
+        alert('Gelişim raporu için en az 2 sınav gerekli');
+        return;
+    }
+    
+    const existing = document.getElementById('progressModal');
+    if (existing) existing.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'progressModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;justify-content:center;align-items:center;z-index:9999;';
+    modal.innerHTML = `
+        <div style="background:white;border-radius:16px;padding:24px;max-width:900px;width:95%;max-height:90vh;overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <h2 style="font-size:1.3rem;color:#1f2937;">📈 Gelişim Raporu</h2>
+                <button onclick="closeProgressModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;">&times;</button>
+            </div>
+            <div id="progressContent" style="padding:16px;">
+                <p style="color:#6b7280;text-align:center;">Yükleniyor...</p>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    
+    loadProgressData();
+}
+
+function closeProgressModal() {
+    const modal = document.getElementById('progressModal');
+    if (modal) modal.remove();
+}
+
+async function loadProgressData() {
+    const content = document.getElementById('progressContent');
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/my-progress');
+        const data = await response.json();
+        
+        if (data.error) { content.innerHTML = `<p style="color:#dc2626;">${data.error}</p>`; return; }
+        
+        if (!data.exams || data.exams.length < 2) {
+            content.innerHTML = '<p style="color:#6b7280;text-align:center;">Gelişim raporu için en az 2 sınav gerekli</p>';
+            return;
+        }
+        
+        let html = `<div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;">
+                <thead>
+                    <tr style="background:#f3f4f6;">
+                        <th style="padding:12px;text-align:left;border-bottom:2px solid #e5e7eb;">Sınav</th>
+                        <th style="padding:12px;text-align:center;border-bottom:2px solid #e5e7eb;">Doğru</th>
+                        <th style="padding:12px;text-align:center;border-bottom:2px solid #e5e7eb;">Yanlış</th>
+                        <th style="padding:12px;text-align:center;border-bottom:2px solid #e5e7eb;">Boş</th>
+                        <th style="padding:12px;text-align:center;border-bottom:2px solid #e5e7eb;">Net</th>
+                        <th style="padding:12px;text-align:center;border-bottom:2px solid #e5e7eb;">Değişim</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+        
+        let prevNet = null;
+        data.exams.forEach(exam => {
+            let changeHtml = '-';
+            if (prevNet !== null) {
+                const diff = exam.total_net - prevNet;
+                if (diff > 0) changeHtml = `<span style="color:#10b981;font-weight:bold;">↑ +${diff.toFixed(2)}</span>`;
+                else if (diff < 0) changeHtml = `<span style="color:#dc2626;font-weight:bold;">↓ ${diff.toFixed(2)}</span>`;
+                else changeHtml = '<span style="color:#6b7280;">→ 0</span>';
+            }
+            prevNet = exam.total_net;
+            
+            html += `<tr style="border-bottom:1px solid #e5e7eb;">
+                <td style="padding:12px;">${exam.exam_name}</td>
+                <td style="padding:12px;text-align:center;" class="correct">${exam.total_correct}</td>
+                <td style="padding:12px;text-align:center;" class="wrong">${exam.total_wrong}</td>
+                <td style="padding:12px;text-align:center;" class="blank">${exam.total_blank}</td>
+                <td style="padding:12px;text-align:center;font-weight:bold;" class="net">${exam.total_net.toFixed(2)}</td>
+                <td style="padding:12px;text-align:center;">${changeHtml}</td>
+            </tr>`;
+        });
+        
+        html += '</tbody></table></div>';
+        
+        const first = data.exams[0];
+        const last = data.exams[data.exams.length - 1];
+        const totalChange = last.total_net - first.total_net;
+        const changeColor = totalChange > 0 ? '#10b981' : (totalChange < 0 ? '#dc2626' : '#6b7280');
+        const changeIcon = totalChange > 0 ? '📈' : (totalChange < 0 ? '📉' : '➡️');
+        
+        html += `<div style="margin-top:20px;padding:16px;background:#f0fdf4;border-radius:12px;text-align:center;">
+            <h3 style="margin-bottom:8px;">${changeIcon} Toplam Gelişim</h3>
+            <div style="font-size:2rem;font-weight:bold;color:${changeColor};">${totalChange > 0 ? '+' : ''}${totalChange.toFixed(2)} Net</div>
+            <p style="color:#6b7280;margin-top:8px;">${first.exam_name} → ${last.exam_name}</p>
+        </div>`;
+        
+        content.innerHTML = html;
+    } catch (error) {
+        content.innerHTML = '<p style="color:#dc2626;">Yüklenirken hata oluştu</p>';
+    }
+}
+</script>
+{% endblock %}

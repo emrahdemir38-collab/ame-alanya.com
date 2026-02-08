@@ -1,0 +1,610 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Anket Yönetimi - Öğretmen{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1>📋 Anket Yönetimi</h1>
+        <p>Sınıfınız için anket oluşturun ve sonuçları görüntüleyin</p>
+    </div>
+
+    <div class="action-buttons" style="margin-bottom: 20px;">
+        <button class="btn btn-primary" onclick="showCreateSurveyModal()" style="font-size: 16px; padding: 12px 24px;">
+            ➕ Yeni Anket Oluştur
+        </button>
+        <button class="btn btn-sm" onclick="loadSurveys()" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
+            🔄 Yenile
+        </button>
+    </div>
+
+    <div class="widget-grid">
+        <div class="widget">
+            <div class="widget-header">
+                <h3>📋 Anketlerim</h3>
+            </div>
+            <div class="widget-body">
+                <div id="surveysList">
+                    <div style="padding: 40px; text-align: center; color: #999;">
+                        <div style="font-size: 3em; margin-bottom: 10px;">📊</div>
+                        <p>Yükleniyor...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal ve diğer kod admin ile aynı -->
+<div id="createSurveyModal" class="modal" style="display:none;">
+    <div class="modal-content" style="max-width: 700px;">
+        <div class="modal-header">
+            <h2>➕ Yeni Anket Oluştur</h2>
+            <button class="close-btn" onclick="closeCreateModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="surveyForm" onsubmit="submitSurvey(event)">
+                <div class="form-group">
+                    <label>Anket Başlığı *</label>
+                    <input type="text" id="surveyTitle" class="form-control" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Açıklama</label>
+                    <textarea id="surveyDescription" class="form-control" rows="3"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Hedef Sınıflar</label>
+                    <div style="margin-bottom: 10px;">
+                        <button type="button" class="btn btn-sm" onclick="selectAllClasses()" style="margin-right: 5px;">✅ Tümünü Seç</button>
+                        <button type="button" class="btn btn-sm" onclick="deselectAllClasses()" style="background: #6b7280; color: white;">❌ Tümünü Kaldır</button>
+                    </div>
+                    <div id="classCheckboxes" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #dee2e6;">
+                        <label class="class-checkbox"><input type="checkbox" name="targetClasses" value="5A"> 5A</label>
+                        <label class="class-checkbox"><input type="checkbox" name="targetClasses" value="5B"> 5B</label>
+                        <label class="class-checkbox"><input type="checkbox" name="targetClasses" value="5C"> 5C</label>
+                        <label class="class-checkbox"><input type="checkbox" name="targetClasses" value="5D"> 5D</label>
+                        <label class="class-checkbox"><input type="checkbox" name="targetClasses" value="5E"> 5E</label>
+                        <label class="class-checkbox"><input type="checkbox" name="targetClasses" value="6A"> 6A</label>
+                        <label class="class-checkbox"><input type="checkbox" name="targetClasses" value="6B"> 6B</label>
+                        <label class="class-checkbox"><input type="checkbox" name="targetClasses" value="6C"> 6C</label>
+                        <label class="class-checkbox"><input type="checkbox" name="targetClasses" value="6D"> 6D</label>
+                        <label class="class-checkbox"><input type="checkbox" name="targetClasses" value="6E"> 6E</label>
+                        <label class="class-checkbox"><input type="checkbox" name="targetClasses" value="7A"> 7A</label>
+                        <label class="class-checkbox"><input type="checkbox" name="targetClasses" value="7B"> 7B</label>
+                        <label class="class-checkbox"><input type="checkbox" name="targetClasses" value="7C"> 7C</label>
+                        <label class="class-checkbox"><input type="checkbox" name="targetClasses" value="7D"> 7D</label>
+                        <label class="class-checkbox"><input type="checkbox" name="targetClasses" value="7E"> 7E</label>
+                        <label class="class-checkbox"><input type="checkbox" name="targetClasses" value="8A"> 8A</label>
+                        <label class="class-checkbox"><input type="checkbox" name="targetClasses" value="8B"> 8B</label>
+                        <label class="class-checkbox"><input type="checkbox" name="targetClasses" value="8C"> 8C</label>
+                        <label class="class-checkbox"><input type="checkbox" name="targetClasses" value="8D"> 8D</label>
+                        <label class="class-checkbox"><input type="checkbox" name="targetClasses" value="8E"> 8E</label>
+                    </div>
+                    <small style="color: #666; margin-top: 5px; display: block;">En az bir sınıf seçin veya tüm sınıfları seçmek için "Tümünü Seç" butonuna tıklayın</small>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="form-group">
+                        <label>Başlangıç Tarihi *</label>
+                        <input type="datetime-local" id="surveyStartDate" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Bitiş Tarihi *</label>
+                        <input type="datetime-local" id="surveyEndDate" class="form-control" required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="surveyAnonymous">
+                        <span>Anonim anket (öğrenci isimleri gizli)</span>
+                    </label>
+                </div>
+                
+                <hr>
+                
+                <div class="form-group">
+                    <label style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>Sorular *</span>
+                        <button type="button" class="btn btn-sm" onclick="addQuestion()">+ Soru Ekle</button>
+                    </label>
+                    <div id="questionsList"></div>
+                </div>
+                
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                    <button type="button" class="btn" onclick="closeCreateModal()" style="background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%); color: white; box-shadow: 0 4px 12px rgba(107, 114, 128, 0.3);">İptal</button>
+                    <button type="submit" class="btn btn-primary">✅ Anketi Oluştur</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 20px;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 12px;
+    max-height: 90vh;
+    overflow-y: auto;
+    width: 100%;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+    padding: 25px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 12px 12px 0 0;
+    color: white;
+}
+
+.modal-header h2 {
+    color: white;
+    margin: 0;
+}
+
+.modal-body {
+    padding: 25px;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 28px;
+    cursor: pointer;
+    color: white;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+}
+
+.close-btn:hover {
+    opacity: 1;
+}
+
+.class-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: white;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 14px;
+    border: 1px solid #e0e0e0;
+}
+
+.class-checkbox:hover {
+    background: #e8f4fd;
+    border-color: #667eea;
+}
+
+.class-checkbox input:checked + span,
+.class-checkbox:has(input:checked) {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-color: #667eea;
+}
+
+.class-checkbox input {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.question-item {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    position: relative;
+    border-left: 4px solid #667eea;
+}
+
+.question-item .remove-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 10px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.question-item .remove-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
+}
+
+.survey-card {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
+    border: 2px solid #e0e7ff;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 15px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+.survey-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 24px rgba(102, 126, 234, 0.15);
+    border-color: #667eea;
+}
+
+.survey-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 15px;
+}
+
+.survey-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.survey-status {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.survey-status.active {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.survey-status.ended {
+    background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(107, 114, 128, 0.3);
+}
+
+.survey-actions {
+    margin-top: 15px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.survey-actions .btn {
+    flex: 1;
+    min-width: 120px;
+}
+
+.btn {
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.btn.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
+}
+
+.btn.btn-sm {
+    padding: 8px 14px;
+    font-size: 13px;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.btn.btn-sm:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+}
+
+.btn[style*="color: #ff4444"] {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+    color: white !important;
+    box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+}
+
+.btn[style*="color: #ff4444"]:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(255, 107, 107, 0.4);
+}
+
+.action-buttons {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.action-buttons .btn {
+    flex: 0 1 auto;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+</style>
+
+<script>
+let questions = [];
+
+function showCreateSurveyModal() {
+    document.getElementById('createSurveyModal').style.display = 'flex';
+    questions = [];
+    document.getElementById('questionsList').innerHTML = '';
+    document.getElementById('surveyForm').reset();
+    
+    // Tüm sınıf checkbox'larını temizle
+    document.querySelectorAll('input[name="targetClasses"]').forEach(cb => cb.checked = false);
+    
+    const now = new Date();
+    const week = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    
+    // Başlangıç tarihi şimdi olsun (yarın değil) ki anket hemen görünsün
+    document.getElementById('surveyStartDate').value = now.toISOString().slice(0, 16);
+    document.getElementById('surveyEndDate').value = week.toISOString().slice(0, 16);
+}
+
+function selectAllClasses() {
+    document.querySelectorAll('input[name="targetClasses"]').forEach(cb => cb.checked = true);
+}
+
+function deselectAllClasses() {
+    document.querySelectorAll('input[name="targetClasses"]').forEach(cb => cb.checked = false);
+}
+
+function closeCreateModal() {
+    document.getElementById('createSurveyModal').style.display = 'none';
+}
+
+function addQuestion() {
+    const questionId = Date.now();
+    questions.push({
+        id: questionId,
+        text: '',
+        type: 'text',
+        options: [],
+        required: true
+    });
+    
+    const questionHTML = `
+        <div class="question-item" data-id="${questionId}">
+            <button class="remove-btn" onclick="removeQuestion(${questionId})">✕</button>
+            <div class="form-group">
+                <input type="text" class="form-control" placeholder="Soru metni" onchange="updateQuestion(${questionId}, 'text', this.value)" required>
+            </div>
+            <div class="form-group">
+                <select class="form-control" onchange="updateQuestion(${questionId}, 'type', this.value)">
+                    <option value="text">Metin Cevap</option>
+                    <option value="choice">Çoktan Seçmeli</option>
+                    <option value="rating">Puanlama (1-5)</option>
+                </select>
+            </div>
+            <div class="options-container-${questionId}" style="display:none; margin-top: 10px;">
+                <label style="font-size: 13px; color: #666;">Seçenekler (virgülle ayırın):</label>
+                <input type="text" class="form-control" placeholder="Örn: Evet,Hayır,Kararsızım" onchange="updateQuestionOptions(${questionId}, this.value)">
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('questionsList').insertAdjacentHTML('beforeend', questionHTML);
+}
+
+function removeQuestion(questionId) {
+    questions = questions.filter(q => q.id !== questionId);
+    document.querySelector(`[data-id="${questionId}"]`).remove();
+}
+
+function updateQuestion(questionId, field, value) {
+    const question = questions.find(q => q.id === questionId);
+    if (question) {
+        question[field] = value;
+        
+        if (field === 'type') {
+            const optionsContainer = document.querySelector(`.options-container-${questionId}`);
+            if (value === 'choice') {
+                optionsContainer.style.display = 'block';
+            } else {
+                optionsContainer.style.display = 'none';
+            }
+        }
+    }
+}
+
+function updateQuestionOptions(questionId, value) {
+    const question = questions.find(q => q.id === questionId);
+    if (question) {
+        question.options = value
+            .split(',')
+            .map(o => o.trim())
+            .filter(o => o.length > 0);
+    }
+}
+
+async function submitSurvey(event) {
+    event.preventDefault();
+    
+    if (questions.length === 0) {
+        alert('En az bir soru eklemelisiniz!');
+        return;
+    }
+    
+    if (questions.some(q => !q.text)) {
+        alert('Tüm soruların metinlerini doldurun!');
+        return;
+    }
+    
+    // Seçili sınıfları topla
+    const selectedClasses = [];
+    document.querySelectorAll('input[name="targetClasses"]:checked').forEach(cb => {
+        selectedClasses.push(cb.value);
+    });
+    
+    if (selectedClasses.length === 0) {
+        alert('En az bir hedef sınıf seçmelisiniz!');
+        return;
+    }
+    
+    const data = {
+        title: document.getElementById('surveyTitle').value,
+        description: document.getElementById('surveyDescription').value,
+        target_role: 'student',
+        target_classes: selectedClasses,
+        start_date: document.getElementById('surveyStartDate').value,
+        end_date: document.getElementById('surveyEndDate').value,
+        is_anonymous: document.getElementById('surveyAnonymous').checked,
+        questions: questions
+    };
+    
+    try {
+        const response = await fetch('/api/surveys/create', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            alert('✅ Anket başarıyla oluşturuldu!');
+            closeCreateModal();
+            loadSurveys();
+        } else {
+            alert('Hata: ' + (result.error || 'Bilinmeyen hata'));
+        }
+    } catch (error) {
+        console.error(error);
+        alert('Anket oluşturulurken hata oluştu!');
+    }
+}
+
+async function loadSurveys() {
+    try {
+        const response = await fetch('/api/surveys/list');
+        const data = await response.json();
+        
+        const surveysList = document.getElementById('surveysList');
+        
+        if (!data.surveys || data.surveys.length === 0) {
+            surveysList.innerHTML = `
+                <div style="padding: 40px; text-align: center; color: #999;">
+                    <div style="font-size: 3em; margin-bottom: 10px;">📋</div>
+                    <p>Henüz anket oluşturmadınız</p>
+                    <button class="btn btn-primary" onclick="showCreateSurveyModal()" style="margin-top: 15px;">➕ İlk Anketi Oluştur</button>
+                </div>
+            `;
+            return;
+        }
+        
+        let html = '';
+        data.surveys.forEach(survey => {
+            const now = new Date();
+            const endDate = new Date(survey.end_date);
+            const isActive = endDate > now;
+            
+            html += `
+                <div class="survey-card">
+                    <div class="survey-header">
+                        <div>
+                            <div class="survey-title">${survey.title}</div>
+                            <div style="font-size: 13px; color: #666; margin-top: 5px;">
+                                ${survey.description || ''}
+                            </div>
+                        </div>
+                        <span class="survey-status ${isActive ? 'active' : 'ended'}">
+                            ${isActive ? '🟢 Aktif' : '⏹️ Sona Erdi'}
+                        </span>
+                    </div>
+                    <div style="font-size: 13px; color: #666; margin-top: 10px;">
+                        📅 ${new Date(survey.start_date).toLocaleString('tr-TR')} - ${new Date(survey.end_date).toLocaleString('tr-TR')}
+                    </div>
+                    <div style="font-size: 13px; color: #666; margin-top: 5px;">
+                        📝 ${survey.question_count} soru | 👥 ${survey.response_count || 0} yanıt
+                    </div>
+                    <div class="survey-actions">
+                        <button class="btn btn-sm" onclick="downloadSurveyPDF(${survey.id})" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);">📄 PDF Rapor</button>
+                        <button class="btn btn-sm" onclick="deleteSurvey(${survey.id})" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%); color: white; box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);">🗑️ Sil</button>
+                    </div>
+                </div>
+            `;
+        });
+        
+        surveysList.innerHTML = html;
+    } catch (error) {
+        console.error(error);
+        document.getElementById('surveysList').innerHTML = `
+            <div style="padding: 40px; text-align: center; color: #ff4444;">
+                Anketler yüklenirken hata oluştu
+            </div>
+        `;
+    }
+}
+
+function downloadSurveyPDF(surveyId) {
+    window.open(`/api/surveys/${surveyId}/report/pdf`, '_blank');
+}
+
+async function deleteSurvey(surveyId) {
+    if (!confirm('Bu anketi silmek istediğinize emin misiniz?')) return;
+    
+    try {
+        const response = await fetch(`/api/surveys/${surveyId}/delete`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            alert('✅ Anket silindi');
+            loadSurveys();
+        } else {
+            alert('Anket silinirken hata oluştu');
+        }
+    } catch (error) {
+        console.error(error);
+        alert('Anket silinirken hata oluştu');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadSurveys();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,507 @@
+{% set breadcrumbs = [{'text': 'Aktivite Takibi', 'url': ''}] %}
+{% extends "base_dashboard.html" %}
+
+{% block title %}Aktivite Takibi{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/admin-modern.css">
+<style>
+    .activity-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .activity-header {
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        margin-bottom: 25px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    
+    .activity-header h1 {
+        font-size: 1.8em;
+        color: #1f2937;
+        margin-bottom: 10px;
+    }
+    
+    .activity-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-top: 20px;
+    }
+    
+    .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 10px;
+        text-align: center;
+    }
+    
+    .stat-card.active {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+    
+    .stat-card.inactive {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    }
+    
+    .stat-number {
+        font-size: 2em;
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+    
+    .stat-label {
+        font-size: 0.9em;
+        opacity: 0.9;
+    }
+    
+    .filters {
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+        align-items: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    
+    .filter-group {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+    
+    .filter-group label {
+        font-weight: 500;
+        color: #374151;
+        white-space: nowrap;
+    }
+    
+    .filter-group select,
+    .filter-group input {
+        padding: 10px 15px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 1em;
+        background: white;
+        cursor: pointer;
+    }
+    
+    .filter-group select:focus,
+    .filter-group input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    .btn-primary {
+        padding: 10px 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    
+    .activity-table-container {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        overflow-x: auto;
+    }
+    
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    th {
+        background: #f9fafb;
+        padding: 15px;
+        text-align: left;
+        font-weight: 600;
+        color: #374151;
+        border-bottom: 2px solid #e5e7eb;
+        font-size: 0.95em;
+    }
+    
+    td {
+        padding: 15px;
+        border-bottom: 1px solid #f3f4f6;
+        color: #1f2937;
+    }
+    
+    tr:hover {
+        background: #f9fafb;
+    }
+    
+    .badge {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.85em;
+        font-weight: 600;
+    }
+    
+    .badge-teacher {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+    
+    .badge-student {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    
+    .status-badge {
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.9em;
+    }
+    
+    .status-active {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    
+    .status-inactive {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+    
+    .time-cell {
+        font-family: 'Courier New', monospace;
+        font-size: 0.9em;
+        color: #6b7280;
+    }
+    
+    .loading {
+        text-align: center;
+        padding: 40px;
+        color: #9ca3af;
+    }
+    
+    .no-data {
+        text-align: center;
+        padding: 40px;
+        color: #9ca3af;
+    }
+    
+    .pagination {
+        padding: 20px;
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+    }
+    
+    .pagination button {
+        padding: 8px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        background: white;
+        color: #374151;
+        cursor: pointer;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+    
+    .pagination button:hover {
+        border-color: #667eea;
+        color: #667eea;
+    }
+    
+    .pagination button.active {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+    }
+    
+    .export-btn {
+        padding: 10px 20px;
+        background: #10b981;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    
+    .export-btn:hover {
+        background: #059669;
+        transform: translateY(-2px);
+    }
+    
+    @media (max-width: 768px) {
+        .activity-header {
+            padding: 15px;
+        }
+        
+        .filters {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        
+        .filter-group {
+            flex-direction: column;
+        }
+        
+        .filter-group select,
+        .filter-group input {
+            width: 100%;
+        }
+        
+        table {
+            font-size: 0.85em;
+        }
+        
+        th, td {
+            padding: 10px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="activity-container">
+    <!-- Header -->
+    <div class="activity-header">
+        <h1>📊 Aktivite Takibi</h1>
+        <p style="color: #6b7280;">Tüm öğretmen ve öğrencilerin sistem aktivitelerini takip edin</p>
+        
+        <div class="activity-stats">
+            <div class="stat-card">
+                <div class="stat-number" id="totalUsers">0</div>
+                <div class="stat-label">Toplam Kullanıcı</div>
+            </div>
+            <div class="stat-card active">
+                <div class="stat-number" id="activeUsers">0</div>
+                <div class="stat-label">Aktif Kullanıcılar</div>
+            </div>
+            <div class="stat-card inactive">
+                <div class="stat-number" id="inactiveUsers">0</div>
+                <div class="stat-label">İnaktif Kullanıcılar</div>
+            </div>
+            <div class="stat-card" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                <div class="stat-number" id="totalSessions">0</div>
+                <div class="stat-label">Toplam Oturumlar</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Filters -->
+    <div class="filters">
+        <div class="filter-group">
+            <label>Rol Filtresi:</label>
+            <select id="roleFilter">
+                <option value="">Tümü</option>
+                <option value="teacher">Öğretmen</option>
+                <option value="student">Öğrenci</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Sınıf Filtresi:</label>
+            <select id="classFilter">
+                <option value="">Tümü</option>
+                <option value="5A">5A</option>
+                <option value="5B">5B</option>
+                <option value="5C">5C</option>
+                <option value="5D">5D</option>
+                <option value="5E">5E</option>
+                <option value="6A">6A</option>
+                <option value="6B">6B</option>
+                <option value="6C">6C</option>
+                <option value="6D">6D</option>
+                <option value="6E">6E</option>
+                <option value="7A">7A</option>
+                <option value="7B">7B</option>
+                <option value="7C">7C</option>
+                <option value="7D">7D</option>
+                <option value="7E">7E</option>
+                <option value="8A">8A</option>
+                <option value="8B">8B</option>
+                <option value="8C">8C</option>
+                <option value="8D">8D</option>
+                <option value="8E">8E</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Sıralama:</label>
+            <select id="sortBy">
+                <option value="last_login">Son Giriş (Yeni → Eski)</option>
+                <option value="total_duration">Toplam Süre (Uzun → Kısa)</option>
+                <option value="total_sessions">Oturum Sayısı (Çok → Az)</option>
+                <option value="name">Ad Soyad (A → Z)</option>
+            </select>
+        </div>
+        <button class="btn-primary" onclick="loadActivityData()">🔄 Yenile</button>
+        <button class="export-btn" onclick="exportToPDF()">📄 PDF İndir</button>
+    </div>
+    
+    <!-- Activity Table -->
+    <div class="activity-table-container">
+        <table id="activityTable">
+            <thead>
+                <tr>
+                    <th style="width: 20%;">Kullanıcı</th>
+                    <th style="width: 10%;">Rol</th>
+                    <th style="width: 10%;">Sınıf</th>
+                    <th style="width: 15%;">Son Giriş</th>
+                    <th style="width: 15%;">Son Çıkış</th>
+                    <th style="width: 12%;">Oturum Sayısı</th>
+                    <th style="width: 12%;">Toplam Süre</th>
+                    <th style="width: 6%;">Durum</th>
+                </tr>
+            </thead>
+            <tbody id="activityTableBody">
+                <tr>
+                    <td colspan="8" class="loading">Veriler yükleniyor...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+let allData = [];
+
+// Tarih formatla
+function formatDate(dateStr) {
+    if (!dateStr) return "-";
+    const date = new Date(dateStr);
+    return date.toLocaleString('tr-TR', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+}
+
+// Dakikaları saat ve dakikaya çevir
+function formatDuration(minutes) {
+    if (!minutes || minutes === 0) return "-";
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours > 0) {
+        return `${hours}s ${mins}d`;
+    }
+    return `${mins}d`;
+}
+
+// Aktivite verilerini yükle
+async function loadActivityData() {
+    try {
+        const response = await fetch('/api/admin/user-activity');
+        const result = await response.json();
+        
+        if (!result.success) {
+            alert('Veri yüklenirken hata oluştu');
+            return;
+        }
+        
+        allData = result.data;
+        displayData(allData);
+        updateStats(allData);
+    } catch (error) {
+        console.error('Error loading activity data:', error);
+        alert('Veri yüklenirken hata oluştu');
+    }
+}
+
+// Verileri filtrele ve göster
+function displayData(data) {
+    const roleFilter = document.getElementById('roleFilter').value;
+    const classFilter = document.getElementById('classFilter').value;
+    const sortBy = document.getElementById('sortBy').value;
+    
+    let filtered = data.filter(user => {
+        if (roleFilter && user.role !== roleFilter) return false;
+        if (classFilter && user.class_name !== classFilter) return false;
+        return true;
+    });
+    
+    // Sıralama
+    if (sortBy === 'last_login') {
+        filtered.sort((a, b) => {
+            const timeA = a.last_login ? new Date(a.last_login) : new Date(0);
+            const timeB = b.last_login ? new Date(b.last_login) : new Date(0);
+            return timeB - timeA;
+        });
+    } else if (sortBy === 'total_duration') {
+        filtered.sort((a, b) => b.total_duration_minutes - a.total_duration_minutes);
+    } else if (sortBy === 'total_sessions') {
+        filtered.sort((a, b) => b.total_sessions - a.total_sessions);
+    } else if (sortBy === 'name') {
+        filtered.sort((a, b) => a.full_name.localeCompare(b.full_name, 'tr'));
+    }
+    
+    const tbody = document.getElementById('activityTableBody');
+    
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="no-data">Veri bulunamadı</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = filtered.map(user => `
+        <tr>
+            <td><strong>${user.full_name}</strong><br><small style="color: #6b7280;">${user.username}</small></td>
+            <td><span class="badge ${user.role === 'teacher' ? 'badge-teacher' : 'badge-student'}">${user.role === 'teacher' ? '👨‍🏫 Öğretmen' : '👨‍🎓 Öğrenci'}</span></td>
+            <td>${user.class_name || '-'}</td>
+            <td class="time-cell">${formatDate(user.last_login)}</td>
+            <td class="time-cell">${formatDate(user.last_logout)}</td>
+            <td><strong>${user.total_sessions}</strong></td>
+            <td><strong>${formatDuration(user.total_duration_minutes)}</strong></td>
+            <td><span class="status-badge ${user.status.includes('Aktif') ? 'status-active' : 'status-inactive'}">${user.status}</span></td>
+        </tr>
+    `).join('');
+}
+
+// İstatistikleri güncelle
+function updateStats(data) {
+    document.getElementById('totalUsers').textContent = data.length;
+    
+    const now = new Date();
+    const activeUsers = data.filter(user => {
+        if (!user.last_login) return false;
+        const lastLogin = new Date(user.last_login);
+        const hoursDiff = (now - lastLogin) / (1000 * 60 * 60);
+        return hoursDiff < 24; // Son 24 saatte giriş yapmışsa aktif
+    });
+    
+    document.getElementById('activeUsers').textContent = activeUsers.length;
+    document.getElementById('inactiveUsers').textContent = data.length - activeUsers.length;
+    document.getElementById('totalSessions').textContent = data.reduce((sum, user) => sum + user.total_sessions, 0);
+}
+
+// Filtreleme event'leri
+document.getElementById('roleFilter').addEventListener('change', () => displayData(allData));
+document.getElementById('classFilter').addEventListener('change', () => displayData(allData));
+document.getElementById('sortBy').addEventListener('change', () => displayData(allData));
+
+// PDF'ye aktar
+function exportToPDF() {
+    window.open('/api/admin/user-activity/pdf', '_blank');
+}
+
+// Sayfa yüklendiğinde veri yükle
+window.addEventListener('DOMContentLoaded', loadActivityData);
+</script>
+{% endblock %}

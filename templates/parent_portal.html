@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Veli Portalı - AMEO</title>
+    <link rel="stylesheet" href="/static/css/admin-modern.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: var(--font-family), 'Segoe UI', sans-serif;
+            background: var(--gradient-primary);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+        }
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .subtitle {
+            color: #6b7280;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #374151;
+            font-weight: 500;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .form-group textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102,126,234,0.4);
+        }
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .success-message {
+            background: #d1fae5;
+            color: #065f46;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .error-message {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .note {
+            background: #fef3c7;
+            color: #92400e;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>👨‍👩‍👧 Veli Portalı</h1>
+        <p class="subtitle">Öğretmene mesaj gönderin</p>
+        
+        <div class="success-message" id="successMessage">
+            ✅ Mesajınız başarıyla iletildi. Öğretmeniniz en kısa sürede dönüş yapacaktır.
+        </div>
+        
+        <div class="error-message" id="errorMessage"></div>
+        
+        <form id="parentForm">
+            <div class="form-group">
+                <label for="studentId">Öğrenci TC Kimlik No</label>
+                <input type="text" id="studentId" required maxlength="11" pattern="[0-9]{11}" 
+                       placeholder="11 haneli TC kimlik numarası">
+            </div>
+            
+            <div class="form-group">
+                <label for="parentName">Veli Adı Soyadı</label>
+                <input type="text" id="parentName" required placeholder="Adınız ve soyadınız">
+            </div>
+            
+            <div class="form-group">
+                <label for="parentEmail">E-posta (İsteğe bağlı)</label>
+                <input type="email" id="parentEmail" placeholder="ornek@email.com">
+            </div>
+            
+            <div class="form-group">
+                <label for="parentPhone">Telefon (İsteğe bağlı)</label>
+                <input type="tel" id="parentPhone" placeholder="05XX XXX XX XX">
+            </div>
+            
+            <div class="form-group">
+                <label for="message">Mesajınız</label>
+                <textarea id="message" required placeholder="Öğretmene iletmek istediğiniz mesajınızı yazın..."></textarea>
+            </div>
+            
+            <button type="submit" class="btn" id="submitBtn">📤 Mesajı Gönder</button>
+        </form>
+        
+        <div class="note">
+            💡 <strong>Not:</strong> Mesajınız öğrencinin öğretmenine iletilecektir. Öğretmeniniz en kısa sürede dönüş yapacaktır.
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('parentForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const successMessage = document.getElementById('successMessage');
+        const errorMessage = document.getElementById('errorMessage');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = '⏳ Gönderiliyor...';
+            successMessage.style.display = 'none';
+            errorMessage.style.display = 'none';
+
+            const formData = {
+                student_id: parseInt(document.getElementById('studentId').value),
+                parent_name: document.getElementById('parentName').value,
+                parent_email: document.getElementById('parentEmail').value || null,
+                parent_phone: document.getElementById('parentPhone').value || null,
+                message: document.getElementById('message').value
+            };
+
+            try {
+                const response = await fetch('/api/coaching/parent-messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    successMessage.style.display = 'block';
+                    form.reset();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                } else {
+                    errorMessage.textContent = '❌ ' + (result.error || 'Bir hata oluştu');
+                    errorMessage.style.display = 'block';
+                }
+            } catch (error) {
+                errorMessage.textContent = '❌ Bağlantı hatası: ' + error.message;
+                errorMessage.style.display = 'block';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '📤 Mesajı Gönder';
+            }
+        });
+
+        // TC kimlik no sadece rakam
+        document.getElementById('studentId').addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/[^0-9]/g, '');
+        });
+
+        // Telefon formatı
+        document.getElementById('parentPhone').addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/[^0-9]/g, '');
+        });
+    </script>
+</body>
+</html>

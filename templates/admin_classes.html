@@ -1,0 +1,595 @@
+{% set breadcrumbs = [{'text': 'Sınıf Yönetimi', 'url': ''}] %}
+{% extends "base_dashboard.html" %}
+
+{% block title %}Sınıf Yönetimi{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/admin-modern.css">
+<style>
+    .dashboard-content {
+        padding: 24px 28px;
+    }
+    
+    .classes-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+        margin-top: 24px;
+    }
+    
+    .class-card {
+        background: white;
+        border-radius: var(--radius-xl);
+        padding: 24px;
+        box-shadow: var(--shadow-md);
+        border: 1px solid var(--gray-100);
+        transition: all var(--transition-normal);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .class-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, var(--primary-500), var(--info-500));
+    }
+    
+    .class-card:hover {
+        transform: translateY(-6px);
+        box-shadow: var(--shadow-xl);
+    }
+    
+    .class-header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+    
+    .class-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: var(--radius-lg);
+        background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        font-weight: 700;
+    }
+    
+    .class-title {
+        flex: 1;
+    }
+    
+    .class-title h3 {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: var(--gray-800);
+        margin-bottom: 4px;
+    }
+    
+    .class-title span {
+        font-size: 0.85rem;
+        color: var(--gray-500);
+    }
+    
+    .class-stats {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+    
+    .class-stat-item {
+        background: var(--gray-50);
+        padding: 12px;
+        border-radius: var(--radius-md);
+        text-align: center;
+    }
+    
+    .class-stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--gray-800);
+    }
+    
+    .class-stat-label {
+        font-size: 0.75rem;
+        color: var(--gray-500);
+        text-transform: uppercase;
+    }
+    
+    .class-actions {
+        display: flex;
+        gap: 8px;
+    }
+    
+    .class-actions .btn {
+        flex: 1;
+        padding: 10px;
+        font-size: 0.85rem;
+    }
+    
+    .summary-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+    
+    .summary-card {
+        background: white;
+        padding: 20px;
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--gray-100);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+    
+    .summary-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: var(--radius-md);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.3rem;
+    }
+    
+    .summary-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: var(--gray-800);
+    }
+    
+    .summary-label {
+        font-size: 0.8rem;
+        color: var(--gray-500);
+    }
+    
+    @media (max-width: 768px) {
+        .dashboard-content {
+            padding: 16px;
+        }
+        
+        .classes-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .class-actions {
+            flex-wrap: wrap;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-content">
+    <div class="page-header-modern">
+        <h1>🏫 Sınıf Yönetimi</h1>
+        <p>Okulunuzdaki sınıfları yönetin ve öğrenci dağılımını görün</p>
+    </div>
+    
+    <div class="summary-cards">
+        <div class="summary-card">
+            <div class="summary-icon" style="background: var(--primary-100); color: var(--primary-600);">🏫</div>
+            <div>
+                <div class="summary-value" id="totalClassesCount">-</div>
+                <div class="summary-label">Toplam Sınıf</div>
+            </div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-icon" style="background: var(--success-100); color: var(--success-600);">👨‍🎓</div>
+            <div>
+                <div class="summary-value" id="totalStudentsCount">-</div>
+                <div class="summary-label">Toplam Öğrenci</div>
+            </div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-icon" style="background: var(--warning-100); color: var(--warning-600);">📊</div>
+            <div>
+                <div class="summary-value" id="avgStudentsCount">-</div>
+                <div class="summary-label">Ort. Öğrenci/Sınıf</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="loading" style="text-align: center; padding: 60px 20px; color: var(--gray-400);">
+        <div class="loading-spinner" style="margin: 0 auto 16px;"></div>
+        <p>Sınıflar yükleniyor...</p>
+    </div>
+    
+    <div id="classesGrid" class="classes-grid" style="display:none"></div>
+</div>
+
+<!-- Students Modal -->
+<div id="classModal" class="modal-overlay" onclick="if(event.target === this) closeClassModal()">
+    <div class="modal-modern" style="max-width: 800px;">
+        <div class="modal-header">
+            <h2 id="modalTitle">👥 Sınıf Öğrencileri</h2>
+            <button class="modal-close" onclick="closeClassModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div style="margin-bottom: 20px;">
+                <button class="btn btn-success" onclick="showAddStudentForm()">
+                    <span>➕</span> Öğrenci Ekle
+                </button>
+            </div>
+            
+            <div id="addStudentForm" style="display:none; background: var(--gray-50); padding: 20px; border-radius: var(--radius-lg); margin-bottom: 20px;">
+                <h4 style="margin-bottom: 12px; color: var(--gray-800);">Öğrenci Ekle/Değiştir</h4>
+                <div class="form-group">
+                    <label class="form-label">Öğrenci Seç</label>
+                    <select id="studentSelect" class="form-select">
+                        <option value="">Öğrenci seçiniz...</option>
+                    </select>
+                </div>
+                <div class="btn-group" style="margin-top: 16px;">
+                    <button class="btn btn-primary" onclick="addStudentToClass()">Ekle</button>
+                    <button class="btn btn-secondary" onclick="hideAddStudentForm()">İptal</button>
+                </div>
+            </div>
+
+            <table class="table-modern" id="studentsTable">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">#</th>
+                        <th>Ad Soyad</th>
+                        <th>Mevcut Sınıf</th>
+                        <th style="text-align: right;">İşlemler</th>
+                    </tr>
+                </thead>
+                <tbody id="studentsBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Class Modal -->
+<div id="editClassModal" class="modal-overlay" onclick="if(event.target === this) closeEditClassModal()">
+    <div class="modal-modern" style="max-width: 480px;">
+        <div class="modal-header">
+            <h2>✏️ Sınıf Adını Düzenle</h2>
+            <button class="modal-close" onclick="closeEditClassModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label required">Sınıf Adı</label>
+                <input type="text" id="editClassName" class="form-input" placeholder="Örn: 5A, 10B, 9C..." required>
+                <span class="form-helper">Sınıf adını değiştirdiğinizde bu sınıftaki tüm öğrencilerin sınıf bilgisi de güncellenecektir.</span>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeEditClassModal()">İptal</button>
+            <button class="btn btn-primary" onclick="updateClassName()">Kaydet</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentClassId = null;
+    let currentClassName = null;
+    let classStudentCounts = {};
+    
+    function showToast(message, type = 'info') {
+        const container = document.querySelector('.toast-container') || createToastContainer();
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.innerHTML = `
+            <span style="font-size: 1.2rem;">${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
+            <span style="flex: 1;">${message}</span>
+        `;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 4000);
+    }
+
+    function createToastContainer() {
+        const container = document.createElement('div');
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+        return container;
+    }
+    
+    async function loadClasses() {
+        try {
+            const response = await fetch('/admin/classes');
+            const data = await response.json();
+            const grid = document.getElementById('classesGrid');
+            grid.innerHTML = '';
+            
+            const sortedClasses = data.classes.sort((a, b) => {
+                const aNum = parseInt(a.name.match(/\d+/)?.[0] || 0);
+                const bNum = parseInt(b.name.match(/\d+/)?.[0] || 0);
+                const aLetter = a.name.match(/[A-Z]+/)?.[0] || '';
+                const bLetter = b.name.match(/[A-Z]+/)?.[0] || '';
+                
+                if (aNum !== bNum) return aNum - bNum;
+                return aLetter.localeCompare(bLetter);
+            });
+            
+            let totalStudents = 0;
+            
+            for (const cls of sortedClasses) {
+                const studentsResp = await fetch(`/admin/classes/${cls.id}/students`);
+                const studentsData = await studentsResp.json();
+                const studentCount = studentsData.students?.length || 0;
+                totalStudents += studentCount;
+                classStudentCounts[cls.id] = studentCount;
+                
+                const classNum = cls.name.match(/\d+/)?.[0] || '';
+                const classLetter = cls.name.match(/[A-Z]+/)?.[0] || '';
+                
+                const card = document.createElement('div');
+                card.className = 'class-card';
+                card.innerHTML = `
+                    <div class="class-header">
+                        <div class="class-icon">${classNum}${classLetter}</div>
+                        <div class="class-title">
+                            <h3>${cls.name}</h3>
+                            <span>Sınıf</span>
+                        </div>
+                    </div>
+                    <div class="class-stats">
+                        <div class="class-stat-item">
+                            <div class="class-stat-value">${studentCount}</div>
+                            <div class="class-stat-label">Öğrenci</div>
+                        </div>
+                        <div class="class-stat-item">
+                            <div class="class-stat-value">${cls.capacity || 40}</div>
+                            <div class="class-stat-label">Kapasite</div>
+                        </div>
+                    </div>
+                    <div class="class-actions">
+                        <button class="btn btn-primary btn-sm" onclick="showClassStudents(${cls.id}, '${cls.name}')">👥 Öğrenciler</button>
+                        <button class="btn btn-warning btn-sm" onclick="showEditClassModal(${cls.id}, '${cls.name}')">✏️</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteClass(${cls.id}, '${cls.name}')">🗑️</button>
+                    </div>
+                `;
+                grid.appendChild(card);
+            }
+            
+            document.getElementById('totalClassesCount').textContent = sortedClasses.length;
+            document.getElementById('totalStudentsCount').textContent = totalStudents;
+            document.getElementById('avgStudentsCount').textContent = sortedClasses.length > 0 
+                ? Math.round(totalStudents / sortedClasses.length) 
+                : 0;
+            
+            document.getElementById('loading').style.display = 'none';
+            grid.style.display = 'grid';
+        } catch (error) {
+            document.getElementById('loading').innerHTML = `
+                <div style="font-size: 3rem; margin-bottom: 16px;">😕</div>
+                <p>Yükleme hatası: ${error.message}</p>
+            `;
+        }
+    }
+    
+    function showEditClassModal(classId, className) {
+        currentClassId = classId;
+        currentClassName = className;
+        document.getElementById('editClassName').value = className;
+        document.getElementById('editClassModal').classList.add('show');
+    }
+    
+    function closeEditClassModal() {
+        document.getElementById('editClassModal').classList.remove('show');
+        document.getElementById('editClassName').value = '';
+    }
+    
+    async function updateClassName() {
+        const newName = document.getElementById('editClassName').value.trim().toUpperCase();
+        
+        if (!newName) {
+            showToast('Lütfen sınıf adı girin', 'error');
+            return;
+        }
+        
+        if (!confirm(`"${currentClassName}" sınıfının adını "${newName}" olarak değiştirmek istediğinizden emin misiniz?`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/admin/classes/${currentClassId}/rename`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ new_name: newName })
+            });
+            
+            const result = await response.json();
+            if (result.success) {
+                showToast(`Sınıf adı güncellendi! ${result.updated_students} öğrenci güncellendi.`, 'success');
+                closeEditClassModal();
+                loadClasses();
+            } else {
+                showToast('Hata: ' + (result.error || 'İşlem başarısız'), 'error');
+            }
+        } catch (error) {
+            showToast('Bağlantı hatası: ' + error.message, 'error');
+        }
+    }
+    
+    async function showClassStudents(classId, className) {
+        currentClassId = classId;
+        currentClassName = className;
+        document.getElementById('modalTitle').textContent = `👥 ${className} Sınıfı Öğrencileri`;
+        
+        try {
+            const response = await fetch(`/admin/classes/${classId}/students`);
+            const data = await response.json();
+            const tbody = document.getElementById('studentsBody');
+            tbody.innerHTML = '';
+            
+            if (!data.students || data.students.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" style="text-align: center; padding: 40px;">
+                            <div style="font-size: 2rem; margin-bottom: 8px; opacity: 0.5;">👤</div>
+                            <p style="color: var(--gray-500);">Bu sınıfta henüz öğrenci yok</p>
+                        </td>
+                    </tr>
+                `;
+            } else {
+                data.students.forEach((student, index) => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${index + 1}</td>
+                        <td style="font-weight: 600;">${student.full_name}</td>
+                        <td><span class="badge badge-primary">${student.class_name || '-'}</span></td>
+                        <td style="text-align: right;">
+                            <div class="btn-group" style="justify-content: flex-end;">
+                                <button class="btn btn-sm btn-warning" onclick="changeStudentClass(${student.id}, '${student.full_name}')">Sınıf Değiştir</button>
+                                <button class="btn btn-sm btn-danger" onclick="removeStudentFromClass(${student.id}, '${student.full_name}')">Çıkar</button>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+            
+            document.getElementById('classModal').classList.add('show');
+        } catch (error) {
+            showToast('Öğrenci listesi yüklenemedi: ' + error.message, 'error');
+        }
+    }
+    
+    async function showAddStudentForm() {
+        document.getElementById('addStudentForm').style.display = 'block';
+        
+        try {
+            const response = await fetch('/api/admin/users');
+            const data = await response.json();
+            const select = document.getElementById('studentSelect');
+            select.innerHTML = '<option value="">Öğrenci seçiniz...</option>';
+            
+            const students = data.users.filter(u => u.role === 'student');
+            students.forEach(student => {
+                const option = document.createElement('option');
+                option.value = student.id;
+                option.textContent = `${student.full_name} (${student.class_name || 'Sınıfsız'})`;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            showToast('Öğrenci listesi alınamadı: ' + error.message, 'error');
+        }
+    }
+    
+    function hideAddStudentForm() {
+        document.getElementById('addStudentForm').style.display = 'none';
+        document.getElementById('studentSelect').value = '';
+    }
+    
+    async function addStudentToClass() {
+        const studentId = document.getElementById('studentSelect').value;
+        if (!studentId) {
+            showToast('Lütfen bir öğrenci seçin', 'error');
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/admin/users/${studentId}/class`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ class_name: currentClassName })
+            });
+            
+            const result = await response.json();
+            if (result.success) {
+                showToast('Öğrenci sınıfa eklendi', 'success');
+                hideAddStudentForm();
+                showClassStudents(currentClassId, currentClassName);
+                loadClasses();
+            } else {
+                showToast('Hata: ' + (result.error || 'İşlem başarısız'), 'error');
+            }
+        } catch (error) {
+            showToast('Bağlantı hatası: ' + error.message, 'error');
+        }
+    }
+    
+    async function removeStudentFromClass(studentId, studentName) {
+        if (!confirm(`${studentName} öğrencisini sınıftan çıkarmak istediğinizden emin misiniz?`)) return;
+        
+        try {
+            const response = await fetch(`/api/admin/users/${studentId}/class`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ class_name: null })
+            });
+            
+            const result = await response.json();
+            if (result.success) {
+                showToast('Öğrenci sınıftan çıkarıldı', 'success');
+                showClassStudents(currentClassId, currentClassName);
+                loadClasses();
+            } else {
+                showToast('Hata: ' + (result.error || 'İşlem başarısız'), 'error');
+            }
+        } catch (error) {
+            showToast('Bağlantı hatası: ' + error.message, 'error');
+        }
+    }
+    
+    async function changeStudentClass(studentId, studentName) {
+        const newClass = prompt(`${studentName} öğrencisinin yeni sınıfını girin (örn: 5A, 6B):`, '');
+        if (!newClass) return;
+        
+        try {
+            const response = await fetch(`/api/admin/users/${studentId}/class`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ class_name: newClass.trim().toUpperCase() })
+            });
+            
+            const result = await response.json();
+            if (result.success) {
+                showToast(`Öğrenci ${newClass} sınıfına taşındı`, 'success');
+                showClassStudents(currentClassId, currentClassName);
+                loadClasses();
+            } else {
+                showToast('Hata: ' + (result.error || 'İşlem başarısız'), 'error');
+            }
+        } catch (error) {
+            showToast('Bağlantı hatası: ' + error.message, 'error');
+        }
+    }
+    
+    function closeClassModal() {
+        document.getElementById('classModal').classList.remove('show');
+        hideAddStudentForm();
+    }
+    
+    async function deleteClass(classId, className) {
+        if (!confirm(`"${className}" sınıfını silmek istediğinizden emin misiniz?\n\nBu işlem geri alınamaz!`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/admin/classes/${classId}`, {
+                method: 'DELETE'
+            });
+            
+            const result = await response.json();
+            if (result.success) {
+                showToast('Sınıf silindi!', 'success');
+                loadClasses();
+            } else {
+                showToast('Hata: ' + (result.error || 'Sınıf silinemedi'), 'error');
+            }
+        } catch (error) {
+            showToast('Bağlantı hatası: ' + error.message, 'error');
+        }
+    }
+    
+    loadClasses();
+</script>
+{% endblock %}

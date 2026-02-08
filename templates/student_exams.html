@@ -1,0 +1,430 @@
+{% set breadcrumbs = [{'text': 'Sınavlarım', 'url': ''}] %}
+{% extends "base_dashboard.html" %}
+
+{% block title %}Sınavlarım{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/admin-modern.css">
+<style>
+    .dashboard-content {
+        padding: 24px 28px;
+    }
+    
+    .section-title { 
+        color: var(--gray-800); 
+        font-size: 1.4em; 
+        margin: 30px 0 20px 0; 
+        padding-bottom: 12px; 
+        border-bottom: 3px solid var(--success-500);
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .exam-card { 
+        background: white; 
+        border-radius: var(--radius-xl); 
+        padding: 28px; 
+        margin-bottom: 20px; 
+        box-shadow: var(--shadow-lg); 
+        border: 1px solid var(--gray-100);
+        position: relative;
+        transition: all var(--transition-fast);
+    }
+    
+    .exam-card:hover {
+        box-shadow: var(--shadow-xl);
+        transform: translateY(-2px);
+    }
+    
+    .exam-card.active { border-left: 5px solid var(--success-500); }
+    .exam-card.upcoming { border-left: 5px solid var(--primary-500); }
+    .exam-card.past { border-left: 5px solid var(--gray-400); }
+    
+    .exam-title { 
+        font-size: 1.3em; 
+        color: var(--gray-800); 
+        margin-bottom: 12px;
+        font-weight: 700;
+    }
+    
+    .exam-info { 
+        color: var(--gray-600); 
+        margin: 8px 0; 
+        font-size: 0.95em;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .countdown { 
+        background: var(--warning-100); 
+        color: var(--warning-700); 
+        padding: 12px 18px; 
+        border-radius: var(--radius-lg); 
+        margin: 16px 0; 
+        font-weight: 700; 
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .countdown.active { background: var(--success-100); color: var(--success-700); }
+    .countdown.expired { background: var(--error-100); color: var(--error-700); }
+    
+    .btn-start { 
+        background: var(--gradient-success); 
+        color: white; 
+        padding: 14px 32px; 
+        border: none; 
+        border-radius: var(--radius-lg); 
+        cursor: pointer; 
+        font-size: 1em; 
+        font-weight: 700; 
+        margin-top: 12px;
+        box-shadow: var(--shadow-success);
+        transition: all var(--transition-fast);
+    }
+    
+    .btn-start:hover { transform: translateY(-2px); }
+    
+    .btn-view { 
+        background: var(--gradient-primary); 
+        color: white; 
+        padding: 14px 32px; 
+        border: none; 
+        border-radius: var(--radius-lg); 
+        cursor: pointer; 
+        font-size: 1em; 
+        margin-top: 12px; 
+        margin-right: 12px;
+        font-weight: 600;
+        box-shadow: var(--shadow-primary);
+        transition: all var(--transition-fast);
+    }
+    
+    .btn-view:hover { transform: translateY(-2px); }
+    .btn-disabled { background: var(--gray-300); color: var(--gray-500); cursor: not-allowed; box-shadow: none; }
+    
+    .status-badge { 
+        display: inline-block; 
+        padding: 6px 16px; 
+        border-radius: var(--radius-full); 
+        font-size: 0.85em; 
+        font-weight: 700; 
+        margin-left: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+    
+    .status-active { background: var(--success-100); color: var(--success-700); }
+    .status-upcoming { background: var(--primary-100); color: var(--primary-700); }
+    .status-completed { background: var(--success-100); color: var(--success-700); }
+    .status-missed { background: var(--error-100); color: var(--error-700); }
+    .status-draft { background: var(--warning-100); color: var(--warning-700); }
+    
+    .btn-continue { 
+        background: var(--gradient-warning); 
+        color: white; 
+        padding: 14px 32px; 
+        border: none; 
+        border-radius: var(--radius-lg); 
+        cursor: pointer; 
+        font-size: 1em; 
+        font-weight: 700; 
+        margin-top: 12px;
+        box-shadow: var(--shadow-warning);
+        transition: all var(--transition-fast);
+    }
+    
+    .btn-continue:hover { transform: translateY(-2px); }
+    
+    .allow-pause-info { 
+        background: var(--success-50); 
+        color: var(--success-700); 
+        padding: 10px 16px; 
+        border-radius: var(--radius-md); 
+        font-size: 0.9em; 
+        margin-top: 12px; 
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid var(--success-200);
+    }
+    
+    .empty-state { 
+        text-align: center; 
+        padding: 80px 20px; 
+        color: var(--gray-400); 
+    }
+    
+    .empty-state-icon { 
+        font-size: 5em; 
+        margin-bottom: 20px; 
+        opacity: 0.5; 
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="padding: 20px;">
+    <h2 class="section-title">🔴 Aktif Sınavlar</h2>
+    <div id="activeExams"></div>
+    
+    <h2 class="section-title">🔵 Yaklaşan Sınavlar</h2>
+    <div id="upcomingExams"></div>
+    
+    <h2 class="section-title">⚫ Geçmiş Sınavlar</h2>
+    <div id="pastExams"></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let countdownIntervals = [];
+    
+    function clearAllCountdowns() {
+        countdownIntervals.forEach(interval => clearInterval(interval));
+        countdownIntervals = [];
+    }
+    
+    async function loadExams() {
+        try {
+            clearAllCountdowns();
+            const response = await fetch('/student/my-exams');
+            const data = await response.json();
+            
+            const now = new Date();
+            const activeExams = [];
+            const upcomingExams = [];
+            const pastExams = [];
+            
+            data.exams.forEach(exam => {
+                const startTime = new Date(exam.start_time);
+                const endTime = exam.end_time ? new Date(exam.end_time) : null;
+                
+                // submission_status: null (hiç girmemiş), 'draft' (ara verilmiş), 'submitted' (teslim edilmiş)
+                const isFinalized = exam.submission_status === 'submitted';
+                const isDraft = exam.submission_status === 'draft';
+                
+                // exam_status: 'not_started', 'active', 'ended' (server tarafından hesaplanır)
+                if (exam.exam_status === 'active' && !isFinalized) {
+                    // Aktif sınavlar: Başlangıç-bitiş aralığında ve teslim edilmemiş
+                    activeExams.push({...exam, startTime, endTime});
+                } else if (exam.exam_status === 'not_started') {
+                    upcomingExams.push({...exam, startTime, endTime});
+                } else {
+                    // Geçmiş sınavlar: Bitiş süresi dolmuş veya teslim edilmiş
+                    pastExams.push({...exam, startTime, endTime});
+                }
+            });
+            
+            renderActiveExams(activeExams);
+            renderUpcomingExams(upcomingExams);
+            renderPastExams(pastExams);
+            
+        } catch (error) {
+            console.error('Sınavlar yüklenemedi:', error);
+        }
+    }
+    
+    function renderActiveExams(exams) {
+        const container = document.getElementById('activeExams');
+        if (exams.length === 0) {
+            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📝</div><p>Şu anda aktif sınav yok</p></div>';
+            return;
+        }
+        
+        container.innerHTML = '';
+        exams.forEach(exam => {
+            const card = document.createElement('div');
+            card.className = 'exam-card active';
+            const countdownId = `countdown-active-${exam.id}`;
+            
+            const isDraft = exam.submission_status === 'draft';
+            const statusBadge = isDraft 
+                ? '<span class="status-badge status-draft">⏸️ DEVAM EDİYOR</span>' 
+                : '<span class="status-badge status-active">🔴 AKTİF</span>';
+            const buttonHtml = isDraft
+                ? `<button class="btn-continue" onclick="startExam('${exam.id}')">▶️ Devam Et</button>`
+                : `<button class="btn-start" onclick="startExam('${exam.id}')">🚀 Sınava Başla</button>`;
+            const pauseInfo = exam.allow_pause 
+                ? '<div class="allow-pause-info">⏸️ Bu sınava ara verebilirsiniz</div>' 
+                : '';
+            
+            const endTimeStr = exam.endTime ? exam.endTime.toLocaleString('tr-TR') : 'Belirlenmedi';
+            
+            // İlk süre hesaplamasını hemen yap
+            const nowInit = new Date();
+            let initialCountdown = '';
+            let hasEndTime = exam.endTime !== null && exam.endTime !== undefined;
+            let remainingInit = hasEndTime ? (exam.endTime - nowInit) : null;
+            
+            if (!hasEndTime) {
+                // Bitiş tarihi belirlenmemişse, sınav süresi bazlı göster
+                initialCountdown = `⏱️ Sınav Süresi: ${exam.duration_minutes} dakika`;
+            } else if (remainingInit <= 0) {
+                initialCountdown = '⏰ Sınav süresi doldu!';
+            } else {
+                const mins = Math.floor(remainingInit / 60000);
+                const secs = Math.floor((remainingInit % 60000) / 1000);
+                initialCountdown = `⏱️ Kalan Süre: ${mins}:${secs.toString().padStart(2, '0')}`;
+            }
+            
+            card.innerHTML = `
+                <div class="exam-title">${exam.title} ${statusBadge}</div>
+                <div class="exam-info">📊 Soru Sayısı: ${exam.question_count}</div>
+                <div class="exam-info">⏱️ Sınav Süresi: ${exam.duration_minutes} dakika</div>
+                <div class="exam-info">🕐 Başlangıç: ${exam.startTime.toLocaleString('tr-TR')}</div>
+                <div class="exam-info">🏁 Bitiş: ${endTimeStr}</div>
+                ${pauseInfo}
+                <div class="countdown active" id="${countdownId}">${initialCountdown}</div>
+                ${buttonHtml}
+            `;
+            container.appendChild(card);
+            
+            if (hasEndTime && remainingInit > 0) {
+                const interval = setInterval(() => {
+                    const now = new Date();
+                    const remaining = exam.endTime - now;
+                    
+                    if (remaining <= 0) {
+                        document.getElementById(countdownId).innerHTML = '⏰ Sınav süresi doldu!';
+                        document.getElementById(countdownId).className = 'countdown expired';
+                        clearInterval(interval);
+                        setTimeout(loadExams, 2000);
+                    } else {
+                        const minutes = Math.floor(remaining / 60000);
+                        const seconds = Math.floor((remaining % 60000) / 1000);
+                        document.getElementById(countdownId).innerHTML = `⏱️ Kalan Süre: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+                    }
+                }, 1000);
+                countdownIntervals.push(interval);
+            }
+        });
+    }
+    
+    function renderUpcomingExams(exams) {
+        const container = document.getElementById('upcomingExams');
+        if (exams.length === 0) {
+            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔵</div><p>Yaklaşan sınav yok</p></div>';
+            return;
+        }
+        
+        container.innerHTML = '';
+        exams.forEach(exam => {
+            const card = document.createElement('div');
+            card.className = 'exam-card upcoming';
+            const countdownId = `countdown-upcoming-${exam.id}`;
+            
+            const endTimeStrUp = exam.endTime ? exam.endTime.toLocaleString('tr-TR') : 'Belirlenmedi';
+            
+            // İlk süre hesaplamasını hemen yap
+            const nowInitUp = new Date();
+            const remainingInitUp = exam.startTime - nowInitUp;
+            let initialCountdownUp = '';
+            
+            if (remainingInitUp <= 0) {
+                initialCountdownUp = '⏳ Sınav başladı!';
+            } else {
+                const days = Math.floor(remainingInitUp / 86400000);
+                const hours = Math.floor((remainingInitUp % 86400000) / 3600000);
+                const mins = Math.floor((remainingInitUp % 3600000) / 60000);
+                const secs = Math.floor((remainingInitUp % 60000) / 1000);
+                
+                let timeStr = '';
+                if (days > 0) timeStr += `${days} gün `;
+                if (hours > 0) timeStr += `${hours} saat `;
+                if (mins > 0) timeStr += `${mins} dakika `;
+                timeStr += `${secs} saniye`;
+                initialCountdownUp = `⏳ Sınava kalan: ${timeStr}`;
+            }
+            
+            card.innerHTML = `
+                <div class="exam-title">${exam.title} <span class="status-badge status-upcoming">🔵 YAKLAŞAN</span></div>
+                <div class="exam-info">📊 Soru Sayısı: ${exam.question_count}</div>
+                <div class="exam-info">⏱️ Sınav Süresi: ${exam.duration_minutes} dakika</div>
+                <div class="exam-info">🕐 Başlangıç: ${exam.startTime.toLocaleString('tr-TR')}</div>
+                <div class="exam-info">🏁 Bitiş: ${endTimeStrUp}</div>
+                <div class="countdown" id="${countdownId}">${initialCountdownUp}</div>
+                <button class="btn-start btn-disabled" disabled>⏳ Henüz Başlamadı</button>
+            `;
+            container.appendChild(card);
+            
+            if (remainingInitUp > 0) {
+                const interval = setInterval(() => {
+                    const now = new Date();
+                    const remaining = exam.startTime - now;
+                    
+                    if (remaining <= 0) {
+                        clearInterval(interval);
+                        loadExams();
+                    } else {
+                        const days = Math.floor(remaining / 86400000);
+                        const hours = Math.floor((remaining % 86400000) / 3600000);
+                        const minutes = Math.floor((remaining % 3600000) / 60000);
+                        const seconds = Math.floor((remaining % 60000) / 1000);
+                        
+                        let timeStr = '';
+                        if (days > 0) timeStr += `${days} gün `;
+                        if (hours > 0) timeStr += `${hours} saat `;
+                        if (minutes > 0) timeStr += `${minutes} dakika `;
+                        timeStr += `${seconds} saniye`;
+                        
+                        document.getElementById(countdownId).innerHTML = `⏳ Sınava kalan: ${timeStr}`;
+                    }
+                }, 1000);
+                countdownIntervals.push(interval);
+            }
+        });
+    }
+    
+    function renderPastExams(exams) {
+        const container = document.getElementById('pastExams');
+        if (exams.length === 0) {
+            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚫</div><p>Geçmiş sınav yok</p></div>';
+            return;
+        }
+        
+        container.innerHTML = '';
+        exams.forEach(exam => {
+            const card = document.createElement('div');
+            card.className = 'exam-card past';
+            const statusBadge = exam.is_submitted ? 
+                '<span class="status-badge status-completed">✅ TAMAMLANDI</span>' : 
+                '<span class="status-badge status-missed">❌ GİRİLMEDİ</span>';
+            
+            card.innerHTML = `
+                <div class="exam-title">${exam.title} ${statusBadge}</div>
+                <div class="exam-info">📊 Soru Sayısı: ${exam.question_count}</div>
+                <div class="exam-info">⏱️ Süre: ${exam.duration_minutes} dakika</div>
+                <div class="exam-info">🕐 Tarih: ${exam.startTime.toLocaleString('tr-TR')}</div>
+                ${exam.is_submitted ? 
+                    `<button class="btn-view" onclick="viewExamResults('${exam.id}')">📊 Sonuçları Gör</button>` : 
+                    `<button class="btn-view" onclick="viewExam('${exam.id}')">👁️ Sınavı Görüntüle</button>
+                     <p style="color:#991b1b; margin-top:10px; font-size:0.9em;">⚠️ Bu sınava giremediniz (sadece görüntüleme)</p>`
+                }
+            `;
+            container.appendChild(card);
+        });
+    }
+    
+    function startExam(examId) {
+        if (confirm('Sınava başlamak istediğinizden emin misiniz? Sınav süreniz başlayacaktır.')) {
+            window.location.href = `/student/exam/${examId}/take`;
+        }
+    }
+    
+    function viewExamResults(examId) {
+        window.location.href = `/student/exam/${examId}/results`;
+    }
+    
+    function viewExam(examId) {
+        window.location.href = `/student/exam/${examId}/view`;
+    }
+    
+    loadExams();
+    setInterval(loadExams, 30000);
+</script>
+{% endblock %}

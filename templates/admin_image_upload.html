@@ -1,0 +1,745 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Görsel Yükleme{% endblock %}
+
+{% block extra_css %}
+<style>
+    .upload-container {
+        padding: 20px;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+    
+    .page-title {
+        font-size: 1.75rem;
+        font-weight: 600;
+        color: #1f2937;
+    }
+    
+    .back-btn {
+        padding: 10px 16px;
+        background: #6b7280;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .upload-section {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        margin-bottom: 24px;
+    }
+    
+    .section-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #1f2937;
+        margin-bottom: 16px;
+    }
+    
+    .form-group {
+        margin-bottom: 20px;
+    }
+    
+    .form-group label {
+        display: block;
+        font-weight: 500;
+        color: #374151;
+        margin-bottom: 8px;
+    }
+    
+    .form-control {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 1rem;
+    }
+    
+    .dropzone {
+        border: 2px dashed #d1d5db;
+        border-radius: 12px;
+        padding: 40px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: #f9fafb;
+    }
+    
+    .dropzone:hover, .dropzone.dragover {
+        border-color: #3b82f6;
+        background: #eff6ff;
+    }
+    
+    .dropzone-icon {
+        font-size: 3rem;
+        color: #9ca3af;
+        margin-bottom: 16px;
+    }
+    
+    .dropzone-text {
+        color: #6b7280;
+        margin-bottom: 8px;
+    }
+    
+    .dropzone-hint {
+        color: #9ca3af;
+        font-size: 0.875rem;
+    }
+    
+    .file-list {
+        margin-top: 16px;
+    }
+    
+    .file-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        background: #f3f4f6;
+        border-radius: 8px;
+        margin-bottom: 8px;
+    }
+    
+    .file-item img {
+        width: 60px;
+        height: 60px;
+        object-fit: cover;
+        border-radius: 6px;
+    }
+    
+    .file-info {
+        flex: 1;
+    }
+    
+    .file-name {
+        font-weight: 500;
+        color: #1f2937;
+    }
+    
+    .file-size {
+        color: #6b7280;
+        font-size: 0.875rem;
+    }
+    
+    .remove-file {
+        background: #ef4444;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 6px 12px;
+        cursor: pointer;
+    }
+    
+    .btn-primary {
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-size: 1rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .btn-primary:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    .btn-success {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-size: 1rem;
+        cursor: pointer;
+    }
+    
+    .results-section {
+        display: none;
+    }
+    
+    .results-section.show {
+        display: block;
+    }
+    
+    .student-result {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        margin-bottom: 16px;
+    }
+    
+    .student-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .student-name {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #1f2937;
+    }
+    
+    .student-class {
+        color: #6b7280;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+    
+    .stat-box {
+        text-align: center;
+        padding: 12px;
+        background: #f3f4f6;
+        border-radius: 8px;
+    }
+    
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+    }
+    
+    .stat-label {
+        font-size: 0.75rem;
+        color: #6b7280;
+    }
+    
+    .stat-correct { color: #10b981; }
+    .stat-wrong { color: #ef4444; }
+    .stat-blank { color: #f59e0b; }
+    
+    .subjects-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .subjects-table th, .subjects-table td {
+        padding: 10px;
+        text-align: left;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .subjects-table th {
+        background: #f9fafb;
+        font-weight: 600;
+        color: #374151;
+    }
+    
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+    
+    .loading-overlay.show {
+        display: flex;
+    }
+    
+    .loading-content {
+        background: white;
+        padding: 40px;
+        border-radius: 12px;
+        text-align: center;
+    }
+    
+    .spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid #e5e7eb;
+        border-top-color: #3b82f6;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 16px;
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    .alert {
+        padding: 16px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+    }
+    
+    .alert-success {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    
+    .alert-error {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="upload-container">
+    <div class="page-header">
+        <h1 class="page-title">Veri Yükleme</h1>
+        <a href="/admin/report-cards" class="back-btn">
+            <i class="fas fa-arrow-left"></i> Karne Yönetimine Dön
+        </a>
+    </div>
+    
+    <div id="alertContainer"></div>
+    
+    <div style="margin-bottom: 20px;">
+        <h2 style="color: #1f2937; margin: 0;"><i class="fas fa-file-excel" style="color: #10b981;"></i> CSV/Excel Dosyasi Yukle</h2>
+    </div>
+    
+    <div class="upload-section tab-content" id="csvTab">
+        <h2 class="section-title"><i class="fas fa-file-excel" style="color: #10b981;"></i> CSV/Excel Dosyası Yükle</h2>
+        <p style="color: #6b7280; margin-bottom: 16px;">FMT dosyasını Python scripti ile düzenleyip CSV/Excel olarak yükleyin. %100 doğruluk garantisi!</p>
+        
+        <div class="form-group">
+            <label for="csvExamName">Sınav Adı</label>
+            <input type="text" id="csvExamName" class="form-control" placeholder="Örn: 1. TÜRKİYE GENELİ SINAV">
+        </div>
+        
+        <div class="form-group">
+            <label for="gradeLevel">Sınıf Seviyesi</label>
+            <select id="gradeLevel" class="form-control">
+                <option value="">-- Sınıf Seçin --</option>
+                <option value="5">5. Sınıf (15/10/10/10/15/15)</option>
+                <option value="6">6. Sınıf (15/10/10/10/15/15)</option>
+                <option value="7">7. Sınıf (20/10/10/10/20/20)</option>
+                <option value="8">8. Sınıf (20/10/10/10/20/20 - İnkılap Tarihi)</option>
+            </select>
+            <small style="color: #6b7280;">Seçilen sınıfa göre cevap anahtarı formatı ve ders sayıları belirlenir</small>
+        </div>
+        
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="fetchStudentNames" checked> 
+                Öğrenci isimlerini numaradan otomatik çek
+            </label>
+        </div>
+        
+        <details style="margin-bottom: 20px; background: #f0fdf4; border: 1px solid #10b981; border-radius: 8px; padding: 16px;" open>
+            <summary style="cursor: pointer; font-weight: 600; color: #059669;">
+                <i class="fas fa-key"></i> Cevap Anahtarı Yükle (Kazanımlı Excel)
+            </summary>
+            <div style="margin-top: 16px;">
+                <p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 12px;">
+                    Kazanımları içeren Excel cevap anahtarı dosyasını yükleyin. A ve B kitapçık bilgileri tek dosyadan okunur.
+                </p>
+                
+                <div>
+                    <label style="font-weight: 600; color: #059669; margin-bottom: 8px; display: block;">
+                        <i class="fas fa-file-excel"></i> Cevap Anahtarı Excel Dosyası
+                    </label>
+                    <input type="file" id="answerKeyFile" accept=".xlsx,.xls" class="form-control" style="padding: 8px;">
+                    <div id="akFileName" style="margin-top: 6px; font-size: 0.85rem; color: #6b7280;"></div>
+                </div>
+                
+                <div style="margin-top: 16px; padding: 12px; background: #fef3c7; border-radius: 6px;">
+                    <p style="font-size: 0.85rem; color: #92400e; margin: 0;">
+                        <i class="fas fa-info-circle"></i> 
+                        Excel'deki G sütunundaki B kitapçık soru karşılıkları otomatik olarak eşleştirilecek.
+                        Kazanımlar sorularla birlikte kaydedilecek.
+                    </p>
+                </div>
+            </div>
+        </details>
+        
+        <div class="dropzone" id="csvDropzone" style="border-color: #10b981;">
+            <div class="dropzone-icon" style="color: #10b981;">
+                <i class="fas fa-file-csv"></i>
+            </div>
+            <div class="dropzone-text">CSV veya Excel dosyasını sürükleyip bırakın</div>
+            <div class="dropzone-hint">CSV (;), TXT veya XLSX formatları desteklenir</div>
+            <input type="file" id="csvFileInput" accept=".csv,.txt,.xlsx,.xls" style="display:none">
+        </div>
+        
+        <div id="csvFileName" style="margin-top: 12px; color: #374151;"></div>
+        
+        <div style="margin-top: 20px; display: flex; gap: 12px;">
+            <button class="btn-primary" id="csvParseBtn" disabled style="background: linear-gradient(135deg, #10b981, #059669);">
+                <i class="fas fa-upload"></i> CSV/Excel Yükle
+            </button>
+        </div>
+    </div>
+    
+    
+    <div class="results-section" id="resultsSection">
+        <div class="upload-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h2 class="section-title">Analiz Sonuçları</h2>
+                <button class="btn-success" id="saveBtn">
+                    <i class="fas fa-save"></i> Veritabanına Kaydet
+                </button>
+            </div>
+            
+            <div id="studentResults"></div>
+        </div>
+    </div>
+</div>
+
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-content">
+        <div class="spinner"></div>
+        <div id="loadingText">Görseller analiz ediliyor...</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let parsedStudents = [];
+
+const saveBtn = document.getElementById('saveBtn');
+const resultsSection = document.getElementById('resultsSection');
+const studentResults = document.getElementById('studentResults');
+const loadingOverlay = document.getElementById('loadingOverlay');
+const loadingText = document.getElementById('loadingText');
+const alertContainer = document.getElementById('alertContainer');
+
+const csvDropzone = document.getElementById('csvDropzone');
+const csvFileInput = document.getElementById('csvFileInput');
+const csvParseBtn = document.getElementById('csvParseBtn');
+const csvFileName = document.getElementById('csvFileName');
+let selectedCsvFile = null;
+
+
+csvDropzone.addEventListener('click', () => csvFileInput.click());
+csvDropzone.addEventListener('dragover', (e) => { e.preventDefault(); csvDropzone.classList.add('dragover'); });
+csvDropzone.addEventListener('dragleave', () => csvDropzone.classList.remove('dragover'));
+csvDropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    csvDropzone.classList.remove('dragover');
+    if (e.dataTransfer.files.length > 0) {
+        handleCsvFile(e.dataTransfer.files[0]);
+    }
+});
+csvFileInput.addEventListener('change', (e) => {
+    if (e.target.files.length > 0) {
+        handleCsvFile(e.target.files[0]);
+    }
+});
+
+function handleCsvFile(file) {
+    const ext = file.name.toLowerCase().split('.').pop();
+    if (['csv', 'txt', 'xlsx', 'xls'].includes(ext)) {
+        selectedCsvFile = file;
+        csvFileName.innerHTML = '<i class="fas fa-check-circle" style="color: #10b981;"></i> ' + file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB)';
+        csvParseBtn.disabled = false;
+    } else {
+        showAlert('Desteklenmeyen format. CSV, TXT veya Excel dosyası yükleyin.', 'error');
+    }
+}
+
+const answerKeyFile = document.getElementById('answerKeyFile');
+
+answerKeyFile.addEventListener('change', (e) => {
+    if (e.target.files.length > 0) {
+        document.getElementById('akFileName').innerHTML = '<i class="fas fa-check-circle" style="color: #10b981;"></i> ' + e.target.files[0].name;
+    }
+});
+
+csvParseBtn.addEventListener('click', async () => {
+    if (!selectedCsvFile) return;
+    
+    loadingOverlay.classList.add('show');
+    loadingText.textContent = 'CSV/Excel dosyası işleniyor...';
+    
+    const gradeLevel = document.getElementById('gradeLevel').value;
+    if (!gradeLevel) {
+        loadingOverlay.classList.remove('show');
+        showAlert('Lütfen sınıf seviyesi seçin!', 'error');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', selectedCsvFile);
+    formData.append('exam_name', document.getElementById('csvExamName').value || 'CSV Yükleme');
+    formData.append('fetch_student_names', document.getElementById('fetchStudentNames').checked ? '1' : '0');
+    formData.append('grade_level', gradeLevel);
+    
+    if (answerKeyFile.files.length > 0) {
+        formData.append('answer_key', answerKeyFile.files[0]);
+    }
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/upload-csv', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            parsedStudents = data.students;
+            renderResults();
+            resultsSection.classList.add('show');
+            showAlert(data.student_count + ' öğrenci başarıyla yüklendi', 'success');
+        } else {
+            showAlert(data.error || 'Yükleme hatası', 'error');
+        }
+    } catch (error) {
+        showAlert('Bağlantı hatası: ' + error.message, 'error');
+    } finally {
+        loadingOverlay.classList.remove('show');
+    }
+});
+
+function removeStudent(index) {
+    if (confirm('Bu öğrenci sonucunu silmek istediğinizden emin misiniz?')) {
+        parsedStudents.splice(index, 1);
+        renderResults();
+        if (parsedStudents.length === 0) {
+            resultsSection.classList.remove('show');
+            showAlert('Tüm sonuçlar silindi. Yeni dosya yükleyebilirsiniz.', 'info');
+        } else {
+            showAlert('Öğrenci sonucu silindi', 'success');
+        }
+    }
+}
+
+function showAlert(message, type) {
+    alertContainer.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+    setTimeout(() => alertContainer.innerHTML = '', 5000);
+}
+
+function renderResults() {
+    const subjectNames = {
+        'turkce': 'Türkçe',
+        'matematik': 'Matematik',
+        'fen': 'Fen Bilimleri',
+        'ingilizce': 'İngilizce',
+        'inkilap': 'İnkılap Tarihi',
+        'din': 'Din Kültürü',
+        'sosyal': 'Sosyal Bilgiler'
+    };
+    
+    studentResults.innerHTML = parsedStudents.map(student => {
+        const totals = student.totals || {};
+        const subjects = student.subjects || {};
+        const ranking = student.ranking || {};
+        
+        const rankingHtml = (ranking.percentile || ranking.turkey_rank) ? `
+            <div style="background: linear-gradient(135deg, #8b5cf6, #a855f7); color: white; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; display: flex; justify-content: space-around; text-align: center;">
+                ${ranking.turkey_rank ? `<div><div style="font-size: 1.25rem; font-weight: 700;">${ranking.turkey_rank.toLocaleString()}</div><div style="font-size: 0.75rem; opacity: 0.9;">Türkiye Sırası</div></div>` : ''}
+                ${ranking.percentile ? `<div><div style="font-size: 1.25rem; font-weight: 700;">%${ranking.percentile}</div><div style="font-size: 0.75rem; opacity: 0.9;">Yüzdelik Dilim</div></div>` : ''}
+                ${ranking.total_participants ? `<div><div style="font-size: 1.25rem; font-weight: 700;">${ranking.total_participants.toLocaleString()}</div><div style="font-size: 0.75rem; opacity: 0.9;">Toplam Katılımcı</div></div>` : ''}
+            </div>
+        ` : '';
+        
+        const studentIndex = parsedStudents.indexOf(student);
+        return `
+            <div class="student-result" data-index="${studentIndex}">
+                <div class="student-header">
+                    <div>
+                        <div class="student-name">${student.name}</div>
+                        <div class="student-class">${student.class_name} - No: ${student.student_no || '-'}</div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 16px;">
+                        <div style="text-align: right;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #3b82f6;">
+                                ${totals.total_score?.toFixed(2) || '-'}
+                            </div>
+                            <div style="color: #6b7280; font-size: 0.875rem;">Puan</div>
+                        </div>
+                        <button onclick="removeStudent(${studentIndex})" style="background: #ef4444; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 0.875rem; display: flex; align-items: center; gap: 4px;" title="Bu sonucu sil">
+                            <i class="fas fa-trash"></i> Sil
+                        </button>
+                    </div>
+                </div>
+                
+                ${rankingHtml}
+                
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-value">${totals.question_count || 0}</div>
+                        <div class="stat-label">Soru</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value stat-correct">${totals.correct_count || 0}</div>
+                        <div class="stat-label">Doğru</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value stat-wrong">${totals.wrong_count || 0}</div>
+                        <div class="stat-label">Yanlış</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value stat-blank">${totals.blank_count || 0}</div>
+                        <div class="stat-label">Boş</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value">${totals.net_score?.toFixed(2) || '-'}</div>
+                        <div class="stat-label">Net</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value">%${totals.success_rate?.toFixed(1) || '-'}</div>
+                        <div class="stat-label">Başarı</div>
+                    </div>
+                </div>
+                
+                <table class="subjects-table">
+                    <thead>
+                        <tr>
+                            <th>Ders</th>
+                            <th>Soru</th>
+                            <th>Doğru</th>
+                            <th>Yanlış</th>
+                            <th>Boş</th>
+                            <th>Net</th>
+                            <th>Detay</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${Object.entries(subjects).map(([key, subj]) => `
+                            <tr>
+                                <td>${subjectNames[key] || key}</td>
+                                <td>${subj.question_count}</td>
+                                <td style="color: #10b981; font-weight: 600;">${subj.correct_count}</td>
+                                <td style="color: #ef4444; font-weight: 600;">${subj.wrong_count}</td>
+                                <td style="color: #f59e0b; font-weight: 600;">${subj.blank_count}</td>
+                                <td>${subj.net_score?.toFixed(2) || '-'}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-secondary" onclick="showAnswerDetail('${key}', ${JSON.stringify(subj.answers || []).replace(/"/g, '&quot;')}, '${subjectNames[key] || key}')">
+                                        <i class="fas fa-list"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }).join('');
+}
+
+function showAnswerDetail(subjectKey, answers, subjectName) {
+    if (!answers || answers.length === 0) {
+        showAlert('Bu ders için soru detayı bulunamadı', 'warning');
+        return;
+    }
+    
+    let answersHtml = '';
+    answers.forEach((ans, idx) => {
+        let bgColor = '#f1f5f9';
+        let textColor = '#475569';
+        let label = ans.student_answer || '-';
+        
+        if (ans.status === 'correct') {
+            bgColor = '#dcfce7';
+            textColor = '#16a34a';
+        } else if (ans.status === 'wrong') {
+            bgColor = '#fee2e2';
+            textColor = '#dc2626';
+        } else if (ans.status === 'blank') {
+            bgColor = '#fef3c7';
+            textColor = '#d97706';
+            label = 'B';
+        }
+        
+        answersHtml += '<div style="background: ' + bgColor + '; color: ' + textColor + '; padding: 8px; border-radius: 6px; text-align: center; font-weight: 600;">' +
+            '<div style="font-size: 0.7rem; color: #94a3b8; margin-bottom: 2px;">S' + (idx + 1) + '</div>' +
+            '<div>' + label + '</div>' +
+        '</div>';
+    });
+    
+    const modalHtml = '<div id="answerModal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999;">' +
+        '<div style="background: white; border-radius: 12px; max-width: 600px; width: 90%; max-height: 80vh; overflow: hidden;">' +
+            '<div style="padding: 16px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">' +
+                '<h3 style="margin: 0; font-size: 1.1rem;">' + subjectName + ' - Soru Detayları</h3>' +
+                '<button onclick="document.getElementById(\'answerModal\').remove()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #64748b;">&times;</button>' +
+            '</div>' +
+            '<div style="padding: 20px; max-height: 60vh; overflow-y: auto;">' +
+                '<div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;">' +
+                    answersHtml +
+                '</div>' +
+                '<div style="margin-top: 16px; display: flex; gap: 16px; justify-content: center; font-size: 0.85rem;">' +
+                    '<span><span style="display: inline-block; width: 12px; height: 12px; background: #dcfce7; border-radius: 3px; margin-right: 4px;"></span> Doğru</span>' +
+                    '<span><span style="display: inline-block; width: 12px; height: 12px; background: #fee2e2; border-radius: 3px; margin-right: 4px;"></span> Yanlış</span>' +
+                    '<span><span style="display: inline-block; width: 12px; height: 12px; background: #fef3c7; border-radius: 3px; margin-right: 4px;"></span> Boş</span>' +
+                '</div>' +
+            '</div>' +
+        '</div>' +
+    '</div>';
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+saveBtn.addEventListener('click', async () => {
+    if (parsedStudents.length === 0) return;
+    
+    loadingOverlay.classList.add('show');
+    loadingText.textContent = 'Veriler kaydediliyor...';
+    
+    try {
+        // CSV veya Görsel sınav adını al
+        const csvExamInput = document.getElementById('csvExamName');
+        const imageExamInput = document.getElementById('examName');
+        let examName = 'Sınav';
+        
+        if (csvExamInput && csvExamInput.value.trim()) {
+            examName = csvExamInput.value.trim();
+        } else if (imageExamInput && imageExamInput.value.trim()) {
+            examName = imageExamInput.value.trim();
+        }
+        
+        const response = await fetch('/admin/report-cards/api/save-image-results', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                students: parsedStudents,
+                exam_name: examName
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showAlert(`${data.saved_count} öğrenci başarıyla kaydedildi`, 'success');
+            parsedStudents = [];
+            resultsSection.classList.remove('show');
+        } else {
+            showAlert(data.error || 'Kayıt hatası', 'error');
+        }
+    } catch (error) {
+        showAlert('Bağlantı hatası: ' + error.message, 'error');
+    } finally {
+        loadingOverlay.classList.remove('show');
+    }
+});
+</script>
+{% endblock %}

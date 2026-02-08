@@ -1,0 +1,634 @@
+{% set breadcrumbs = [{'text': 'Sınavlarım', 'url': ''}] %}
+{% extends "base_dashboard.html" %}
+
+{% block title %}Sınavlarım{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/admin-modern.css">
+<style>
+    .dashboard-content {
+        padding: 24px 28px;
+    }
+    
+    .btn { padding: 12px 24px; border: none; border-radius: var(--radius-lg); cursor: pointer; font-size: 1em; margin-left: 10px; transition: all 0.3s; font-weight: 600; }
+    .btn:hover { transform: translateY(-2px); }
+    .btn-success { background: var(--gradient-success); color: white; box-shadow: var(--shadow-success); }
+    .btn-secondary { background: var(--gray-500); color: white; }
+    .btn-danger { background: var(--gradient-error); color: white; box-shadow: var(--shadow-error); }
+    .exam-card { background: white; border-radius: var(--radius-xl); padding: 24px; margin-bottom: 20px; box-shadow: var(--shadow-lg); border: 1px solid var(--gray-100); transition: all var(--transition-fast); }
+    .exam-card:hover { box-shadow: var(--shadow-xl); }
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; overflow-y: auto; }
+    .modal.show { display: block; }
+    .modal-content { background: white; max-width: 600px; margin: 30px auto; padding: 30px; border-radius: 15px; }
+    .form-group { margin-bottom: 20px; }
+    .form-group label { display: block; margin-bottom: 8px; font-weight: 500; color: #374151; }
+    .form-group input, .form-group select { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 5px; font-size: 1em; }
+    .checkbox-area { border: 1px solid #d1d5db; border-radius: 5px; padding: 10px; max-height: 300px; overflow-y: auto; background: #f9fafb; }
+    .checkbox-area label { 
+        display: flex; 
+        align-items: center; 
+        padding: 15px; 
+        margin: 8px 0; 
+        cursor: pointer; 
+        border: 2px solid #d1d5db; 
+        border-radius: 8px; 
+        background: white;
+        transition: all 0.3s;
+    }
+    .checkbox-area label:hover { 
+        border-color: #2563eb; 
+        background: #eff6ff; 
+    }
+    .checkbox-area input[type="checkbox"] { 
+        margin-right: 12px; 
+        width: 20px; 
+        height: 20px; 
+        cursor: pointer;
+    }
+    .bulk-actions {
+        margin-bottom: 20px;
+        display: flex;
+        gap: 15px;
+        align-items: center;
+        padding: 15px;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .btn-bulk-delete {
+        background: #ef4444;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1em;
+    }
+    .btn-bulk-delete:hover {
+        background: #dc2626;
+    }
+    .btn-bulk-delete:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+    }
+    .select-all-label {
+        font-size: 1em;
+        color: #374151;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 500;
+    }
+    .item-checkbox {
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+    }
+    .exam-card-checkbox {
+        display: flex;
+        align-items: flex-start;
+        gap: 15px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="padding: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h1 style="color: #1f2937; font-size: 1.8em;">📝 Sınavlarım</h1>
+        <button class="btn btn-success" id="btnNewExam">+ Yeni Sınav</button>
+    </div>
+
+    <div class="bulk-actions" id="bulkActionsPanel" style="display:none;">
+        <label class="select-all-label">
+            <input type="checkbox" class="item-checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)">
+            Tümünü Seç
+        </label>
+        <button class="btn-bulk-delete" onclick="bulkDeleteExams()" disabled id="bulkDeleteBtn">
+            🗑️ Seçilenleri Sil (<span id="selectedCount">0</span>)
+        </button>
+    </div>
+    <div id="examsList"></div>
+</div>
+
+<div id="modalCreate" class="modal">
+    <div class="modal-content">
+        <h2 style="margin-bottom: 25px;">📝 Yeni Sınav Oluştur</h2>
+        <form id="formCreate" enctype="multipart/form-data">
+            <div class="form-group">
+                <label>📋 Sınav Başlığı *</label>
+                <input type="text" name="baslik" required placeholder="Örn: Matematik 1. Dönem Sınavı">
+            </div>
+            
+            <div class="form-group">
+                <label>🔢 Soru Sayısı *</label>
+                <input type="number" name="soru_sayisi" required min="1" placeholder="Örn: 20">
+            </div>
+            
+            <div class="form-group">
+                <label>📅 Başlangıç Zamanı *</label>
+                <input type="datetime-local" name="baslangic_zamani" required>
+            </div>
+            
+            <div class="form-group">
+                <label>📅 Bitiş Zamanı *</label>
+                <input type="datetime-local" name="bitis_zamani" required>
+                <small style="color: #6b7280; display: block; margin-top: 5px;">
+                    💡 Öğrenciler bu tarih aralığında sınava girebilir
+                </small>
+            </div>
+            
+            <div class="form-group">
+                <label>⏱️ Sınav Süresi *</label>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="number" name="sure_deger" required min="1" placeholder="Örn: 40" style="flex: 2;">
+                    <select name="sure_birimi" style="flex: 1; padding: 12px; border: 1px solid #d1d5db; border-radius: 5px; font-size: 1em;">
+                        <option value="dakika" selected>Dakika</option>
+                        <option value="saat">Saat</option>
+                        <option value="gun">Gün</option>
+                    </select>
+                </div>
+                <small style="color: #6b7280; display: block; margin-top: 5px;">
+                    💡 İstediğiniz birimi seçin: Dakika, Saat veya Gün
+                </small>
+            </div>
+            
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 15px; background: #f0fdf4; border: 2px solid #86efac; border-radius: 10px;">
+                    <input type="checkbox" name="allow_pause" id="allowPauseCheck" style="width: 22px; height: 22px; accent-color: #10b981;">
+                    <span style="flex: 1;">
+                        <strong style="color: #166534;">⏸️ Ara Verilebilir Sınav</strong>
+                        <small style="display: block; color: #15803d; margin-top: 3px;">
+                            Öğrenci cevaplarını kaydedip daha sonra kaldığı yerden devam edebilir
+                        </small>
+                    </span>
+                </label>
+            </div>
+            
+            <div class="form-group">
+                <label>🎯 Hedef Sınıflar *</label>
+                <div class="checkbox-area" id="classCheckboxes">
+                    <p style="color: #6b7280;">Yükleniyor...</p>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>📄 Sınav Dosyası (PDF veya Fotoğraf) *</label>
+                <div id="fileInputsContainer">
+                    <div class="file-input-wrapper" style="margin-bottom: 10px;">
+                        <button type="button" class="file-select-btn" onclick="this.nextElementSibling.click()" style="width: 100%; padding: 20px; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border: none; border-radius: 12px; font-size: 1.1em; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 4px 15px rgba(59,130,246,0.3);">
+                            📷 Dosya Seç / Fotoğraf Çek
+                        </button>
+                        <input type="file" name="pdf_files[]" accept="application/pdf,image/jpeg,image/png,image/*" capture="environment" required style="display: none;" onchange="showSelectedFile(this)">
+                        <div class="selected-file-name" style="margin-top: 8px; padding: 8px 12px; background: #f0fdf4; border-radius: 8px; color: #166534; display: none;"></div>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-secondary" onclick="addMoreFiles()" style="padding: 8px 15px; font-size: 0.9em; margin-top: 5px;">
+                    ➕ Yeni Fotoğraf Ekle
+                </button>
+                <small style="color: #6b7280; display: block; margin-top: 8px;">
+                    📱 Mobil: Kamera ile çek veya galeriden seç | 💻 Bilgisayar: PDF/Resim yükle
+                </small>
+            </div>
+            
+            <div class="form-group">
+                <label>✅ Cevap Anahtarı Yöntemi *</label>
+                <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                    <label style="cursor: pointer; padding: 10px 20px; border: 2px solid #d1d5db; border-radius: 8px; background: white; transition: all 0.3s;">
+                        <input type="radio" name="answer_method" value="excel" checked onchange="toggleAnswerMethod()" style="margin-right: 8px;">
+                        📊 Excel Yükle
+                    </label>
+                    <label style="cursor: pointer; padding: 10px 20px; border: 2px solid #d1d5db; border-radius: 8px; background: white; transition: all 0.3s;">
+                        <input type="radio" name="answer_method" value="manual" onchange="toggleAnswerMethod()" style="margin-right: 8px;">
+                        ✍️ Manuel Gir
+                    </label>
+                </div>
+                
+                <div id="excelUpload" style="display: block;">
+                    <button type="button" class="file-select-btn" onclick="document.getElementById('excelFileInput').click()" style="width: 100%; padding: 15px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 12px; font-size: 1em; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 4px 15px rgba(16,185,129,0.3);">
+                        📊 Excel Dosyası Seç
+                    </button>
+                    <input type="file" name="cevap_file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" id="excelFileInput" style="display: none;" onchange="showExcelFile(this)">
+                    <div id="excelFileName" style="margin-top: 8px; padding: 8px 12px; background: #f0fdf4; border-radius: 8px; color: #166534; display: none;"></div>
+                </div>
+                
+                <div id="manualEntry" style="display: none;">
+                    <p style="color: #6b7280; margin-bottom: 10px; font-size: 0.9em;">
+                        📝 Her soru için doğru cevabı seçin (A, B, C veya D)
+                    </p>
+                    <div id="answerKeysContainer" style="max-height: 400px; overflow-y: auto; border: 1px solid #d1d5db; border-radius: 8px; padding: 15px; background: #f9fafb;">
+                        <p style="color: #9ca3af; text-align: center;">Önce soru sayısını girin</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-top: 25px;">
+                <button type="submit" class="btn btn-success" style="flex: 1;">✅ Oluştur</button>
+                <button type="button" class="btn btn-secondary" id="btnCloseModal" style="flex: 1;">❌ İptal</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const modal = document.getElementById('modalCreate');
+    const btnNew = document.getElementById('btnNewExam');
+    const btnClose = document.getElementById('btnCloseModal');
+    const form = document.getElementById('formCreate');
+    const classCheckboxes = document.getElementById('classCheckboxes');
+    
+    let manualAnswers = {};
+    let fileInputCount = 1;
+    
+    function showSelectedFile(input) {
+        const nameDiv = input.nextElementSibling;
+        if (input.files && input.files.length > 0) {
+            nameDiv.textContent = '✅ ' + input.files[0].name;
+            nameDiv.style.display = 'block';
+        } else {
+            nameDiv.style.display = 'none';
+        }
+    }
+    
+    function showExcelFile(input) {
+        const nameDiv = document.getElementById('excelFileName');
+        if (input.files && input.files.length > 0) {
+            nameDiv.textContent = '✅ ' + input.files[0].name;
+            nameDiv.style.display = 'block';
+        } else {
+            nameDiv.style.display = 'none';
+        }
+    }
+    
+    function addMoreFiles() {
+        fileInputCount++;
+        const container = document.getElementById('fileInputsContainer');
+        const wrapper = document.createElement('div');
+        wrapper.className = 'file-input-wrapper';
+        wrapper.style.cssText = 'margin-bottom: 10px;';
+        wrapper.innerHTML = `
+            <div style="display: flex; gap: 5px; align-items: center;">
+                <button type="button" class="file-select-btn" onclick="this.parentElement.querySelector('input[type=file]').click()" style="flex: 1; padding: 15px; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border: none; border-radius: 12px; font-size: 1em; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;">
+                    📷 Dosya Seç / Fotoğraf Çek
+                </button>
+                <button type="button" onclick="removeFileInput(this)" style="padding: 15px; background: #ef4444; color: white; border: none; border-radius: 12px; cursor: pointer; font-size: 1.2em;">🗑️</button>
+            </div>
+            <input type="file" name="pdf_files[]" accept="application/pdf,image/jpeg,image/png,image/*" capture="environment" style="display: none;" onchange="showSelectedFile(this)">
+            <div class="selected-file-name" style="margin-top: 8px; padding: 8px 12px; background: #f0fdf4; border-radius: 8px; color: #166534; display: none;"></div>
+        `;
+        container.appendChild(wrapper);
+    }
+    
+    function removeFileInput(btn) {
+        btn.closest('.file-input-wrapper').remove();
+        fileInputCount--;
+    }
+    
+    btnNew.addEventListener('click', function() {
+        console.log('Yeni Sınav butonu tıklandı');
+        modal.classList.add('show');
+        loadClasses();
+    });
+    
+    btnClose.addEventListener('click', function() {
+        modal.classList.remove('show');
+        form.reset();
+    });
+    
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            modal.classList.remove('show');
+            form.reset();
+        }
+    });
+    
+    async function loadClasses() {
+        try {
+            const response = await fetch('/teacher/classes');
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Sınıflar yüklenirken hata:', errorText);
+                throw new Error('Sınıflar yüklenemedi');
+            }
+            
+            const data = await response.json();
+            classCheckboxes.innerHTML = '';
+            
+            if (!data.classes || data.classes.length === 0) {
+                classCheckboxes.innerHTML = '<p style="color:#ef4444;">Henüz sınıf oluşturulmamış. Lütfen yöneticiden sınıf eklemesini isteyin.</p>';
+                return;
+            }
+            
+            data.classes.forEach(cls => {
+                const label = document.createElement('label');
+                label.innerHTML = `
+                    <input type="checkbox" name="target_classes[]" value="${cls.name}">
+                    <span style="font-weight: 500; font-size: 1.05em;">${cls.name}</span>
+                `;
+                classCheckboxes.appendChild(label);
+            });
+        } catch (error) {
+            console.error('Sınıf yükleme hatası:', error);
+            classCheckboxes.innerHTML = '<p style="color:#ef4444;">Sınıflar yüklenirken hata oluştu. Lütfen sayfayı yenileyin.</p>';
+        }
+    }
+    
+    async function loadExams() {
+        try {
+            const response = await fetch('/teacher/my-exams');
+            if (!response.ok) throw new Error('Sınavlar yüklenemedi');
+            
+            const data = await response.json();
+            const container = document.getElementById('examsList');
+            const bulkPanel = document.getElementById('bulkActionsPanel');
+            container.innerHTML = '';
+            
+            if (!data.exams || data.exams.length === 0) {
+                container.innerHTML = '<div style="text-align:center; padding:60px; background:white; border-radius:10px; color:#6b7280;">Henüz sınav oluşturmadınız</div>';
+                bulkPanel.style.display = 'none';
+                return;
+            }
+            
+            bulkPanel.style.display = 'flex';
+            
+            data.exams.forEach(exam => {
+                const card = document.createElement('div');
+                card.className = 'exam-card';
+                card.id = `exam-${exam.id}`;
+                
+                const startDate = new Date(exam.start_time).toLocaleString('tr-TR');
+                const endDate = exam.end_time ? new Date(exam.end_time).toLocaleString('tr-TR') : 'Belirlenmedi';
+                
+                card.innerHTML = `
+                    <div class="exam-card-checkbox">
+                        <input type="checkbox" class="item-checkbox exam-checkbox" value="${exam.id}" onchange="updateSelection()">
+                        <div style="flex:1;">
+                            <h3 style="color:#1f2937; margin-bottom:10px;">${exam.title}</h3>
+                            <p style="color:#6b7280; margin:5px 0;">📚 Sınıf: ${exam.target_class} | 📊 Sorular: ${exam.question_count} | ⏱️ Süre: ${exam.duration_minutes} dk</p>
+                            <p style="color:#6b7280; margin:5px 0;">📅 Başlangıç: ${startDate}</p>
+                            <p style="color:#6b7280; margin:5px 0;">🏁 Bitiş: ${endDate}</p>
+                            <div style="margin-top:15px; display:flex; gap:10px;">
+                                <button class="btn btn-success" style="padding:8px 20px; font-size:0.9em;" onclick="location.href='/teacher/exams/${exam.id}/report'">📊 Rapor</button>
+                                <button class="btn btn-danger" style="padding:8px 20px; font-size:0.9em;" onclick="deleteExam('${exam.id}')">🗑️ Tek Sil</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        } catch (error) {
+            console.error('Hata:', error);
+            document.getElementById('examsList').innerHTML = '<div style="text-align:center; padding:40px; color:#ef4444;">❌ Sınavlar yüklenirken hata oluştu</div>';
+        }
+    }
+    
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const method = document.querySelector('input[name="answer_method"]:checked').value;
+        const soruSayisi = parseInt(document.querySelector('input[name="soru_sayisi"]').value);
+        
+        if (method === 'manual') {
+            const answeredCount = Object.keys(manualAnswers).length;
+            if (answeredCount !== soruSayisi) {
+                alert(`⚠️ Lütfen tüm soruların cevaplarını girin! (${answeredCount}/${soruSayisi} cevaplandı)`);
+                return;
+            }
+            
+            for (let i = 1; i <= soruSayisi; i++) {
+                if (!manualAnswers[i] || !['A', 'B', 'C', 'D'].includes(manualAnswers[i])) {
+                    alert(`⚠️ Soru ${i} için geçerli bir cevap seçilmedi!`);
+                    return;
+                }
+            }
+        }
+        
+        const formData = new FormData(form);
+        
+        const timezoneOffset = new Date().getTimezoneOffset();
+        formData.append('timezone_offset', timezoneOffset);
+        
+        if (method === 'manual') {
+            formData.append('manual_answers', JSON.stringify(manualAnswers));
+        }
+        
+        const submitBtn = form.querySelector('[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.textContent = '⏳ Oluşturuluyor...';
+        
+        try {
+            const response = await fetch('/teacher/exams/create', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert('✅ Sınav başarıyla oluşturuldu!');
+                modal.classList.remove('show');
+                form.reset();
+                manualAnswers = {};
+                loadExams();
+            } else {
+                alert('❌ Hata: ' + (result.error || 'Sınav oluşturulamadı'));
+            }
+        } catch (error) {
+            console.error('Hata:', error);
+            alert('❌ Bağlantı hatası: ' + error.message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = '✅ Oluştur';
+        }
+    });
+    
+    async function deleteExam(examId) {
+        if (!confirm('Bu sınavı silmek istediğinizden emin misiniz?')) return;
+        
+        try {
+            const response = await fetch(`/teacher/exams/${examId}`, { 
+                method: 'DELETE' 
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert('✅ Sınav silindi');
+                loadExams();
+            } else {
+                alert('❌ Hata: ' + (result.error || 'Silinemedi'));
+            }
+        } catch (error) {
+            console.error('Hata:', error);
+            alert('❌ Bağlantı hatası: ' + error.message);
+        }
+    }
+    
+    function toggleAnswerMethod() {
+        const method = document.querySelector('input[name="answer_method"]:checked').value;
+        const excelUpload = document.getElementById('excelUpload');
+        const manualEntry = document.getElementById('manualEntry');
+        const excelFileInput = document.getElementById('excelFileInput');
+        
+        if (method === 'excel') {
+            excelUpload.style.display = 'block';
+            manualEntry.style.display = 'none';
+            excelFileInput.setAttribute('required', 'required');
+        } else {
+            excelUpload.style.display = 'none';
+            manualEntry.style.display = 'block';
+            excelFileInput.removeAttribute('required');
+            generateAnswerKeys();
+        }
+    }
+    
+    function generateAnswerKeys() {
+        const soruSayisi = parseInt(document.querySelector('input[name="soru_sayisi"]').value) || 0;
+        const container = document.getElementById('answerKeysContainer');
+        
+        if (soruSayisi <= 0 || soruSayisi > 100) {
+            container.innerHTML = '<p style="color: #ef4444; text-align: center;">⚠️ Geçerli soru sayısı girin (1-100)</p>';
+            return;
+        }
+        
+        container.innerHTML = '';
+        manualAnswers = {};
+        
+        for (let i = 1; i <= soruSayisi; i++) {
+            const questionDiv = document.createElement('div');
+            questionDiv.style.cssText = 'margin-bottom: 15px; padding: 12px; background: white; border-radius: 8px; border: 2px solid #e5e7eb;';
+            
+            const questionLabel = document.createElement('div');
+            questionLabel.textContent = `Soru ${i}:`;
+            questionLabel.style.cssText = 'font-weight: 600; margin-bottom: 8px; color: #374151;';
+            questionDiv.appendChild(questionLabel);
+            
+            const buttonsDiv = document.createElement('div');
+            buttonsDiv.style.cssText = 'display: flex; gap: 8px; flex-wrap: wrap;';
+            
+            ['A', 'B', 'C', 'D'].forEach(option => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = option;
+                btn.style.cssText = 'width: 50px; height: 50px; min-width: 50px; min-height: 50px; font-size: 1.1em; font-weight: bold; border: 2px solid #d1d5db; border-radius: 8px; background: white; cursor: pointer; transition: all 0.2s;';
+                
+                btn.addEventListener('click', function() {
+                    buttonsDiv.querySelectorAll('button').forEach(b => {
+                        b.style.background = 'white';
+                        b.style.color = '#374151';
+                        b.style.borderColor = '#d1d5db';
+                    });
+                    
+                    this.style.background = '#10b981';
+                    this.style.color = 'white';
+                    this.style.borderColor = '#10b981';
+                    
+                    manualAnswers[i] = option;
+                });
+                
+                buttonsDiv.appendChild(btn);
+            });
+            
+            questionDiv.appendChild(buttonsDiv);
+            container.appendChild(questionDiv);
+        }
+    }
+    
+    document.querySelector('input[name="soru_sayisi"]').addEventListener('input', function() {
+        const method = document.querySelector('input[name="answer_method"]:checked').value;
+        if (method === 'manual') {
+            generateAnswerKeys();
+        }
+    });
+    
+    async function deleteExam(examId) {
+        if (!confirm('Bu sınavı silmek istediğinizden emin misiniz?')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/teacher/exams/${examId}`, { method: 'DELETE' });
+            const data = await response.json();
+            
+            if (data.success) {
+                alert('✅ Sınav silindi!');
+                const element = document.getElementById(`exam-${examId}`);
+                if (element) element.remove();
+                loadExams();
+            } else {
+                alert('❌ Hata: ' + data.error);
+            }
+        } catch (error) {
+            alert('❌ Silme hatası: ' + error.message);
+        }
+    }
+    
+    function toggleSelectAll(checkbox) {
+        const checkboxes = document.querySelectorAll('.exam-checkbox');
+        checkboxes.forEach(cb => cb.checked = checkbox.checked);
+        updateSelection();
+    }
+    
+    function updateSelection() {
+        const checkboxes = document.querySelectorAll('.exam-checkbox:checked');
+        const count = checkboxes.length;
+        const btn = document.getElementById('bulkDeleteBtn');
+        const countSpan = document.getElementById('selectedCount');
+        
+        if (countSpan) countSpan.textContent = count;
+        if (btn) btn.disabled = count === 0;
+        
+        const allCheckboxes = document.querySelectorAll('.exam-checkbox');
+        const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+        if (selectAllCheckbox) {
+            selectAllCheckbox.checked = allCheckboxes.length > 0 && count === allCheckboxes.length;
+        }
+    }
+    
+    async function bulkDeleteExams() {
+        const checkboxes = document.querySelectorAll('.exam-checkbox:checked');
+        const ids = Array.from(checkboxes).map(cb => cb.value);
+        
+        if (ids.length === 0) {
+            alert('⚠️ Lütfen en az bir sınav seçin!');
+            return;
+        }
+        
+        if (!confirm(`${ids.length} sınavı silmek istediğinizden emin misiniz?`)) {
+            return;
+        }
+        
+        let successCount = 0;
+        let errorCount = 0;
+        
+        for (const examId of ids) {
+            try {
+                const response = await fetch(`/api/teacher/exams/${examId}`, { method: 'DELETE' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    successCount++;
+                    const element = document.getElementById(`exam-${examId}`);
+                    if (element) element.remove();
+                } else {
+                    errorCount++;
+                }
+            } catch (error) {
+                errorCount++;
+            }
+        }
+        
+        if (successCount > 0) {
+            alert(`✅ ${successCount} sınav silindi!${errorCount > 0 ? ` (${errorCount} hata)` : ''}`);
+            loadExams();
+        } else {
+            alert('❌ Hiçbir sınav silinemedi!');
+        }
+    }
+    
+    loadExams();
+</script>
+{% endblock %}

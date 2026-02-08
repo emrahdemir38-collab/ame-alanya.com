@@ -1,0 +1,483 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/admin-modern.css">
+<style>
+    .dashboard-content {
+        padding: 24px 28px;
+    }
+    
+    .welcome-banner {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #0ea5e9 100%);
+        border-radius: 20px;
+        padding: 32px 40px;
+        color: white;
+        margin-bottom: 28px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 10px 40px -10px rgba(59, 130, 246, 0.5);
+    }
+    
+    .welcome-banner::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -10%;
+        width: 400px;
+        height: 400px;
+        background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+        border-radius: 50%;
+    }
+    
+    .welcome-banner::after {
+        content: '';
+        position: absolute;
+        bottom: -30%;
+        left: 20%;
+        width: 300px;
+        height: 300px;
+        background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
+        border-radius: 50%;
+    }
+    
+    .welcome-content {
+        position: relative;
+        z-index: 1;
+    }
+    
+    .welcome-banner h1 {
+        font-size: 1.8rem;
+        font-weight: 800;
+        margin-bottom: 8px;
+    }
+    
+    .welcome-banner p {
+        font-size: 1rem;
+        opacity: 0.9;
+    }
+    
+    .welcome-date {
+        margin-top: 16px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(255,255,255,0.15);
+        padding: 8px 16px;
+        border-radius: 30px;
+        font-size: 0.9rem;
+        backdrop-filter: blur(10px);
+    }
+    
+    .activity-feed {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    
+    .activity-item {
+        display: flex;
+        gap: 16px;
+        padding: 16px 0;
+        border-bottom: 1px solid var(--gray-100);
+    }
+    
+    .activity-item:last-child {
+        border-bottom: none;
+    }
+    
+    .activity-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        flex-shrink: 0;
+    }
+    
+    .activity-icon.blue { background: var(--primary-100); color: var(--primary-600); }
+    .activity-icon.green { background: var(--success-100); color: var(--success-600); }
+    .activity-icon.orange { background: var(--warning-100); color: var(--warning-600); }
+    .activity-icon.purple { background: #f3e8ff; color: #9333ea; }
+    
+    .activity-content {
+        flex: 1;
+    }
+    
+    .activity-title {
+        font-weight: 600;
+        color: var(--gray-800);
+        margin-bottom: 4px;
+    }
+    
+    .activity-time {
+        font-size: 0.8rem;
+        color: var(--gray-500);
+    }
+    
+    .quick-stats-mini {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        margin-top: 16px;
+    }
+    
+    .quick-stat-item {
+        background: var(--gray-50);
+        padding: 12px;
+        border-radius: 10px;
+        text-align: center;
+    }
+    
+    .quick-stat-value {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: var(--gray-800);
+    }
+    
+    .quick-stat-label {
+        font-size: 0.7rem;
+        color: var(--gray-500);
+        text-transform: uppercase;
+    }
+    
+    @media (max-width: 768px) {
+        .dashboard-content {
+            padding: 16px;
+        }
+        
+        .welcome-banner {
+            padding: 24px;
+        }
+        
+        .welcome-banner h1 {
+            font-size: 1.4rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-content">
+    <!-- Welcome Banner -->
+    <div class="welcome-banner">
+        <div class="welcome-content">
+            <h1>👨‍💼 Hoş Geldiniz, {{ current_user.full_name }}</h1>
+            <p>AMEO Okul Yönetim Sistemi - Kontrol Paneli</p>
+            <div class="welcome-date">
+                <span>📅</span>
+                <span id="currentDate"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-card-icon blue">👥</div>
+            <div class="stat-card-label">Toplam Kullanıcı</div>
+            <div class="stat-card-value" id="totalUsers">
+                <div class="skeleton" style="height: 40px; width: 80px;"></div>
+            </div>
+            <div class="stat-card-change positive" id="userChange"></div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-card-icon green">🏫</div>
+            <div class="stat-card-label">Sınıf Sayısı</div>
+            <div class="stat-card-value" id="totalClasses">
+                <div class="skeleton" style="height: 40px; width: 60px;"></div>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-card-icon orange">👨‍🏫</div>
+            <div class="stat-card-label">Öğretmen Sayısı</div>
+            <div class="stat-card-value" id="totalTeachers">
+                <div class="skeleton" style="height: 40px; width: 60px;"></div>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-card-icon purple">👨‍🎓</div>
+            <div class="stat-card-label">Öğrenci Sayısı</div>
+            <div class="stat-card-value" id="totalStudents">
+                <div class="skeleton" style="height: 40px; width: 80px;"></div>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-card-icon cyan">📁</div>
+            <div class="stat-card-label">Dosya Sayısı</div>
+            <div class="stat-card-value" id="totalFiles">
+                <div class="skeleton" style="height: 40px; width: 60px;"></div>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-card-icon red">💾</div>
+            <div class="stat-card-label">Depolama Kullanımı</div>
+            <div class="stat-card-value" id="storageUsed">
+                <div class="skeleton" style="height: 40px; width: 100px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section Title -->
+    <h2 class="section-title">⚡ Hızlı Erişim</h2>
+
+    <!-- Quick Access Cards -->
+    <div class="quick-access-grid">
+        <a href="/admin/users" class="action-card bg-gradient-blue">
+            <div class="action-card-icon">👥</div>
+            <h3>Kullanıcı Yönetimi</h3>
+            <p>Öğretmen ve öğrenci hesaplarını yönetin</p>
+            <span class="action-card-arrow">→</span>
+        </a>
+        
+        <a href="/admin/classes-page" class="action-card bg-gradient-green">
+            <div class="action-card-icon">🏫</div>
+            <h3>Sınıf Yönetimi</h3>
+            <p>Sınıfları görüntüleyin ve düzenleyin</p>
+            <span class="action-card-arrow">→</span>
+        </a>
+        
+        <a href="/admin/reports" class="action-card bg-gradient-purple">
+            <div class="action-card-icon">📊</div>
+            <h3>Raporlar</h3>
+            <p>Sistem raporları ve istatistikler</p>
+            <span class="action-card-arrow">→</span>
+        </a>
+        
+        <a href="/admin/files-page" class="action-card bg-gradient-orange">
+            <div class="action-card-icon">📁</div>
+            <h3>Dosya Yönetimi</h3>
+            <p>Yüklenen dosyaları yönetin</p>
+            <span class="action-card-arrow">→</span>
+        </a>
+        
+        <a href="/admin/practice-exams" class="action-card bg-gradient-pink">
+            <div class="action-card-icon">📝</div>
+            <h3>Deneme Sınavları</h3>
+            <p>LGS deneme sınavlarını yönetin</p>
+            <span class="action-card-arrow">→</span>
+        </a>
+        
+        <a href="/admin/surveys" class="action-card bg-gradient-cyan">
+            <div class="action-card-icon">📋</div>
+            <h3>Anket Yönetimi</h3>
+            <p>Anketleri oluşturun ve sonuçları görün</p>
+            <span class="action-card-arrow">→</span>
+        </a>
+        
+        <a href="/admin/user-activity" class="action-card bg-gradient-teal">
+            <div class="action-card-icon">👁️</div>
+            <h3>Aktivite Takibi</h3>
+            <p>Kullanıcı aktivitelerini izleyin</p>
+            <span class="action-card-arrow">→</span>
+        </a>
+        
+        <a href="/admin/announcements" class="action-card bg-gradient-red">
+            <div class="action-card-icon">📢</div>
+            <h3>Duyurular</h3>
+            <p>Duyuruları oluşturun ve yönetin</p>
+            <span class="action-card-arrow">→</span>
+        </a>
+        
+    </div>
+
+    <!-- Two Column Layout -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 24px; margin-top: 32px;">
+        <!-- Recent Activity -->
+        <div class="card-modern">
+            <div class="card-header">
+                <h3>🔔 Son Aktiviteler</h3>
+                <a href="/admin/user-activity" class="btn btn-sm btn-secondary">Tümünü Gör</a>
+            </div>
+            <div class="card-body">
+                <div class="activity-feed" id="activityFeed">
+                    <div class="activity-item">
+                        <div class="activity-icon blue">📊</div>
+                        <div class="activity-content">
+                            <div class="activity-title skeleton" style="height: 16px; width: 200px;"></div>
+                            <div class="activity-time skeleton" style="height: 12px; width: 100px; margin-top: 8px;"></div>
+                        </div>
+                    </div>
+                    <div class="activity-item">
+                        <div class="activity-icon green">👤</div>
+                        <div class="activity-content">
+                            <div class="activity-title skeleton" style="height: 16px; width: 180px;"></div>
+                            <div class="activity-time skeleton" style="height: 12px; width: 80px; margin-top: 8px;"></div>
+                        </div>
+                    </div>
+                    <div class="activity-item">
+                        <div class="activity-icon orange">📝</div>
+                        <div class="activity-content">
+                            <div class="activity-title skeleton" style="height: 16px; width: 220px;"></div>
+                            <div class="activity-time skeleton" style="height: 12px; width: 120px; margin-top: 8px;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="card-modern">
+            <div class="card-header">
+                <h3>📈 Sistem Durumu</h3>
+            </div>
+            <div class="card-body">
+                <div style="margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                        <span style="font-weight: 600; color: var(--gray-700);">Depolama Kullanımı</span>
+                        <span id="storagePercent" style="color: var(--primary-600); font-weight: 600;">--%</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar" id="storageBar" style="width: 0%;"></div>
+                    </div>
+                </div>
+                
+                <div class="quick-stats-mini">
+                    <div class="quick-stat-item">
+                        <div class="quick-stat-value" id="todayLogins">-</div>
+                        <div class="quick-stat-label">Bugün Giriş</div>
+                    </div>
+                    <div class="quick-stat-item">
+                        <div class="quick-stat-value" id="activeExams">-</div>
+                        <div class="quick-stat-label">Aktif Sınav</div>
+                    </div>
+                    <div class="quick-stat-item">
+                        <div class="quick-stat-value" id="pendingAssignments">-</div>
+                        <div class="quick-stat-label">Bekleyen Ödev</div>
+                    </div>
+                    <div class="quick-stat-item">
+                        <div class="quick-stat-value" id="totalAnnouncements">-</div>
+                        <div class="quick-stat-label">Aktif Duyuru</div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--gray-100);">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 12px; height: 12px; background: var(--success-500); border-radius: 50%; animation: pulse 2s infinite;"></div>
+                        <span style="font-size: 0.9rem; color: var(--gray-600);">Sistem aktif ve çalışıyor</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.2); }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Set current date
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    document.getElementById('currentDate').textContent = new Date().toLocaleDateString('tr-TR', options);
+    
+    async function loadStats() {
+        try {
+            const response = await fetch('/api/admin/stats');
+            const data = await response.json();
+            
+            if (data.success) {
+                // Main stats with animation
+                animateValue('totalUsers', 0, data.total_users || 0, 800);
+                animateValue('totalClasses', 0, data.total_classes || 0, 800);
+                animateValue('totalTeachers', 0, data.total_teachers || 0, 800);
+                animateValue('totalStudents', 0, data.total_students || 0, 800);
+                animateValue('totalFiles', 0, data.total_files || 0, 800);
+                
+                const storageMB = data.storage_mb || 0;
+                document.getElementById('storageUsed').textContent = storageMB + ' MB';
+                
+                // Storage progress (assume 5GB limit for visualization)
+                const storagePercent = Math.min((storageMB / 5120) * 100, 100);
+                document.getElementById('storagePercent').textContent = storagePercent.toFixed(1) + '%';
+                document.getElementById('storageBar').style.width = storagePercent + '%';
+                
+                // Quick stats
+                document.getElementById('todayLogins').textContent = data.today_logins || 0;
+                document.getElementById('activeExams').textContent = data.active_exams || 0;
+                document.getElementById('pendingAssignments').textContent = data.pending_assignments || 0;
+                document.getElementById('totalAnnouncements').textContent = data.active_announcements || 0;
+            }
+        } catch (error) {
+            console.error('Failed to load stats:', error);
+            document.getElementById('totalUsers').textContent = '-';
+            document.getElementById('totalClasses').textContent = '-';
+            document.getElementById('totalTeachers').textContent = '-';
+            document.getElementById('totalStudents').textContent = '-';
+            document.getElementById('totalFiles').textContent = '-';
+            document.getElementById('storageUsed').textContent = '- MB';
+        }
+    }
+    
+    function animateValue(id, start, end, duration) {
+        const element = document.getElementById(id);
+        if (!element) return;
+        
+        const range = end - start;
+        const startTime = performance.now();
+        
+        function update(currentTime) {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const easeOut = 1 - Math.pow(1 - progress, 3);
+            const current = Math.floor(start + range * easeOut);
+            element.textContent = current.toLocaleString('tr-TR');
+            
+            if (progress < 1) {
+                requestAnimationFrame(update);
+            }
+        }
+        
+        requestAnimationFrame(update);
+    }
+    
+    async function loadRecentActivity() {
+        try {
+            const response = await fetch('/api/admin/recent-activity');
+            const data = await response.json();
+            
+            const feed = document.getElementById('activityFeed');
+            
+            if (data.success && data.activities && data.activities.length > 0) {
+                feed.innerHTML = data.activities.map(activity => `
+                    <div class="activity-item">
+                        <div class="activity-icon ${activity.color || 'blue'}">${activity.icon || '📌'}</div>
+                        <div class="activity-content">
+                            <div class="activity-title">${activity.title}</div>
+                            <div class="activity-time">${activity.time}</div>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                feed.innerHTML = `
+                    <div style="text-align: center; padding: 40px 20px; color: var(--gray-400);">
+                        <div style="font-size: 3rem; margin-bottom: 12px;">📭</div>
+                        <p>Henüz aktivite yok</p>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Failed to load activity:', error);
+        }
+    }
+    
+    // Load data
+    loadStats();
+    loadRecentActivity();
+    
+    // Refresh every 30 seconds
+    setInterval(loadStats, 30000);
+</script>
+{% endblock %}

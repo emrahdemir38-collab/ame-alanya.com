@@ -1,0 +1,2226 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Dashboard{% endblock %} - AMEO</title>
+    <link rel="stylesheet" href="/static/css/admin-modern.css">
+    <link rel="stylesheet" href="/static/css/sidebar.css">
+    <!-- Sortable.js for drag-and-drop (Task #10) -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <!-- OneSignal Push Notifications -->
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    <script>
+        window.OneSignalDeferred = window.OneSignalDeferred || [];
+        OneSignalDeferred.push(async function(OneSignal) {
+            try {
+                await OneSignal.init({
+                    appId: "{{ config.get('ONESIGNAL_APP_ID', '') }}",
+                    allowLocalhostAsSecureOrigin: true,
+                    autoResubscribe: true,
+                    notifyButton: {
+                        enable: true,
+                        size: 'medium',
+                        position: 'bottom-right',
+                        showCredit: false,
+                        text: {
+                            'tip.state.unsubscribed': 'Bildirimlere abone ol',
+                            'tip.state.subscribed': 'Bildirimlere abone oldunuz',
+                            'tip.state.blocked': 'Bildirimler engellendi',
+                            'dialog.main.title': 'Bildirimleri Yönet',
+                            'dialog.main.button.subscribe': 'ABONE OL',
+                            'dialog.main.button.unsubscribe': 'Abonelikten Çık'
+                        }
+                    },
+                    welcomeNotification: {
+                        title: "AMEO - Hoş Geldiniz!",
+                        message: "Artık önemli güncellemelerden haberdar olacaksınız."
+                    }
+                });
+                
+                // Kullanıcı bilgilerini OneSignal'a tag olarak kaydet
+                {% if current_user.is_authenticated %}
+                await OneSignal.User.addTags({
+                    "user_id": "{{ current_user.id }}",
+                    "role": "{{ current_user.role }}",
+                    "class_name": "{{ current_user.class_name or '' }}",
+                    "grade": "{{ (current_user.class_name or '')[:1] }}"
+                });
+                console.log("OneSignal tags set for user: {{ current_user.username }}");
+                {% endif %}
+            } catch (e) {
+                console.log("OneSignal init info:", e.message);
+            }
+        });
+    </script>
+    {% block extra_css %}{% endblock %}
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: var(--font-family), 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--gray-50);
+        }
+        
+        .breadcrumb-nav {
+            background: white;
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+        
+        .breadcrumb {
+            list-style: none;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            margin: 0;
+            padding: 0;
+            font-size: 0.9em;
+        }
+        
+        .breadcrumb-item {
+            display: flex;
+            align-items: center;
+        }
+        
+        .breadcrumb-item + .breadcrumb-item::before {
+            content: '›';
+            padding: 0 10px;
+            color: #9ca3af;
+            font-weight: 500;
+        }
+        
+        .breadcrumb-item a {
+            color: #3b82f6;
+            text-decoration: none;
+            transition: color 0.2s;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        
+        .breadcrumb-item a:hover {
+            color: #2563eb;
+            background: #eff6ff;
+        }
+        
+        .breadcrumb-item.active {
+            color: #6b7280;
+            font-weight: 500;
+        }
+        
+        @media (max-width: 768px) {
+            .breadcrumb-nav {
+                padding: 10px 15px;
+                font-size: 0.85em;
+            }
+            
+            .breadcrumb-item + .breadcrumb-item::before {
+                padding: 0 6px;
+            }
+        }
+        
+        /* Topbar (Search + Notification) */
+        .topbar {
+            background: white;
+            padding: 12px 20px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .search-container {
+            flex: 1;
+            max-width: 500px;
+            position: relative;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 10px 15px 10px 40px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+        
+        .search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.2em;
+            color: #9ca3af;
+        }
+        
+        .search-results {
+            display: none;
+            position: absolute;
+            top: 48px;
+            left: 0;
+            right: 0;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+        
+        .search-results.show {
+            display: block;
+        }
+        
+        .search-category {
+            padding: 10px 15px;
+            font-size: 0.85em;
+            font-weight: 600;
+            color: #6b7280;
+            background: #f9fafb;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .search-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid #f3f4f6;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .search-item:hover {
+            background: #f9fafb;
+        }
+        
+        .search-item-title {
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+        
+        .search-item-subtitle {
+            font-size: 0.85em;
+            color: #6b7280;
+        }
+        
+        .search-empty {
+            padding: 30px 15px;
+            text-align: center;
+            color: #9ca3af;
+        }
+        
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        @media (max-width: 768px) {
+            .search-container {
+                max-width: 100%;
+            }
+        }
+        
+        .notification-container {
+            position: relative;
+        }
+        
+        .notification-bell {
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+            position: relative;
+            padding: 8px;
+            border-radius: 50%;
+            transition: background 0.3s;
+        }
+        
+        .notification-bell:hover {
+            background: #f3f4f6;
+        }
+        
+        .notification-badge {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: #ef4444;
+            color: white;
+            font-size: 0.7em;
+            padding: 2px 6px;
+            border-radius: 10px;
+            min-width: 18px;
+            text-align: center;
+        }
+        
+        .notification-dropdown {
+            display: none;
+            position: absolute;
+            top: 45px;
+            right: 0;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            width: 350px;
+            max-height: 400px;
+            z-index: 1000;
+        }
+        
+        .notification-dropdown.show {
+            display: block;
+        }
+        
+        .notification-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .notification-header h4 {
+            margin: 0;
+            font-size: 1.1em;
+            color: #1f2937;
+        }
+        
+        .notification-close {
+            background: none;
+            border: none;
+            font-size: 1.2em;
+            cursor: pointer;
+            color: #6b7280;
+        }
+        
+        .notification-list {
+            max-height: 320px;
+            overflow-y: auto;
+        }
+        
+        .notification-item {
+            padding: 12px 20px;
+            border-bottom: 1px solid #f3f4f6;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .notification-item:hover {
+            background: #f9fafb;
+        }
+        
+        .notification-item p {
+            margin: 0;
+            font-size: 0.9em;
+            color: #374151;
+        }
+        
+        .notification-loading {
+            padding: 20px;
+            text-align: center;
+            color: #9ca3af;
+        }
+        
+        .notification-empty {
+            padding: 30px 20px;
+            text-align: center;
+            color: #9ca3af;
+        }
+        
+        /* User Profile Dropdown */
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .user-profile-container {
+            position: relative;
+        }
+        
+        .user-profile-btn {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: white;
+            border: 1px solid #e5e7eb;
+            padding: 8px 12px;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .user-profile-btn:hover {
+            background: #f9fafb;
+            border-color: #d1d5db;
+        }
+        
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+        
+        .user-name {
+            font-size: 0.9em;
+            color: #374151;
+            font-weight: 500;
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .dropdown-arrow {
+            font-size: 0.7em;
+            color: #9ca3af;
+            transition: transform 0.3s;
+        }
+        
+        .user-profile-btn.active .dropdown-arrow {
+            transform: rotate(180deg);
+        }
+        
+        .user-profile-dropdown {
+            display: none;
+            position: absolute;
+            top: 50px;
+            right: 0;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            width: 280px;
+            z-index: 1000;
+        }
+        
+        .user-profile-dropdown.show {
+            display: block;
+        }
+        
+        .profile-dropdown-header {
+            padding: 20px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .profile-dropdown-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 1.2em;
+        }
+        
+        .profile-dropdown-info {
+            flex: 1;
+        }
+        
+        .profile-dropdown-name {
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+        
+        .profile-dropdown-role {
+            font-size: 0.85em;
+            color: #6b7280;
+        }
+        
+        .profile-dropdown-menu {
+            padding: 8px 0;
+        }
+        
+        .profile-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 20px;
+            color: #374151;
+            text-decoration: none;
+            transition: background 0.2s;
+            cursor: pointer;
+        }
+        
+        .profile-menu-item:hover {
+            background: #f9fafb;
+        }
+        
+        .profile-menu-icon {
+            font-size: 1.1em;
+        }
+        
+        .dark-mode-toggle {
+            justify-content: space-between;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #d1d5db;
+            transition: 0.4s;
+            border-radius: 24px;
+        }
+        
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .toggle-slider {
+            background-color: #2563eb;
+        }
+        
+        input:checked + .toggle-slider:before {
+            transform: translateX(20px);
+        }
+        
+        @media (max-width: 768px) {
+            .user-name {
+                display: none;
+            }
+            
+            .user-profile-dropdown {
+                right: -10px;
+                width: 260px;
+            }
+        }
+        
+        /* Floating Action Button (FAB) */
+        .fab-container {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 999;
+        }
+        
+        .fab-main {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+            transition: all 0.3s ease;
+        }
+        
+        .fab-main:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 16px rgba(16, 185, 129, 0.5);
+        }
+        
+        .fab-main.active {
+            transform: rotate(45deg);
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+        
+        .fab-icon {
+            transition: transform 0.3s ease;
+        }
+        
+        .fab-menu {
+            position: absolute;
+            bottom: 70px;
+            right: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+        }
+        
+        .fab-menu.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+        
+        .fab-action {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3em;
+            transition: all 0.3s ease;
+            position: relative;
+            text-decoration: none;
+        }
+        
+        .fab-action:hover {
+            transform: scale(1.15);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        
+        .fab-action::before {
+            content: attr(data-tooltip);
+            position: absolute;
+            right: 60px;
+            background: #1f2937;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+            pointer-events: none;
+        }
+        
+        .fab-action:hover::before {
+            opacity: 1;
+            visibility: visible;
+            right: 65px;
+        }
+        
+        @media (max-width: 768px) {
+            .fab-container {
+                bottom: 20px;
+                right: 20px;
+            }
+            
+            .fab-main {
+                width: 50px;
+                height: 50px;
+                font-size: 1.3em;
+            }
+            
+            .fab-action {
+                width: 45px;
+                height: 45px;
+                font-size: 1.1em;
+            }
+        }
+        
+        /* Dark Mode Styles */
+        body.dark-mode {
+            background: #0f172a;
+            color: #e2e8f0;
+        }
+        
+        /* Sidebar Dark Mode */
+        body.dark-mode .sidebar {
+            background: #1e293b;
+            border-color: #334155;
+        }
+        
+        body.dark-mode .sidebar-header {
+            border-color: #334155;
+        }
+        
+        body.dark-mode .sidebar-logo-text {
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .sidebar-user {
+            background: #334155;
+        }
+        
+        body.dark-mode .sidebar-user-name {
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .sidebar-user-role {
+            color: #94a3b8;
+        }
+        
+        body.dark-mode .sidebar-section-title {
+            color: #94a3b8;
+        }
+        
+        body.dark-mode .sidebar-menu-link {
+            color: #cbd5e1;
+        }
+        
+        body.dark-mode .sidebar-menu-link:hover {
+            background: #334155;
+        }
+        
+        body.dark-mode .sidebar-menu-link.active {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        /* Topbar Dark Mode */
+        body.dark-mode .topbar {
+            background: #1e293b;
+            border-color: #334155;
+        }
+        
+        body.dark-mode .topbar-title {
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .notification-bell,
+        body.dark-mode .user-profile-btn {
+            background: #334155;
+            border-color: #475569;
+            color: #e2e8f0;
+        }
+        
+        body.dark-mode .notification-bell:hover,
+        body.dark-mode .user-profile-btn:hover {
+            background: #475569;
+            border-color: #64748b;
+        }
+        
+        body.dark-mode .notification-dropdown,
+        body.dark-mode .user-profile-dropdown {
+            background: #1e293b;
+            border: 1px solid #334155;
+        }
+        
+        body.dark-mode .notification-item {
+            border-color: #334155;
+            color: #cbd5e1;
+        }
+        
+        body.dark-mode .notification-item:hover {
+            background: #334155;
+        }
+        
+        body.dark-mode .profile-dropdown-name {
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .profile-dropdown-role {
+            color: #94a3b8;
+        }
+        
+        body.dark-mode .profile-menu-item {
+            color: #cbd5e1;
+        }
+        
+        body.dark-mode .profile-menu-item:hover {
+            background: #334155;
+        }
+        
+        body.dark-mode .profile-dropdown-header {
+            border-color: #334155;
+        }
+        
+        /* Breadcrumb Dark Mode */
+        body.dark-mode .breadcrumb-nav {
+            background: #1e293b;
+            border-color: #334155;
+        }
+        
+        body.dark-mode .breadcrumb-item a {
+            color: #60a5fa;
+        }
+        
+        body.dark-mode .breadcrumb-item a:hover {
+            color: #93c5fd;
+        }
+        
+        body.dark-mode .breadcrumb-item.active {
+            color: #cbd5e1;
+        }
+        
+        /* Content Area Dark Mode */
+        body.dark-mode .dashboard-content {
+            background: #0f172a;
+        }
+        
+        /* Cards/Tables Dark Mode */
+        body.dark-mode .card,
+        body.dark-mode .table-container {
+            background: #1e293b;
+            border-color: #334155;
+        }
+        
+        body.dark-mode table {
+            color: #e2e8f0;
+        }
+        
+        body.dark-mode thead {
+            background: #334155;
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode tbody tr:hover {
+            background: #334155;
+        }
+        
+        body.dark-mode td,
+        body.dark-mode th {
+            border-color: #475569;
+        }
+        
+        /* Forms Dark Mode */
+        body.dark-mode input,
+        body.dark-mode select,
+        body.dark-mode textarea {
+            background: #334155;
+            border-color: #475569;
+            color: #e2e8f0;
+        }
+        
+        body.dark-mode input:focus,
+        body.dark-mode select:focus,
+        body.dark-mode textarea:focus {
+            border-color: #3b82f6;
+            background: #1e293b;
+        }
+        
+        /* Buttons Dark Mode */
+        body.dark-mode .btn-primary {
+            background: #3b82f6;
+            border-color: #3b82f6;
+        }
+        
+        body.dark-mode .btn-primary:hover {
+            background: #2563eb;
+        }
+        
+        body.dark-mode .btn-secondary {
+            background: #475569;
+            border-color: #475569;
+            color: #e2e8f0;
+        }
+        
+        body.dark-mode .btn-secondary:hover {
+            background: #64748b;
+        }
+        
+        /* FAB Dark Mode */
+        body.dark-mode .fab-action {
+            background: #334155;
+            color: #e2e8f0;
+        }
+        
+        body.dark-mode .fab-action:hover {
+            background: #475569;
+        }
+        
+        /* Modals Dark Mode */
+        body.dark-mode .modal-content {
+            background: #1e293b;
+            color: #e2e8f0;
+        }
+        
+        body.dark-mode .modal-header {
+            border-color: #334155;
+        }
+        
+        body.dark-mode .modal-footer {
+            border-color: #334155;
+        }
+        
+        /* Alerts/Badges Dark Mode */
+        body.dark-mode .alert {
+            background: #334155;
+            border-color: #475569;
+            color: #e2e8f0;
+        }
+        
+        body.dark-mode .badge {
+            background: #475569;
+            color: #e2e8f0;
+        }
+        
+        /* Smooth transitions for dark mode */
+        body,
+        .sidebar,
+        .dashboard-topbar,
+        .breadcrumb-nav,
+        .card,
+        .notification-dropdown,
+        .user-profile-dropdown,
+        input,
+        select,
+        textarea,
+        .btn {
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        }
+        
+        /* ============================================= */
+        /* WIDGET SYSTEM (Task #10) */
+        /* ============================================= */
+        
+        /* Widget Control Toolbar */
+        .widget-toolbar {
+            background: white;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .widget-toolbar-title {
+            font-size: 0.9em;
+            color: #6b7280;
+            font-weight: 500;
+        }
+        
+        .widget-toolbar-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .widget-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.85em;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+        
+        .widget-btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .widget-btn-primary:hover {
+            background: #2563eb;
+        }
+        
+        .widget-btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+        }
+        
+        .widget-btn-secondary:hover {
+            background: #e5e7eb;
+        }
+        
+        /* Widget Grid */
+        .widget-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            padding: 0 20px 20px;
+        }
+        
+        @media (min-width: 768px) {
+            .widget-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (min-width: 1200px) {
+            .widget-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        
+        /* Widget Card */
+        .widget-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            cursor: move;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .widget-card.widget-large {
+            grid-column: span 2;
+        }
+        
+        .widget-card.widget-medium {
+            grid-column: span 1;
+        }
+        
+        .widget-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        }
+        
+        .widget-card.sortable-ghost {
+            opacity: 0.4;
+            background: #f3f4f6;
+        }
+        
+        .widget-card.sortable-drag {
+            opacity: 0.8;
+            transform: rotate(2deg);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+        }
+        
+        .widget-card.widget-hidden {
+            display: none !important;
+        }
+        
+        .widget-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f3f4f6;
+        }
+        
+        .widget-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #1f2937;
+        }
+        
+        .widget-drag-handle {
+            font-size: 1.3em;
+            color: #9ca3af;
+            cursor: grab;
+        }
+        
+        .widget-drag-handle:active {
+            cursor: grabbing;
+        }
+        
+        .widget-content {
+            min-height: 60px;
+        }
+        
+        /* Widget Visibility Modal */
+        .widget-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .widget-modal.show {
+            display: flex;
+        }
+        
+        .widget-modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .widget-modal-header {
+            font-size: 1.3em;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #1f2937;
+        }
+        
+        .widget-modal-item {
+            padding: 12px 0;
+            border-bottom: 1px solid #f3f4f6;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .widget-modal-item:last-child {
+            border-bottom: none;
+        }
+        
+        .widget-modal-checkbox {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        
+        .widget-modal-label {
+            flex: 1;
+            font-size: 1em;
+            color: #374151;
+            cursor: pointer;
+        }
+        
+        .widget-modal-actions {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        
+        /* Dark Mode Widget Styles */
+        body.dark-mode .widget-toolbar {
+            background: #1e293b;
+        }
+        
+        body.dark-mode .widget-toolbar-title {
+            color: #cbd5e1;
+        }
+        
+        body.dark-mode .widget-card {
+            background: #1e293b;
+        }
+        
+        body.dark-mode .widget-title {
+            color: #e2e8f0;
+        }
+        
+        body.dark-mode .widget-header {
+            border-color: #334155;
+        }
+        
+        body.dark-mode .widget-modal-content {
+            background: #1e293b;
+        }
+        
+        body.dark-mode .widget-modal-header {
+            color: #e2e8f0;
+        }
+        
+        body.dark-mode .widget-modal-item {
+            border-color: #334155;
+        }
+        
+        body.dark-mode .widget-modal-label {
+            color: #cbd5e1;
+        }
+    </style>
+</head>
+<body class="sidebar-layout">
+    <!-- Mobile Menu Button -->
+    <button class="mobile-menu-btn" onclick="toggleSidebarMobile()">☰</button>
+    <div class="mobile-overlay" onclick="toggleSidebarMobile()"></div>
+    
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <span class="sidebar-logo-icon">🎓</span>
+                <span class="sidebar-logo-text">AMEO LMS</span>
+            </div>
+            <button class="sidebar-toggle" onclick="toggleSidebar()">☰</button>
+        </div>
+        
+        <div class="sidebar-user">
+            <div class="sidebar-user-avatar">{{ current_user.full_name[0]|upper if current_user.full_name else 'U' }}</div>
+            <div class="sidebar-user-info">
+                <div class="sidebar-user-name">{{ current_user.full_name or 'Kullanıcı' }}</div>
+                <div class="sidebar-user-role">
+                    {% if current_user.role == 'admin' %}Admin
+                    {% elif current_user.role == 'teacher' %}Öğretmen
+                    {% elif current_user.role == 'student' %}Öğrenci{% if current_user.class_name %} ({{ current_user.class_name }}){% endif %}
+                    {% else %}Misafir{% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <nav class="sidebar-nav">
+            {% if current_user.role == 'admin' %}
+            <!-- Admin Menu -->
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Admin Menüsü</div>
+                <ul class="sidebar-menu">
+                    <li class="sidebar-menu-item"><a href="/admin/users" class="sidebar-menu-link" data-tooltip="Kullanıcı Yönetimi"><span class="sidebar-menu-icon">👥</span><span class="sidebar-menu-text">Kullanıcı Yönetimi</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/admin/classes-page" class="sidebar-menu-link" data-tooltip="Sınıf Yönetimi"><span class="sidebar-menu-icon">🏫</span><span class="sidebar-menu-text">Sınıf Yönetimi</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/admin/teacher-classes" class="sidebar-menu-link" data-tooltip="Öğretmen-Sınıf Atama"><span class="sidebar-menu-icon">👨‍🏫</span><span class="sidebar-menu-text">Öğretmen-Sınıf Atama</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/admin/exam-calendar" class="sidebar-menu-link" data-tooltip="Sınav Takvimi"><span class="sidebar-menu-icon">📅</span><span class="sidebar-menu-text">Sınav Takvimi</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/admin/reports" class="sidebar-menu-link" data-tooltip="Raporlar"><span class="sidebar-menu-icon">📊</span><span class="sidebar-menu-text">Raporlar</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/admin/optical-management" class="sidebar-menu-link" data-tooltip="Optik Yönetimi"><span class="sidebar-menu-icon">📋</span><span class="sidebar-menu-text">Optik Yönetimi</span></a></li>
+                    <li class="sidebar-menu-item has-submenu">
+                        <a href="/admin/report-cards/" class="sidebar-menu-link" data-tooltip="Karne Yönetimi"><span class="sidebar-menu-icon">📄</span><span class="sidebar-menu-text">Karne Yönetimi</span><span class="submenu-arrow">▼</span></a>
+                        <ul class="sidebar-submenu">
+                            <li><a href="/admin/report-cards/" class="sidebar-submenu-link">Karne Listesi</a></li>
+                            <li><a href="/admin/report-cards/image-upload" class="sidebar-submenu-link">CSV/Optik Yükleme</a></li>
+                            <li><a href="/admin/report-cards/txt-converter" class="sidebar-submenu-link">TXT Dönüştürücü</a></li>
+                        </ul>
+                    </li>
+                    <li class="sidebar-menu-item"><a href="/admin/files-page" class="sidebar-menu-link" data-tooltip="Dosya Yönetimi"><span class="sidebar-menu-icon">📁</span><span class="sidebar-menu-text">Dosya Yönetimi</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/admin/question-analysis" class="sidebar-menu-link" data-tooltip="Soru Analizi"><span class="sidebar-menu-icon">🔍</span><span class="sidebar-menu-text">Soru Analizi</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/admin/announcements" class="sidebar-menu-link" data-tooltip="Duyurular"><span class="sidebar-menu-icon">📢</span><span class="sidebar-menu-text">Duyurular</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/admin/user-activity" class="sidebar-menu-link" data-tooltip="Aktivite Takibi"><span class="sidebar-menu-icon">📊</span><span class="sidebar-menu-text">Aktivite Takibi</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/admin/surveys" class="sidebar-menu-link" data-tooltip="Anket Yönetimi"><span class="sidebar-menu-icon">📋</span><span class="sidebar-menu-text">Anket Yönetimi</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/admin/settings" class="sidebar-menu-link" data-tooltip="Sistem Ayarları"><span class="sidebar-menu-icon">⚙️</span><span class="sidebar-menu-text">Sistem Ayarları</span></a></li>
+                </ul>
+            </div>
+            
+            {% elif current_user.role == 'teacher' %}
+            <!-- Öğretmen Menüsü -->
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Öğretmen Menüsü</div>
+                <ul class="sidebar-menu">
+                    <li class="sidebar-menu-item"><a href="/teacher/exams" class="sidebar-menu-link" data-tooltip="Sınavlar"><span class="sidebar-menu-icon">📝</span><span class="sidebar-menu-text">Sınavlar</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/teacher/assignments" class="sidebar-menu-link" data-tooltip="Ödevler"><span class="sidebar-menu-icon">📚</span><span class="sidebar-menu-text">Ödevler</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/teacher/announcements" class="sidebar-menu-link" data-tooltip="Duyurular"><span class="sidebar-menu-icon">📢</span><span class="sidebar-menu-text">Duyurular</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/teacher/questions" class="sidebar-menu-link" data-tooltip="Öğrenci Soruları"><span class="sidebar-menu-icon">💬</span><span class="sidebar-menu-text">Öğrenci Soruları</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/teacher/practice-exams" class="sidebar-menu-link" data-tooltip="LGS Deneme Takip"><span class="sidebar-menu-icon">📈</span><span class="sidebar-menu-text">LGS Deneme Takip</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/teacher/ranked-lists" class="sidebar-menu-link" data-tooltip="Sıralı Liste"><span class="sidebar-menu-icon">📋</span><span class="sidebar-menu-text">Sıralı Liste</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/leaderboards" class="sidebar-menu-link" data-tooltip="Yıldızlar ve Enler"><span class="sidebar-menu-icon">🌟</span><span class="sidebar-menu-text">Yıldızlar ve Enler</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/teacher/question-analysis" class="sidebar-menu-link" data-tooltip="Soru Analizi"><span class="sidebar-menu-icon">🔍</span><span class="sidebar-menu-text">Soru Analizi</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/teacher/study-plan" class="sidebar-menu-link" data-tooltip="Ders Çalışma Planı"><span class="sidebar-menu-icon">📅</span><span class="sidebar-menu-text">Ders Çalışma Planı</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/teacher/daily-tracking" class="sidebar-menu-link" data-tooltip="Günlük Takip"><span class="sidebar-menu-icon">📊</span><span class="sidebar-menu-text">Günlük Takip</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/teacher/exam-calendar" class="sidebar-menu-link" data-tooltip="Sınav Takvimi"><span class="sidebar-menu-icon">📅</span><span class="sidebar-menu-text">Sınav Takvimi</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/teacher/surveys" class="sidebar-menu-link" data-tooltip="Anket Yönetimi"><span class="sidebar-menu-icon">📋</span><span class="sidebar-menu-text">Anket Yönetimi</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/teacher/book-worm" class="sidebar-menu-link" data-tooltip="Kitap Kurdu"><span class="sidebar-menu-icon">📚</span><span class="sidebar-menu-text">Kitap Kurdu</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/teacher/documents" class="sidebar-menu-link" data-tooltip="Dokümanlar"><span class="sidebar-menu-icon">📂</span><span class="sidebar-menu-text">Dokümanlar</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/teacher/reports" class="sidebar-menu-link" data-tooltip="Raporlar"><span class="sidebar-menu-icon">📊</span><span class="sidebar-menu-text">Raporlar</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/admin/report-cards/teacher-analysis" class="sidebar-menu-link" data-tooltip="Karne Analizi"><span class="sidebar-menu-icon">📄</span><span class="sidebar-menu-text">Karne Analizi</span></a></li>
+                </ul>
+            </div>
+            
+            {% elif current_user.role == 'student' %}
+            <!-- Öğrenci Menüsü -->
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Öğrenci Menüsü</div>
+                <ul class="sidebar-menu">
+                    <li class="sidebar-menu-item"><a href="/student/exams" class="sidebar-menu-link" data-tooltip="Sınavlarım"><span class="sidebar-menu-icon">📝</span><span class="sidebar-menu-text">Sınavlarım</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/student/assignments" class="sidebar-menu-link" data-tooltip="Ödevlerim"><span class="sidebar-menu-icon">📚</span><span class="sidebar-menu-text">Ödevlerim</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/student/announcements" class="sidebar-menu-link" data-tooltip="Duyurular"><span class="sidebar-menu-icon">📢</span><span class="sidebar-menu-text">Duyurular</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/student/ask-question-page" class="sidebar-menu-link" data-tooltip="Soru Sor"><span class="sidebar-menu-icon">💬</span><span class="sidebar-menu-text">Soru Sor</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/student/practice-exams" class="sidebar-menu-link" data-tooltip="Deneme Takip"><span class="sidebar-menu-icon">📈</span><span class="sidebar-menu-text">Deneme Takip</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/leaderboards" class="sidebar-menu-link" data-tooltip="Yıldızlar ve Enler"><span class="sidebar-menu-icon">🌟</span><span class="sidebar-menu-text">Yıldızlar ve Enler</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/student/study-plan" class="sidebar-menu-link" data-tooltip="Çalışma Programım"><span class="sidebar-menu-icon">📅</span><span class="sidebar-menu-text">Çalışma Programım</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/student/question-analysis" class="sidebar-menu-link" data-tooltip="Soru Analizi"><span class="sidebar-menu-icon">🔍</span><span class="sidebar-menu-text">Soru Analizi</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/student/daily-tracking" class="sidebar-menu-link" data-tooltip="Günlük Takip"><span class="sidebar-menu-icon">📊</span><span class="sidebar-menu-text">Günlük Takip</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/student/exam-calendar" class="sidebar-menu-link" data-tooltip="Sınav Takvimi"><span class="sidebar-menu-icon">📅</span><span class="sidebar-menu-text">Sınav Takvimi</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/student/book-worm" class="sidebar-menu-link" data-tooltip="Kitap Kurdu"><span class="sidebar-menu-icon">📚</span><span class="sidebar-menu-text">Kitap Kurdu</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/student/documents" class="sidebar-menu-link" data-tooltip="Dokümanlar"><span class="sidebar-menu-icon">📂</span><span class="sidebar-menu-text">Dokümanlar</span></a></li>
+                    <li class="sidebar-menu-item"><a href="/admin/report-cards/student-analysis" class="sidebar-menu-link" data-tooltip="Karne Analizi"><span class="sidebar-menu-icon">📄</span><span class="sidebar-menu-text">Karne Analizi</span></a></li>
+                </ul>
+            </div>
+            {% endif %}
+        </nav>
+        
+        <div class="sidebar-footer">
+            <a href="/{{ current_user.role }}/dashboard" class="sidebar-menu-link" data-tooltip="Ana Sayfa">
+                <span class="sidebar-menu-icon">🏠</span>
+                <span class="sidebar-menu-text">Ana Sayfa</span>
+            </a>
+            <a href="#" onclick="handleLogout(); return false;" class="sidebar-menu-link" data-tooltip="Çıkış">
+                <span class="sidebar-menu-icon">🚪</span>
+                <span class="sidebar-menu-text">Çıkış</span>
+            </a>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="main-content">
+        <!-- Topbar (Search + Notification + User Profile) -->
+        <div class="topbar">
+            <!-- Global Search -->
+            <div class="search-container">
+                <span class="search-icon">🔍</span>
+                <input type="text" class="search-input" id="globalSearch" placeholder="Ara... (kullanıcı, sınav, ödev, duyuru)">
+                <div class="search-results" id="searchResults"></div>
+            </div>
+            
+            <div class="topbar-right">
+                <!-- Push Notification Button (for authorized users) -->
+                <div class="push-notification-container" id="pushNotificationContainer" style="display:none;">
+                    <button class="push-notification-btn" onclick="openPushNotificationModal()" title="Bildirim Gönder">
+                        📢
+                    </button>
+                </div>
+                
+                <!-- Notifications -->
+                <div class="notification-container">
+                    <button class="notification-bell" id="notificationBell" onclick="toggleNotifications()">
+                        🔔
+                        <span class="notification-badge" id="notificationBadge" style="display:none;">0</span>
+                    </button>
+                    <div class="notification-dropdown" id="notificationDropdown">
+                        <div class="notification-header">
+                            <h4>Bildirimler</h4>
+                            <button class="notification-close" onclick="toggleNotifications()">✕</button>
+                        </div>
+                        <div class="notification-list" id="notificationList">
+                            <p class="notification-loading">Yükleniyor...</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- User Profile -->
+                <div class="user-profile-container">
+                    <button class="user-profile-btn" id="userProfileBtn" onclick="toggleUserProfile()">
+                        <div class="user-avatar">{{ current_user.full_name[0]|upper if current_user.full_name else 'U' }}</div>
+                        <span class="user-name">{{ current_user.full_name or 'Kullanıcı' }}</span>
+                        <span class="dropdown-arrow">▼</span>
+                    </button>
+                    <div class="user-profile-dropdown" id="userProfileDropdown">
+                        <div class="profile-dropdown-header">
+                            <div class="profile-dropdown-avatar">{{ current_user.full_name[0]|upper if current_user.full_name else 'U' }}</div>
+                            <div class="profile-dropdown-info">
+                                <div class="profile-dropdown-name">{{ current_user.full_name or 'Kullanıcı' }}</div>
+                                <div class="profile-dropdown-role">
+                                    {% if current_user.role == 'admin' %}Admin
+                                    {% elif current_user.role == 'teacher' %}Öğretmen
+                                    {% elif current_user.role == 'student' %}Öğrenci
+                                    {% else %}Misafir{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="profile-dropdown-menu">
+                            <a href="#" class="profile-menu-item" onclick="openProfileSettings(); return false;">
+                                <span class="profile-menu-icon">⚙️</span>
+                                Profil Ayarları
+                            </a>
+                            <a href="#" class="profile-menu-item" onclick="openChangePassword(); return false;">
+                                <span class="profile-menu-icon">🔒</span>
+                                Şifre Değiştir
+                            </a>
+                            <div class="profile-menu-item dark-mode-toggle">
+                                <span class="profile-menu-icon">🌙</span>
+                                <span>Dark Mode</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <hr style="margin: 8px 0; border: none; border-top: 1px solid #e5e7eb;">
+                            <a href="#" onclick="handleLogout(); return false;" class="profile-menu-item">
+                                <span class="profile-menu-icon">🚪</span>
+                                Çıkış Yap
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Breadcrumb Navigation -->
+        {% if breadcrumbs %}
+        <nav class="breadcrumb-nav" aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">
+                    <a href="/{{ current_user.role }}/dashboard">🏠 Ana Sayfa</a>
+                </li>
+                {% for crumb in breadcrumbs %}
+                    {% if loop.last %}
+                        <li class="breadcrumb-item active" aria-current="page">{{ crumb.text }}</li>
+                    {% else %}
+                        <li class="breadcrumb-item">
+                            <a href="{{ crumb.url }}">{{ crumb.text }}</a>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+            </ol>
+        </nav>
+        {% endif %}
+        
+        <!-- Widget Controls (Task #10) - Only shown if dashboard enables it -->
+        {% block widget_controls %}{% endblock %}
+        
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Quick Actions FAB (Floating Action Button) -->
+    <div class="fab-container" id="fabContainer">
+        <button class="fab-main" id="fabMain" onclick="toggleFAB()">
+            <span class="fab-icon" id="fabIcon">⚡</span>
+        </button>
+        <div class="fab-menu" id="fabMenu">
+            {% if current_user.role == 'admin' %}
+            <a href="/admin/users" class="fab-action" data-tooltip="Yeni Kullanıcı">
+                <span class="fab-action-icon">👤</span>
+            </a>
+            <a href="/admin/announcements" class="fab-action" data-tooltip="Yeni Duyuru">
+                <span class="fab-action-icon">📢</span>
+            </a>
+            <a href="/admin/reports" class="fab-action" data-tooltip="Rapor Oluştur">
+                <span class="fab-action-icon">📊</span>
+            </a>
+            {% elif current_user.role == 'teacher' %}
+            <a href="/teacher/exams" class="fab-action" data-tooltip="Yeni Sınav">
+                <span class="fab-action-icon">📝</span>
+            </a>
+            <a href="/teacher/assignments" class="fab-action" data-tooltip="Yeni Ödev">
+                <span class="fab-action-icon">📚</span>
+            </a>
+            <a href="/teacher/announcements" class="fab-action" data-tooltip="Duyuru Yayınla">
+                <span class="fab-action-icon">📢</span>
+            </a>
+            {% elif current_user.role == 'student' %}
+            <a href="/student/ask-question-page" class="fab-action" data-tooltip="Soru Sor">
+                <span class="fab-action-icon">💬</span>
+            </a>
+            <a href="/student/assignments" class="fab-action" data-tooltip="Ödev Teslim">
+                <span class="fab-action-icon">📤</span>
+            </a>
+            <a href="/student/practice-exams" class="fab-action" data-tooltip="Deneme Ekle">
+                <span class="fab-action-icon">📈</span>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Sidebar Toggle Script (minimal, only for interactions) -->
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('collapsed');
+            localStorage.setItem('sidebar-collapsed', sidebar.classList.contains('collapsed'));
+        }
+
+        function toggleSidebarMobile() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.querySelector('.mobile-overlay');
+            sidebar.classList.toggle('mobile-open');
+            overlay.classList.toggle('active');
+        }
+
+        // Restore collapsed state on load
+        document.addEventListener('DOMContentLoaded', () => {
+            const isCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
+            if (isCollapsed) {
+                document.getElementById('sidebar').classList.add('collapsed');
+            }
+            
+            // Set active menu item
+            const currentPath = window.location.pathname;
+            document.querySelectorAll('.sidebar-menu-link').forEach(link => {
+                if (link.getAttribute('href') === currentPath) {
+                    link.classList.add('active');
+                }
+            });
+            
+            // Submenu toggle
+            document.querySelectorAll('.has-submenu > .sidebar-menu-link').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const parent = link.parentElement;
+                    parent.classList.toggle('open');
+                });
+            });
+            
+            // Auto-open submenu if current page is in submenu
+            document.querySelectorAll('.sidebar-submenu-link').forEach(link => {
+                if (currentPath.startsWith(link.getAttribute('href'))) {
+                    link.closest('.has-submenu').classList.add('open');
+                }
+            });
+            
+            // Load notifications
+            loadNotifications();
+            setInterval(loadNotifications, 60000); // Refresh every minute
+        });
+        
+        // Notification functions
+        function toggleNotifications() {
+            const dropdown = document.getElementById('notificationDropdown');
+            dropdown.classList.toggle('show');
+            if (dropdown.classList.contains('show')) {
+                loadNotifications();
+            }
+        }
+        
+        async function loadNotifications() {
+            try {
+                const response = await fetch('/api/notifications');
+                
+                // Eğer oturum düşmüşse sessizce atla
+                if (!response.ok || response.redirected) {
+                    return;
+                }
+                
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    return; // JSON değilse (login sayfası) sessizce atla
+                }
+                
+                const data = await response.json();
+                
+                const badge = document.getElementById('notificationBadge');
+                const list = document.getElementById('notificationList');
+                
+                if (!badge || !list) return;
+                
+                // Use detailed_notifications for object array (new format)
+                const notifs = data.detailed_notifications || [];
+                
+                // Update badge
+                if (notifs.length > 0) {
+                    badge.textContent = notifs.length;
+                    badge.style.display = 'block';
+                } else {
+                    badge.style.display = 'none';
+                }
+                
+                // Update list
+                if (notifs.length > 0) {
+                    list.innerHTML = notifs.map(notif => `
+                        <div class="notification-item" ${notif.id ? `onclick="markAsRead(${notif.id})"` : ''} style="${notif.id ? 'cursor:pointer;' : 'cursor:default;'}">
+                            <p>${notif.message}</p>
+                            ${notif.created_at ? `<small style="color:#9ca3af;font-size:0.8em;">${new Date(notif.created_at).toLocaleString('tr-TR')}</small>` : ''}
+                        </div>
+                    `).join('');
+                } else {
+                    list.innerHTML = '<p class="notification-empty">Yeni bildiriminiz yok</p>';
+                }
+            } catch (error) {
+                // Sessizce hatayı yoksay (oturum süresi dolmuş olabilir)
+            }
+        }
+        
+        async function markAsRead(notifId) {
+            if (!notifId) return;
+            
+            try {
+                await fetch('/api/notifications/mark_read', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({id: notifId})
+                });
+                loadNotifications();
+            } catch (error) {
+                console.error('Mark as read error:', error);
+            }
+        }
+        
+        // User Profile Dropdown
+        function toggleUserProfile() {
+            const dropdown = document.getElementById('userProfileDropdown');
+            const btn = document.getElementById('userProfileBtn');
+            dropdown.classList.toggle('show');
+            btn.classList.toggle('active');
+        }
+        
+        // Profile Settings
+        function openProfileSettings() {
+            window.location.href = '/profile/settings';
+        }
+        
+        // Change Password Modal
+        function openChangePassword() {
+            const userRole = '{{ current_user.role }}';
+            if (userRole === 'student') {
+                alert('⚠️ Öğrenciler şifre değiştiremez.\n\nŞifrenizi değiştirmek için okul yönetimine başvurun.');
+                return;
+            }
+            
+            const modal = document.createElement('div');
+            modal.id = 'changePasswordModal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10000;';
+            modal.innerHTML = `
+                <div style="background:white;border-radius:16px;padding:32px;width:90%;max-width:420px;box-shadow:0 25px 50px rgba(0,0,0,0.25);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+                        <h2 style="margin:0;font-size:1.5rem;color:#1f2937;">🔐 Şifre Değiştir</h2>
+                        <button onclick="document.getElementById('changePasswordModal').remove()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:#9ca3af;">&times;</button>
+                    </div>
+                    <form id="pwdChangeForm">
+                        <div style="margin-bottom:16px;">
+                            <label style="display:block;font-weight:600;margin-bottom:8px;color:#374151;">Mevcut Şifre</label>
+                            <input type="password" id="currentPwd" required style="width:100%;padding:12px;border:2px solid #e5e7eb;border-radius:8px;font-size:1rem;" />
+                        </div>
+                        <div style="margin-bottom:16px;">
+                            <label style="display:block;font-weight:600;margin-bottom:8px;color:#374151;">Yeni Şifre</label>
+                            <input type="password" id="newPwd" required minlength="6" style="width:100%;padding:12px;border:2px solid #e5e7eb;border-radius:8px;font-size:1rem;" />
+                        </div>
+                        <div style="margin-bottom:24px;">
+                            <label style="display:block;font-weight:600;margin-bottom:8px;color:#374151;">Yeni Şifre (Tekrar)</label>
+                            <input type="password" id="confirmPwd" required minlength="6" style="width:100%;padding:12px;border:2px solid #e5e7eb;border-radius:8px;font-size:1rem;" />
+                        </div>
+                        <div id="pwdError" style="display:none;background:#fee2e2;color:#dc2626;padding:12px;border-radius:8px;margin-bottom:16px;"></div>
+                        <div id="pwdSuccess" style="display:none;background:#d1fae5;color:#059669;padding:12px;border-radius:8px;margin-bottom:16px;"></div>
+                        <button type="submit" style="width:100%;background:linear-gradient(135deg,#10b981,#059669);color:white;padding:14px;border:none;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;">
+                            Şifreyi Değiştir
+                        </button>
+                    </form>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) modal.remove();
+            });
+            
+            document.getElementById('pwdChangeForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const errDiv = document.getElementById('pwdError');
+                const sucDiv = document.getElementById('pwdSuccess');
+                errDiv.style.display = 'none';
+                sucDiv.style.display = 'none';
+                
+                const currentPwd = document.getElementById('currentPwd').value;
+                const newPwd = document.getElementById('newPwd').value;
+                const confirmPwd = document.getElementById('confirmPwd').value;
+                
+                if (newPwd !== confirmPwd) {
+                    errDiv.textContent = 'Yeni şifreler eşleşmiyor!';
+                    errDiv.style.display = 'block';
+                    return;
+                }
+                
+                if (newPwd.length < 6) {
+                    errDiv.textContent = 'Yeni şifre en az 6 karakter olmalıdır!';
+                    errDiv.style.display = 'block';
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/profile/change-password', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({current_password: currentPwd, new_password: newPwd})
+                    });
+                    const result = await response.json();
+                    
+                    if (response.ok) {
+                        sucDiv.textContent = '✅ Şifreniz başarıyla değiştirildi!';
+                        sucDiv.style.display = 'block';
+                        setTimeout(() => modal.remove(), 2000);
+                    } else {
+                        errDiv.textContent = result.error || 'Şifre değiştirilemedi';
+                        errDiv.style.display = 'block';
+                    }
+                } catch (error) {
+                    errDiv.textContent = 'Bağlantı hatası oluştu';
+                    errDiv.style.display = 'block';
+                }
+            });
+        }
+        
+        // Dark Mode Toggle
+        function toggleDarkMode() {
+            const isDark = document.getElementById('darkModeToggle').checked;
+            document.body.classList.toggle('dark-mode', isDark);
+            localStorage.setItem('dark-mode', isDark);
+        }
+        
+        // Load dark mode preference
+        document.addEventListener('DOMContentLoaded', () => {
+            const isDarkMode = localStorage.getItem('dark-mode') === 'true';
+            if (isDarkMode) {
+                document.getElementById('darkModeToggle').checked = true;
+                document.body.classList.add('dark-mode');
+            }
+        });
+        
+        // FAB (Floating Action Button) Toggle
+        function toggleFAB() {
+            const menu = document.getElementById('fabMenu');
+            const mainBtn = document.getElementById('fabMain');
+            menu.classList.toggle('show');
+            mainBtn.classList.toggle('active');
+        }
+        
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', (e) => {
+            const notifContainer = document.querySelector('.notification-container');
+            const profileContainer = document.querySelector('.user-profile-container');
+            const searchContainer = document.querySelector('.search-container');
+            
+            if (notifContainer && !notifContainer.contains(e.target)) {
+                document.getElementById('notificationDropdown').classList.remove('show');
+            }
+            
+            if (profileContainer && !profileContainer.contains(e.target)) {
+                document.getElementById('userProfileDropdown').classList.remove('show');
+                document.getElementById('userProfileBtn').classList.remove('active');
+            }
+            
+            if (searchContainer && !searchContainer.contains(e.target)) {
+                document.getElementById('searchResults').classList.remove('show');
+            }
+        });
+        
+        // Global Search (Task #9)
+        let searchTimeout;
+        const searchInput = document.getElementById('globalSearch');
+        const searchResults = document.getElementById('searchResults');
+        
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                clearTimeout(searchTimeout);
+                const query = e.target.value.trim();
+                
+                if (query.length < 2) {
+                    searchResults.classList.remove('show');
+                    return;
+                }
+                
+                searchTimeout = setTimeout(() => performSearch(query), 300);
+            });
+        }
+        
+        async function performSearch(query) {
+            try {
+                const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                
+                if (!data.results) {
+                    searchResults.innerHTML = '<div class="search-empty">Sonuç bulunamadı</div>';
+                    searchResults.classList.add('show');
+                    return;
+                }
+                
+                let html = '';
+                const categoryNames = {
+                    users: '👥 Kullanıcılar',
+                    exams: '📝 Sınavlar',
+                    assignments: '📚 Ödevler',
+                    announcements: '📢 Duyurular'
+                };
+                
+                let hasResults = false;
+                for (const [key, items] of Object.entries(data.results)) {
+                    if (items && items.length > 0) {
+                        hasResults = true;
+                        html += `<div class="search-category">${categoryNames[key]}</div>`;
+                        items.forEach(item => {
+                            html += `
+                                <div class="search-item" onclick="window.location.href='${item.url}'">
+                                    <div class="search-item-title">${item.title}</div>
+                                    ${item.subtitle ? `<div class="search-item-subtitle">${item.subtitle}</div>` : ''}
+                                </div>
+                            `;
+                        });
+                    }
+                }
+                
+                // Show empty state if no results found
+                if (!hasResults) {
+                    html = '<div class="search-empty">🔍 "${query}" için sonuç bulunamadı</div>';
+                }
+                
+                searchResults.innerHTML = html;
+                searchResults.classList.add('show');
+            } catch (error) {
+                console.error('Search error:', error);
+                searchResults.innerHTML = '<div class="search-empty">Arama hatası</div>';
+                searchResults.classList.add('show');
+            }
+        }
+        
+        // =============================================
+        // LOGOUT HANDLER
+        // =============================================
+        async function handleLogout() {
+            try {
+                const response = await fetch('/api/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    // Başarılı çıkış - ana sayfaya yönlendir
+                    window.location.href = '/';
+                } else {
+                    alert('Çıkış yapılırken bir hata oluştu. Lütfen tekrar deneyin.');
+                }
+            } catch (error) {
+                console.error('Logout error:', error);
+                alert('Çıkış yapılırken bir hata oluştu. Lütfen tekrar deneyin.');
+            }
+        }
+        
+        // =============================================
+        // WIDGET SYSTEM (Task #10)
+        // =============================================
+        
+        // Widget Manager
+        const WidgetManager = {
+            widgets: [],
+            visibility: {},
+            hasChanges: false,
+            sortable: null,
+            
+            async init(dashboardType) {
+                try {
+                    // Load widget preferences
+                    const response = await fetch('/api/dashboard/widgets');
+                    const data = await response.json();
+                    
+                    this.widgets = data.widgets || [];
+                    this.hasChanges = data.hasCustomPreferences || false;
+                    
+                    // Build visibility map
+                    this.visibility = {};
+                    this.widgets.forEach(w => {
+                        this.visibility[w.id] = w.visible !== false;
+                    });
+                    
+                    // Initialize drag-and-drop if Sortable is available
+                    if (typeof Sortable !== 'undefined') {
+                        this.initSortable();
+                    }
+                    
+                    console.log('Widget system initialized:', this.widgets.length, 'widgets');
+                } catch (error) {
+                    console.error('Widget init error:', error);
+                }
+            },
+            
+            initSortable() {
+                const grid = document.getElementById('widgetGrid');
+                if (!grid) return;
+                
+                this.sortable = Sortable.create(grid, {
+                    animation: 200,
+                    ghostClass: 'sortable-ghost',
+                    dragClass: 'sortable-drag',
+                    handle: '.widget-drag-handle',
+                    onEnd: () => {
+                        this.hasChanges = true;
+                        this.updateSaveButton();
+                    }
+                });
+            },
+            
+            openVisibilityModal() {
+                const modal = document.getElementById('widgetModal');
+                if (modal) {
+                    modal.classList.add('show');
+                    this.renderModalContent();
+                }
+            },
+            
+            closeVisibilityModal() {
+                const modal = document.getElementById('widgetModal');
+                if (modal) {
+                    modal.classList.remove('show');
+                }
+            },
+            
+            renderModalContent() {
+                const container = document.getElementById('widgetModalItems');
+                if (!container) return;
+                
+                let html = '';
+                this.widgets.forEach(widget => {
+                    const checked = this.visibility[widget.id] !== false ? 'checked' : '';
+                    html += `
+                        <div class="widget-modal-item">
+                            <input 
+                                type="checkbox" 
+                                id="widget-vis-${widget.id}" 
+                                class="widget-modal-checkbox"
+                                ${checked}
+                                onchange="WidgetManager.toggleWidgetVisibility('${widget.id}', this.checked)"
+                            >
+                            <label for="widget-vis-${widget.id}" class="widget-modal-label">
+                                ${widget.title}
+                            </label>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            },
+            
+            toggleWidgetVisibility(widgetId, visible) {
+                this.visibility[widgetId] = visible;
+                this.hasChanges = true;
+                this.updateSaveButton();
+                
+                // Update widget card visibility
+                const card = document.querySelector(`[data-widget-id="${widgetId}"]`);
+                if (card) {
+                    card.classList.toggle('widget-hidden', !visible);
+                }
+            },
+            
+            applyVisibilityModal() {
+                this.closeVisibilityModal();
+                // Visibility is already applied in real-time via toggleWidgetVisibility
+            },
+            
+            async savePreferences() {
+                try {
+                    // Get current widget order from DOM
+                    const grid = document.getElementById('widgetGrid');
+                    if (!grid) return;
+                    
+                    const layout = Array.from(grid.children)
+                        .map(card => card.dataset.widgetId)
+                        .filter(id => id);
+                    
+                    // Save to backend
+                    const response = await fetch('/api/dashboard/widgets', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            layout: layout,
+                            visibility: this.visibility
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.hasChanges = false;
+                        this.updateSaveButton();
+                        alert('✅ ' + (data.message || 'Widget tercihleri kaydedildi!'));
+                    } else {
+                        alert('❌ Kayıt hatası: ' + (data.error || 'Bilinmeyen hata'));
+                    }
+                } catch (error) {
+                    console.error('Save error:', error);
+                    alert('❌ Kayıt sırasında hata oluştu');
+                }
+            },
+            
+            async resetToDefaults() {
+                if (!confirm('🔄 Widget tercihlerinizi sıfırlamak istediğinizden emin misiniz?\n\nVarsayılan düzene geri dönülecek.')) {
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/dashboard/widgets/reset', {
+                        method: 'POST'
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        alert('✅ ' + (data.message || 'Varsayılan widget düzeni geri yüklendi!'));
+                        location.reload();
+                    } else {
+                        alert('❌ Sıfırlama hatası: ' + (data.error || 'Bilinmeyen hata'));
+                    }
+                } catch (error) {
+                    console.error('Reset error:', error);
+                    alert('❌ Sıfırlama sırasında hata oluştu');
+                }
+            },
+            
+            updateSaveButton() {
+                const saveBtn = document.getElementById('widgetSaveBtn');
+                if (saveBtn) {
+                    if (this.hasChanges) {
+                        saveBtn.style.background = '#ef4444';
+                        saveBtn.textContent = '💾 Değişiklikleri Kaydet';
+                    } else {
+                        saveBtn.style.background = '#3b82f6';
+                        saveBtn.textContent = '✅ Kaydedildi';
+                    }
+                }
+            }
+        };
+        
+        // Make WidgetManager globally accessible
+        window.WidgetManager = WidgetManager;
+    </script>
+    
+    <!-- Widget Visibility Modal (Task #10) -->
+    <div class="widget-modal" id="widgetModal">
+        <div class="widget-modal-content">
+            <div class="widget-modal-header">📋 Widget Görünürlüğü</div>
+            <div id="widgetModalItems">
+                <!-- Widget checkboxes rendered by JavaScript -->
+            </div>
+            <div class="widget-modal-actions">
+                <button class="widget-btn widget-btn-secondary" onclick="WidgetManager.closeVisibilityModal()">İptal</button>
+                <button class="widget-btn widget-btn-primary" onclick="WidgetManager.applyVisibilityModal()">Uygula</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Push Notification Modal -->
+    <div class="push-notification-modal" id="pushNotificationModal" style="display:none;">
+        <div class="push-notification-modal-content">
+            <div class="push-notification-modal-header">
+                <h3>📢 Push Bildirim Gönder</h3>
+                <button class="push-notification-close" onclick="closePushNotificationModal()">✕</button>
+            </div>
+            <div class="push-notification-modal-body">
+                <div class="form-group">
+                    <label>Hedef Kitle</label>
+                    <select id="pushNotificationTarget" class="form-control" onchange="toggleClassSelection()">
+                        <option value="all">🌍 Herkes</option>
+                        <option value="students">👨‍🎓 Tüm Öğrenciler</option>
+                        <option value="teachers">👨‍🏫 Tüm Öğretmenler</option>
+                        <option value="class">🏫 Belirli Sınıflar</option>
+                    </select>
+                </div>
+                <div class="form-group" id="classSelectionGroup" style="display:none;">
+                    <label>Sınıf Seçin</label>
+                    <select id="pushNotificationClasses" class="form-control" multiple size="6">
+                        <option value="5A">5A</option>
+                        <option value="5B">5B</option>
+                        <option value="5C">5C</option>
+                        <option value="5D">5D</option>
+                        <option value="6A">6A</option>
+                        <option value="6B">6B</option>
+                        <option value="6C">6C</option>
+                        <option value="6D">6D</option>
+                        <option value="7A">7A</option>
+                        <option value="7B">7B</option>
+                        <option value="7C">7C</option>
+                        <option value="7D">7D</option>
+                        <option value="8A">8A</option>
+                        <option value="8B">8B</option>
+                        <option value="8C">8C</option>
+                        <option value="8D">8D</option>
+                    </select>
+                    <small style="color:#6b7280;">Ctrl tuşuyla birden fazla sınıf seçebilirsiniz</small>
+                </div>
+                <div class="form-group">
+                    <label>Başlık</label>
+                    <input type="text" id="pushNotificationTitle" class="form-control" placeholder="Bildirim başlığı">
+                </div>
+                <div class="form-group">
+                    <label>Mesaj</label>
+                    <textarea id="pushNotificationMessage" class="form-control" rows="3" placeholder="Bildirim mesajı"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>URL (opsiyonel)</label>
+                    <input type="url" id="pushNotificationUrl" class="form-control" value="https://ameo-alanya.com" placeholder="https://ameo-alanya.com">
+                </div>
+            </div>
+            <div class="push-notification-modal-footer">
+                <button class="btn-cancel" onclick="closePushNotificationModal()">İptal</button>
+                <button class="btn-send" onclick="sendPushNotification()">Gönder</button>
+            </div>
+        </div>
+    </div>
+    
+    <style>
+        .push-notification-btn {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .push-notification-btn:hover { transform: scale(1.1); }
+        
+        .push-notification-modal {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .push-notification-modal-content {
+            background: white;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 450px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .push-notification-modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .push-notification-modal-header h3 { margin: 0; color: #1f2937; }
+        .push-notification-close {
+            background: #fee2e2;
+            color: #dc2626;
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .push-notification-modal-body { padding: 20px; }
+        .push-notification-modal-body .form-group { margin-bottom: 16px; }
+        .push-notification-modal-body label { display: block; font-weight: 600; margin-bottom: 6px; color: #374151; }
+        .push-notification-modal-body .form-control {
+            width: 100%;
+            padding: 10px 14px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 0.95rem;
+        }
+        .push-notification-modal-body .form-control:focus {
+            outline: none;
+            border-color: #8b5cf6;
+        }
+        .push-notification-modal-footer {
+            padding: 16px 20px;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        .push-notification-modal-footer .btn-cancel {
+            background: #f3f4f6;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .push-notification-modal-footer .btn-send {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .push-notification-modal-footer .btn-send:hover { opacity: 0.9; }
+    </style>
+    
+    <script>
+        // Check if user can send notifications
+        async function checkPushNotificationPermission() {
+            try {
+                const res = await fetch('/api/can-send-notification');
+                const data = await res.json();
+                if (data.can_send) {
+                    document.getElementById('pushNotificationContainer').style.display = 'block';
+                }
+            } catch (e) {
+                console.log('Push notification check failed');
+            }
+        }
+        
+        function openPushNotificationModal() {
+            document.getElementById('pushNotificationModal').style.display = 'flex';
+        }
+        
+        function closePushNotificationModal() {
+            document.getElementById('pushNotificationModal').style.display = 'none';
+            document.getElementById('pushNotificationTitle').value = '';
+            document.getElementById('pushNotificationMessage').value = '';
+            document.getElementById('pushNotificationTarget').value = 'all';
+            document.getElementById('classSelectionGroup').style.display = 'none';
+        }
+        
+        function toggleClassSelection() {
+            const target = document.getElementById('pushNotificationTarget').value;
+            document.getElementById('classSelectionGroup').style.display = target === 'class' ? 'block' : 'none';
+        }
+        
+        async function sendPushNotification() {
+            const title = document.getElementById('pushNotificationTitle').value.trim();
+            const message = document.getElementById('pushNotificationMessage').value.trim();
+            const url = document.getElementById('pushNotificationUrl').value.trim() || 'https://ameo-alanya.com';
+            const target = document.getElementById('pushNotificationTarget').value;
+            
+            if (!title || !message) {
+                alert('Başlık ve mesaj zorunludur');
+                return;
+            }
+            
+            let payload = { title, message, url };
+            
+            if (target === 'students') {
+                payload.target_role = 'student';
+            } else if (target === 'teachers') {
+                payload.target_role = 'teacher';
+            } else if (target === 'class') {
+                const classSelect = document.getElementById('pushNotificationClasses');
+                const selectedClasses = Array.from(classSelect.selectedOptions).map(o => o.value);
+                if (selectedClasses.length === 0) {
+                    alert('Lütfen en az bir sınıf seçin');
+                    return;
+                }
+                payload.target_classes = selectedClasses;
+                payload.target_role = 'student';
+            }
+            
+            try {
+                const res = await fetch('/api/send-notification', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    alert('Bildirim gönderildi!');
+                    closePushNotificationModal();
+                } else {
+                    alert(data.error || 'Bildirim gönderilemedi');
+                }
+            } catch (e) {
+                alert('Bağlantı hatası');
+            }
+        }
+        
+        // Check on page load
+        checkPushNotificationPermission();
+    </script>
+    
+    <script>
+        // Activity Tracking - Heartbeat mekanizması
+        let activityPingInterval = null;
+        
+        function startActivityTracking() {
+            // Her 30 saniyede bir aktivite güncelle
+            activityPingInterval = setInterval(() => {
+                fetch('/api/activity/ping', { method: 'POST' })
+                    .catch(err => console.log('Activity ping failed:', err));
+            }, 30000);
+            
+            // Sayfa kapatılırken logout yap
+            window.addEventListener('beforeunload', () => {
+                // Tarayıcı kapatılırken asynchronous request gönder
+                navigator.sendBeacon('/api/logout', JSON.stringify({}));
+            });
+        }
+        
+        // Sayfanın yüklenmesi tamamlandığında başlat
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', startActivityTracking);
+        } else {
+            startActivityTracking();
+        }
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

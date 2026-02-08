@@ -1,0 +1,3524 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Karne Yönetimi{% endblock %}
+
+{% block extra_css %}
+<style>
+    .main-tab-btn {
+        padding: 12px 24px;
+        border: none;
+        background: #f3f4f6;
+        color: #374151;
+        font-size: 0.95rem;
+        font-weight: 500;
+        cursor: pointer;
+        border-radius: 8px 8px 0 0;
+        transition: all 0.2s;
+    }
+    
+    .main-tab-btn:hover {
+        background: #e5e7eb;
+    }
+    
+    .main-tab-btn.active {
+        background: #3b82f6;
+        color: white;
+    }
+    
+    .exams-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .exams-table th, .exams-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .exams-table th {
+        background: #f9fafb;
+        font-weight: 600;
+        color: #374151;
+    }
+    
+    .exams-table tr:hover {
+        background: #f9fafb;
+    }
+    
+    .delete-btn {
+        padding: 6px 12px;
+        background: #ef4444;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.85rem;
+    }
+    
+    .delete-btn:hover {
+        background: #dc2626;
+    }
+    
+    .view-btn {
+        padding: 6px 12px;
+        background: #3b82f6;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        margin-right: 8px;
+    }
+    
+    .report-cards-container {
+        padding: 20px;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+    
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+    
+    .page-title {
+        font-size: 1.75rem;
+        font-weight: 600;
+        color: #1f2937;
+    }
+    
+    .controls {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    
+    .class-filter, .upload-btn {
+        padding: 10px 16px;
+        border-radius: 8px;
+        font-size: 0.95rem;
+    }
+    
+    .class-filter {
+        border: 1px solid #d1d5db;
+        background: white;
+        min-width: 150px;
+    }
+    
+    .upload-btn {
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        color: white;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s;
+    }
+    
+    .upload-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+    
+    .cards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: 20px;
+    }
+    
+    .report-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        border: 1px solid #e5e7eb;
+        transition: all 0.2s;
+    }
+    
+    .report-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 16px;
+    }
+    
+    .card-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #1f2937;
+    }
+    
+    .card-publisher {
+        font-size: 0.85rem;
+        color: #6b7280;
+        margin-top: 4px;
+    }
+    
+    .status-badge {
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    
+    .status-completed {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    
+    .status-processing {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    
+    .status-failed {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+    
+    .status-pending {
+        background: #e5e7eb;
+        color: #4b5563;
+    }
+    
+    .card-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+        padding: 12px;
+        background: #f9fafb;
+        border-radius: 8px;
+    }
+    
+    .stat-item {
+        text-align: center;
+    }
+    
+    .stat-value {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #1f2937;
+    }
+    
+    .stat-label {
+        font-size: 0.75rem;
+        color: #6b7280;
+    }
+    
+    .card-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+    }
+    
+    .card-actions button {
+        flex: 1;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .btn-view {
+        background: #eff6ff;
+        color: #2563eb;
+        border: 1px solid #bfdbfe;
+    }
+    
+    .btn-view:hover {
+        background: #dbeafe;
+    }
+    
+    .btn-delete {
+        background: #fef2f2;
+        color: #dc2626;
+        border: 1px solid #fecaca;
+    }
+    
+    .btn-delete:hover {
+        background: #fee2e2;
+    }
+    
+    /* Upload Modal */
+    .modal-overlay {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        z-index: 99999;
+        background: rgba(0,0,0,0.5);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 99999 !important;
+    }
+    
+    .modal-overlay.active {
+        display: flex !important;
+        z-index: 2147483647 !important;
+    }
+    
+    .modal {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        width: 90%;
+        max-width: 500px;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    
+    .modal-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+    }
+    
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: #6b7280;
+    }
+    
+    .form-group {
+        margin-bottom: 16px;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 500;
+        color: #374151;
+    }
+    
+    .form-group input,
+    .form-group select {
+        width: 100%;
+        padding: 10px 14px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 0.95rem;
+    }
+    
+    .file-drop-zone {
+        border: 2px dashed #d1d5db;
+        border-radius: 12px;
+        padding: 30px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .file-drop-zone:hover,
+    .file-drop-zone.dragover {
+        border-color: #3b82f6;
+        background: #eff6ff;
+    }
+    
+    .file-drop-zone.has-file {
+        border-color: #10b981;
+        background: #d1fae5;
+    }
+    
+    .drop-icon {
+        font-size: 2rem;
+        margin-bottom: 8px;
+    }
+    
+    .submit-btn {
+        width: 100%;
+        padding: 12px;
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 500;
+        cursor: pointer;
+        margin-top: 20px;
+    }
+    
+    .submit-btn:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+    }
+    
+    /* Students Modal */
+    .students-list {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    
+    .student-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .student-item:last-child {
+        border-bottom: none;
+    }
+    
+    .student-name {
+        font-weight: 500;
+    }
+    
+    .student-stats {
+        display: flex;
+        gap: 16px;
+        font-size: 0.85rem;
+        color: #6b7280;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #6b7280;
+    }
+    
+    .empty-icon {
+        font-size: 3rem;
+        margin-bottom: 16px;
+    }
+    
+    @media (max-width: 768px) {
+        .cards-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .page-header {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        
+        .controls {
+            flex-direction: column;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="report-cards-container">
+    <div class="page-header">
+        <h1 class="page-title">📋 Karne {% if current_user.role == 'admin' %}Yönetimi{% else %}Analizi{% endif %}</h1>
+        <div class="controls">
+            <select class="class-filter" id="classFilter">
+                <option value="">Tüm Sınıflar</option>
+            </select>
+            {% if current_user.role == 'admin' %}
+            <button class="upload-btn" id="openUploadBtn" type="button" onclick="openUploadModal()">
+                <span>📤</span> PDF Karne Yükle
+            </button>
+            <button class="upload-btn" style="background: linear-gradient(135deg, #22c55e, #16a34a);" onclick="openFmtUploadModal()">
+                <span>📋</span> FMT Yükle
+            </button>
+            <button class="upload-btn" style="background: linear-gradient(135deg, #f59e0b, #d97706);" onclick="fixStudentNumbers()">
+                <span>🔧</span> No Düzelt
+            </button>
+            {% endif %}
+            <button class="upload-btn" style="background: linear-gradient(135deg, #ef4444, #dc2626);" onclick="openErrorReportModal()">
+                <span>📊</span> Hata Karnesi Oluştur
+            </button>
+            {% if current_user.role == 'admin' %}
+            <button class="upload-btn" style="background: linear-gradient(135deg, #10b981, #059669);" onclick="openOutcomesModal()">
+                <span>📚</span> Kazanım Yükle
+            </button>
+            {% endif %}
+            <button class="upload-btn" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);" onclick="openStudentOutcomeModal()">
+                <span>👤</span> Öğrenci Kazanım
+            </button>
+            <button class="upload-btn" style="background: linear-gradient(135deg, #f59e0b, #d97706);" onclick="openOutcomeAnalyticsModal()">
+                <span>🎯</span> Sınıf Kazanım
+            </button>
+            <button class="upload-btn" style="background: linear-gradient(135deg, #6366f1, #4f46e5);" onclick="openMultiExamModal()">
+                <span>📈</span> Toplu Gelişim
+            </button>
+            {% if current_user.role == 'admin' %}
+            <button class="upload-btn" style="background: linear-gradient(135deg, #dc2626, #b91c1c);" onclick="openDuplicatesModal()">
+                <span>🔄</span> Çift Kayıt
+            </button>
+            <button class="upload-btn" style="background: linear-gradient(135deg, #f97316, #ea580c);" onclick="openIncompleteModal()">
+                <span>🔧</span> Eksik Tamamla
+            </button>
+            <button class="upload-btn" style="background: linear-gradient(135deg, #14b8a6, #0d9488);" onclick="reprocessAllPDFs()">
+                <span>🔄</span> PDF Yenile
+            </button>
+            <button class="upload-btn" style="background: linear-gradient(135deg, #0ea5e9, #0284c7);" onclick="migrateLocalPDFs()">
+                <span>📥</span> Yerel PDF Aktar
+            </button>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb;">
+        <button class="main-tab-btn active" data-tab="cards" onclick="switchMainTab('cards')">
+            📋 Öğrenci Kartları
+        </button>
+        <button class="main-tab-btn" data-tab="exams" onclick="switchMainTab('exams')">
+            📊 Sınav Yönetimi
+        </button>
+        <button class="main-tab-btn" data-tab="matching" onclick="switchMainTab('matching')">
+            🔗 Kayıt Eşleştirme
+        </button>
+    </div>
+    
+    <div id="cardsTab" class="main-tab-content">
+        <div class="cards-grid" id="cardsGrid">
+            <div class="empty-state">
+                <div class="empty-icon">📋</div>
+                <h3>Henüz karne yüklenmemiş</h3>
+                <p>PDF karne yüklemek için yukarıdaki butonu kullanın</p>
+            </div>
+        </div>
+    </div>
+    
+    <div id="examsTab" class="main-tab-content" style="display: none;">
+        <div style="background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="font-size: 1.25rem; font-weight: 600; color: #1f2937;">Yüklenen Sınavlar</h2>
+                <button onclick="loadExamsList()" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                    🔄 Yenile
+                </button>
+            </div>
+            
+            <div id="examsListContainer">
+                <div style="text-align: center; padding: 40px; color: #6b7280;">
+                    <div style="font-size: 2rem; margin-bottom: 12px;">📊</div>
+                    <p>Sınavlar yükleniyor...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="matchingTab" class="main-tab-content" style="display: none;">
+        <div style="background: white; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: #1f2937; margin-bottom: 16px;">
+                🔗 Kayıt Eşleştirme
+            </h2>
+            <p style="color: #6b7280; margin-bottom: 20px;">
+                Excel dosyasındaki öğrenci isimlerini sistemdeki kayıtlarla eşleştirin. Sistem isimleri karşılaştırarak doğru isim, sınıf ve okul numarası bilgilerini bulur.
+            </p>
+            
+            <div style="background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                <strong style="color: #0369a1;">Excel Formatı:</strong>
+                <ul style="margin: 8px 0 0 20px; color: #0369a1;">
+                    <li>İlk sütunda öğrenci isimleri olmalı</li>
+                    <li>İlk satır başlık satırı olarak kabul edilir</li>
+                    <li>.xlsx veya .xls formatı desteklenir</li>
+                </ul>
+            </div>
+            
+            <div style="display: flex; gap: 16px; align-items: center; margin-bottom: 20px;">
+                <input type="file" id="matchingFile" accept=".xlsx,.xls" style="flex: 1; padding: 10px; border: 2px dashed #d1d5db; border-radius: 8px;">
+                <button onclick="matchStudentNames()" style="padding: 12px 24px; background: #10b981; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500;">
+                    🔍 Bul ve Eşleştir
+                </button>
+            </div>
+            
+            <div id="matchingResults" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <h3 style="font-size: 1.1rem; font-weight: 600; color: #1f2937;">Eşleştirme Sonuçları</h3>
+                    <button onclick="downloadMatchingResults()" style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                        📥 Excel İndir
+                    </button>
+                </div>
+                <div id="matchingStats" style="display: flex; gap: 16px; margin-bottom: 16px;">
+                </div>
+                <div style="max-height: 500px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px;">
+                    <table class="exams-table" id="matchingTable">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Girilen İsim</th>
+                                <th>Eşleşen İsim</th>
+                                <th>Sınıf</th>
+                                <th>Okul No</th>
+                                <th>Durum</th>
+                            </tr>
+                        </thead>
+                        <tbody id="matchingTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Modal -->
+<div class="modal-overlay" id="uploadModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h2 class="modal-title">PDF Karne Yükle</h2>
+            <button class="modal-close" onclick="closeUploadModal()">&times;</button>
+        </div>
+        
+        <form id="uploadForm" onsubmit="handleUpload(event)">
+            <div class="form-group">
+                <label>Sınav Adı *</label>
+                <input type="text" id="examName" required placeholder="Örn: TG Gelişim 3">
+            </div>
+            
+            <div class="form-group">
+                <label>Yayınevi</label>
+                <input type="text" id="publisher" placeholder="Örn: Hız Yayınları">
+            </div>
+            
+            <div class="form-group">
+                <label>Sınıf *</label>
+                <select id="uploadClass" required>
+                    <option value="">Sınıf Seçin</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>PDF Dosyası *</label>
+                <div class="file-drop-zone" id="dropZone" onclick="document.getElementById('pdfFile').click()">
+                    <div class="drop-icon">📄</div>
+                    <p id="dropText">PDF dosyasını sürükleyin veya tıklayın</p>
+                </div>
+                <input type="file" id="pdfFile" accept=".pdf" style="display: none" onchange="handleFileSelect(this)">
+            </div>
+            
+            <button type="submit" class="submit-btn" id="submitBtn">
+                Yükle ve İşle
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Static modals removed - using dynamic modals instead -->
+
+<!-- FMT Upload Modal -->
+<div class="modal-overlay" id="fmtUploadModal">
+    <div class="modal" style="max-width: 700px; max-height: 90vh; overflow-y: auto;">
+        <div class="modal-header">
+            <h2 class="modal-title">FMT Dosyası Yükle</h2>
+            <button class="modal-close" onclick="closeFmtUploadModal()">&times;</button>
+        </div>
+        
+        <form id="fmtUploadForm" onsubmit="handleFmtUpload(event)">
+            <div class="form-group">
+                <label>Sınav Adı *</label>
+                <input type="text" id="fmtExamName" required placeholder="Örn: TG Gelişim 3">
+            </div>
+            
+            <div class="form-group">
+                <label>Yayınevi</label>
+                <input type="text" id="fmtPublisher" placeholder="Örn: Hız Yayınları">
+            </div>
+            
+            <div class="form-group">
+                <label>FMT Dosyaları * (Birden fazla seçilebilir)</label>
+                <div class="file-drop-zone" id="fmtDropZone" onclick="document.getElementById('fmtFiles').click()" style="border-color: #22c55e;">
+                    <div class="drop-icon">📋</div>
+                    <p id="fmtDropText">FMT dosyalarını sürükleyin veya tıklayın<br><small>5, 6, 7, 8. sınıf dosyalarını aynı anda seçebilirsiniz</small></p>
+                </div>
+                <input type="file" id="fmtFiles" accept=".txt,.fmt" multiple style="display: none" onchange="handleFmtFileSelect(this)">
+            </div>
+            
+            <div id="fmtFileList" style="margin-bottom: 15px;"></div>
+            
+            <div class="form-group" style="background: linear-gradient(135deg, #f5f3ff, #ede9fe); padding: 15px; border-radius: 8px; border: 2px solid #8b5cf6;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <label style="font-weight: bold; color: #5b21b6; font-size: 14px;">📊 Kazanımlı Cevap Anahtarı (FMT CA) *</label>
+                </div>
+                
+                <div class="file-drop-zone" id="fmtCaDropZoneInline" onclick="document.getElementById('fmtCaFileInline').click()" style="border-color: #8b5cf6; background: white; padding: 20px; cursor: pointer;">
+                    <div class="drop-icon" style="font-size: 2rem;">📊</div>
+                    <p id="fmtCaDropTextInline" style="margin: 0; text-align: center;">
+                        <strong>Excel dosyasını sürükleyin veya tıklayın</strong><br>
+                        <small style="color: #666;">Format: Soru No | Kazanım | A Cevabı | B Soru No</small>
+                    </p>
+                </div>
+                <input type="file" id="fmtCaFileInline" accept=".xlsx,.xls" style="display: none" onchange="handleFmtCaFileSelectInline(this)" required>
+                
+                <div style="background: #fff; padding: 10px; border-radius: 6px; margin-top: 10px; border: 1px solid #c4b5fd;">
+                    <p style="font-size: 11px; color: #5b21b6; margin: 0;">
+                        <strong>Bu Excel formatı nedir?</strong><br>
+                        Yayınevlerinin sağladığı kazanımlı cevap anahtarı dosyası. Her ders için soru numarası, kazanım kodu, A kitapçığı cevabı ve B kitapçığındaki karşılık gelen soru numarası içerir.
+                    </p>
+                </div>
+            </div>
+            
+            <button type="submit" class="submit-btn" id="fmtSubmitBtn" style="background: linear-gradient(135deg, #22c55e, #16a34a);">
+                Yükle ve İşle
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- FMT Cevap Anahtarı Yükle Modal -->
+<div id="fmtCaModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 550px;">
+        <div class="modal-header" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);">
+            <h2 class="modal-title" style="color: white;">FMT Cevap Anahtarı Yükle</h2>
+            <button class="modal-close" onclick="closeFmtCaModal()" style="color: white;">&times;</button>
+        </div>
+        
+        <form id="fmtCaUploadForm" onsubmit="handleFmtCaUpload(event)">
+            <div class="form-group">
+                <label>Sınav Adı *</label>
+                <input type="text" id="fmtCaExamName" required placeholder="Örn: TG Gelişim 1 - 5. Sınıf">
+            </div>
+            
+            <div class="form-group">
+                <label>Yayınevi</label>
+                <input type="text" id="fmtCaPublisher" placeholder="Örn: Hız Yayınları">
+            </div>
+            
+            <div class="form-group">
+                <label>Kazanımlı Excel Dosyası *</label>
+                <div class="file-drop-zone" id="fmtCaDropZone" onclick="document.getElementById('fmtCaFile').click()" style="border-color: #8b5cf6;">
+                    <div class="drop-icon">📊</div>
+                    <p id="fmtCaDropText">
+                        Excel dosyasını sürükleyin veya tıklayın<br>
+                        <small style="color: #666;">Format: Soru No | Kazanım | A Cevabı | B Soru No</small>
+                    </p>
+                </div>
+                <input type="file" id="fmtCaFile" accept=".xlsx,.xls" style="display: none" onchange="handleFmtCaFileSelect(this)">
+            </div>
+            
+            <div style="background: #f5f3ff; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #c4b5fd;">
+                <p style="font-size: 12px; color: #5b21b6; margin: 0;">
+                    <strong>Bu Excel formatı nedir?</strong><br>
+                    Yayınevlerinin sağladığı kazanımlı cevap anahtarı dosyası. Her ders için soru numarası, kazanım kodu, A kitapçığı cevabı ve B kitapçığındaki karşılık gelen soru numarası içerir.
+                </p>
+            </div>
+            
+            <button type="submit" class="submit-btn" id="fmtCaSubmitBtn" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);">
+                Yükle ve Kaydet
+            </button>
+        </form>
+        
+        <div id="fmtCaResult" style="display: none; margin-top: 15px; padding: 15px; background: #f0fdf4; border-radius: 8px; border: 1px solid #22c55e;">
+        </div>
+    </div>
+</div>
+
+<script>
+let selectedFile = null;
+let selectedFmtFiles = [];
+let classes = [];
+const userRole = '{{ current_user.role }}';
+
+// Modal fonksiyonları - en başta tanımlanmalı
+function openUploadModal() {
+    console.log('Opening upload modal...');
+    
+    const existingModal = document.getElementById('dynamicUploadModal');
+    if (existingModal) existingModal.remove();
+    
+    const modalHtml = `
+        <div id="dynamicUploadModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 2147483647;">
+            <div style="background: white; border-radius: 16px; padding: 24px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2 style="font-size: 1.25rem; font-weight: 600; margin: 0;">PDF Karne Yukle (Coklu Secim)</h2>
+                    <button onclick="closeDynamicModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #6b7280;">&times;</button>
+                </div>
+                <form id="dynUploadForm" onsubmit="handleBatchUpload(event)">
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; font-weight: 500; margin-bottom: 6px;">Yayinevi</label>
+                        <input type="text" id="dynPublisher" placeholder="Orn: Hiz Yayinlari" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem; box-sizing: border-box;">
+                    </div>
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; font-weight: 500; margin-bottom: 6px;">Sinif *</label>
+                        <select id="dynUploadClass" required style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem; box-sizing: border-box;">
+                            <option value="">Sinif Secin</option>
+                            <option value="ALL_5">Tum 5. Siniflar</option>
+                            <option value="ALL_6">Tum 6. Siniflar</option>
+                            <option value="ALL_7">Tum 7. Siniflar</option>
+                            <option value="ALL_8">Tum 8. Siniflar</option>
+                            <option disabled>--------------</option>
+                            ${classes.map(c => '<option value="' + c + '">' + c + '</option>').join('')}
+                        </select>
+                    </div>
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; font-weight: 500; margin-bottom: 6px;">PDF Dosyalari * (Birden fazla secebilirsiniz)</label>
+                        <input type="file" id="dynPdfFiles" accept=".pdf" required multiple style="width: 100%; padding: 10px; border: 2px dashed #d1d5db; border-radius: 8px; box-sizing: border-box;">
+                        <p style="font-size: 0.8rem; color: #6b7280; margin-top: 4px;">Dosya adi sinav adi olarak kullanilir (orn: TG1.pdf -> TG1)</p>
+                    </div>
+                    <div id="uploadQueue" style="display: none; margin-bottom: 16px; background: #f9fafb; padding: 12px; border-radius: 8px; max-height: 200px; overflow-y: auto;"></div>
+                    <button type="submit" id="dynSubmitBtn" style="width: 100%; padding: 12px; background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: 500; cursor: pointer;">
+                        Yukle ve Sirali Isle
+                    </button>
+                </form>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    document.body.style.overflow = 'hidden';
+    console.log('Dynamic modal created and opened');
+}
+
+function closeDynamicModal() {
+    const modal = document.getElementById('dynamicUploadModal');
+    if (modal) modal.remove();
+    document.body.style.overflow = '';
+}
+
+function switchMainTab(tabName) {
+    document.querySelectorAll('.main-tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.tab === tabName) btn.classList.add('active');
+    });
+    
+    document.getElementById('cardsTab').style.display = tabName === 'cards' ? 'block' : 'none';
+    document.getElementById('examsTab').style.display = tabName === 'exams' ? 'block' : 'none';
+    document.getElementById('matchingTab').style.display = tabName === 'matching' ? 'block' : 'none';
+    
+    if (tabName === 'exams') {
+        loadExamsList();
+    }
+}
+
+let matchingData = [];
+
+async function matchStudentNames() {
+    const fileInput = document.getElementById('matchingFile');
+    if (!fileInput.files[0]) {
+        alert('Lütfen bir Excel dosyası seçin');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/match-students', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            alert('Hata: ' + (data.error || 'Bilinmeyen hata'));
+            return;
+        }
+        
+        matchingData = data.results;
+        displayMatchingResults(data);
+        
+    } catch (error) {
+        alert('Hata: ' + error.message);
+    }
+}
+
+function displayMatchingResults(data) {
+    document.getElementById('matchingResults').style.display = 'block';
+    
+    const stats = document.getElementById('matchingStats');
+    stats.innerHTML = `
+        <div style="background: #dcfce7; padding: 12px 20px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 1.5rem; font-weight: bold; color: #16a34a;">${data.matched}</div>
+            <div style="color: #15803d; font-size: 0.85rem;">Eşleşen</div>
+        </div>
+        <div style="background: #fef3c7; padding: 12px 20px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 1.5rem; font-weight: bold; color: #d97706;">${data.partial}</div>
+            <div style="color: #b45309; font-size: 0.85rem;">Benzer</div>
+        </div>
+        <div style="background: #fee2e2; padding: 12px 20px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 1.5rem; font-weight: bold; color: #dc2626;">${data.not_found}</div>
+            <div style="color: #b91c1c; font-size: 0.85rem;">Bulunamadı</div>
+        </div>
+        <div style="background: #e0e7ff; padding: 12px 20px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 1.5rem; font-weight: bold; color: #4f46e5;">${data.total}</div>
+            <div style="color: #4338ca; font-size: 0.85rem;">Toplam</div>
+        </div>
+    `;
+    
+    const tbody = document.getElementById('matchingTableBody');
+    tbody.innerHTML = '';
+    
+    data.results.forEach((item, index) => {
+        let statusClass = '';
+        let statusText = '';
+        
+        if (item.status === 'matched') {
+            statusClass = 'background: #dcfce7; color: #16a34a;';
+            statusText = 'Tam Eşleşme';
+        } else if (item.status === 'partial') {
+            statusClass = 'background: #fef3c7; color: #d97706;';
+            statusText = 'Benzer';
+        } else {
+            statusClass = 'background: #fee2e2; color: #dc2626;';
+            statusText = 'Bulunamadı';
+        }
+        
+        tbody.innerHTML += `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${item.input_name}</td>
+                <td>${item.matched_name || '-'}</td>
+                <td>${item.class_name || '-'}</td>
+                <td>${item.student_no || '-'}</td>
+                <td><span style="padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; ${statusClass}">${statusText}</span></td>
+            </tr>
+        `;
+    });
+}
+
+async function downloadMatchingResults() {
+    if (!matchingData.length) {
+        alert('İndirilecek veri yok');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/match-students/download', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({results: matchingData})
+        });
+        
+        if (!response.ok) {
+            alert('İndirme hatası');
+            return;
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'eslestirme_sonuclari.xlsx';
+        a.click();
+        window.URL.revokeObjectURL(url);
+        
+    } catch (error) {
+        alert('Hata: ' + error.message);
+    }
+}
+
+async function loadExamsList() {
+    const container = document.getElementById('examsListContainer');
+    container.innerHTML = '<div style="text-align: center; padding: 40px;"><div class="spinner"></div><p>Sınavlar yükleniyor...</p></div>';
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/exams-list');
+        const data = await response.json();
+        
+        if (!data.exams || data.exams.length === 0) {
+            container.innerHTML = '<div style="text-align: center; padding: 40px; color: #6b7280;"><div style="font-size: 2rem; margin-bottom: 12px;">📊</div><p>Henüz sınav yüklenmemiş</p></div>';
+            return;
+        }
+        
+        let html = `
+            <table class="exams-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Sınav Adı</th>
+                        <th>Öğrenci Sayısı</th>
+                        <th>Yükleme Tarihi</th>
+                        <th>İşlemler</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        data.exams.forEach(exam => {
+            const date = exam.created_at ? new Date(exam.created_at).toLocaleString('tr-TR') : '-';
+            html += `
+                <tr>
+                    <td>${exam.id}</td>
+                    <td>${exam.exam_name || 'İsimsiz'}</td>
+                    <td>${exam.student_count || 0} öğrenci</td>
+                    <td>${date}</td>
+                    <td>
+                        <button class="view-btn" onclick="viewExamStudents(${exam.id}, '${exam.exam_name || ''}')">👁 Görüntüle</button>
+                        <button class="delete-btn" onclick="deleteExam(${exam.id}, '${exam.exam_name || ''}')">🗑 Sil</button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table>';
+        container.innerHTML = html;
+        
+    } catch (err) {
+        container.innerHTML = '<div style="text-align: center; padding: 40px; color: #ef4444;"><p>Hata: ' + err.message + '</p></div>';
+    }
+}
+
+async function fixStudentNumbers() {
+    if (!confirm('Tüm öğrenci numaralarındaki baştaki sıfırları temizlemek istiyor musunuz?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/fix-student-numbers');
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('✅ ' + data.message);
+            location.reload();
+        } else {
+            alert('Hata: ' + (data.error || 'Bilinmeyen hata'));
+        }
+    } catch (error) {
+        alert('Hata: ' + error.message);
+    }
+}
+
+async function deleteExam(examId, examName) {
+    if (!confirm(`"${examName}" sınavını ve tüm öğrenci sonuçlarını silmek istediğinizden emin misiniz?\n\nBu işlem geri alınamaz!`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/admin/report-cards/api/delete-exam/${examId}`, {
+            method: 'DELETE'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(data.message);
+            loadExamsList();
+        } else {
+            alert('Hata: ' + (data.error || 'Bilinmeyen hata'));
+        }
+    } catch (err) {
+        alert('Hata: ' + err.message);
+    }
+}
+
+async function viewExamStudents(examId, examName) {
+    try {
+        const response = await fetch(`/admin/report-cards/api/exam-students/${examId}`);
+        if (!response.ok) {
+            const text = await response.text();
+            console.error('API error:', response.status, text);
+            alert('API hatası: ' + response.status);
+            return;
+        }
+        const data = await response.json();
+        
+        if (data.students && data.students.length > 0) {
+            let html = `<h3 style="margin-bottom: 16px;">${examName} - ${data.students.length} Öğrenci</h3>`;
+            html += '<div style="max-height: 400px; overflow-y: auto;"><table class="exams-table"><thead><tr><th>No</th><th>Ad Soyad</th><th>Sınıf</th><th>Kitapçık</th></tr></thead><tbody>';
+            
+            data.students.forEach(s => {
+                html += `<tr><td>${s.student_no || '-'}</td><td>${s.student_name || '-'}</td><td>${s.class_name || '-'}</td><td>${s.booklet_type || '-'}</td></tr>`;
+            });
+            
+            html += '</tbody></table></div>';
+            
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.id = 'examStudentsModal';
+            modal.style.display = 'flex';
+            modal.innerHTML = `<div class="modal" style="max-width: 700px;"><div class="modal-header"><h2>Sınav Öğrencileri</h2><button class="modal-close" onclick="document.getElementById('examStudentsModal').remove()">&times;</button></div><div style="padding: 20px;">${html}</div></div>`;
+            document.body.appendChild(modal);
+        } else {
+            alert('Bu sınavda öğrenci bulunamadı.');
+        }
+    } catch (err) {
+        alert('Hata: ' + err.message);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Move all modals to body to fix z-index issues with sidebar
+    ['studentsModal', 'errorReportModal', 'outcomesModal', 'multiExamModal', 'outcomeAnalyticsModal', 'successModal'].forEach(id => {
+        const modal = document.getElementById(id);
+        if (modal) document.body.appendChild(modal);
+    });
+    
+    loadClasses();
+    loadReportCards();
+    
+    // Upload button click handler
+    const openUploadBtn = document.getElementById('openUploadBtn');
+    if (openUploadBtn) {
+        openUploadBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('Upload button clicked');
+            try {
+                openUploadModal();
+            } catch (err) {
+                console.error('Modal error:', err);
+            }
+        });
+    }
+    
+    // Filter change
+    document.getElementById('classFilter').addEventListener('change', loadReportCards);
+});
+
+async function loadClasses() {
+    try {
+        const response = await fetch('/admin/report-cards/api/classes');
+        classes = await response.json();
+        
+        const classFilter = document.getElementById('classFilter');
+        const uploadClass = document.getElementById('uploadClass');
+        
+        classes.forEach(cls => {
+            classFilter.innerHTML += `<option value="${cls}">${cls}</option>`;
+            uploadClass.innerHTML += `<option value="${cls}">${cls}</option>`;
+        });
+    } catch (error) {
+        console.error('Classes load error:', error);
+    }
+}
+
+async function loadReportCards() {
+    const classFilter = document.getElementById('classFilter').value;
+    const grid = document.getElementById('cardsGrid');
+    
+    try {
+        let url = '/admin/report-cards/api/list';
+        if (classFilter) {
+            url += `?class_name=${encodeURIComponent(classFilter)}`;
+        }
+        
+        const response = await fetch(url);
+        const cards = await response.json();
+        
+        if (cards.length === 0) {
+            grid.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">📋</div>
+                    <h3>Henüz karne yüklenmemiş</h3>
+                    <p>PDF karne yüklemek için yukarıdaki butonu kullanın</p>
+                </div>
+            `;
+            return;
+        }
+        
+        grid.innerHTML = cards.map(card => `
+            <div class="report-card" id="card-${card.id}">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">${card.exam_name}</div>
+                        <div class="card-publisher">${card.publisher || ''} - ${card.class_name}</div>
+                    </div>
+                    <span class="status-badge status-${card.parse_status}" id="status-${card.id}">
+                        ${getStatusText(card.parse_status)}
+                    </span>
+                </div>
+                
+                ${card.parse_status === 'processing' ? `
+                <div class="progress-container" id="progress-${card.id}" style="margin-bottom: 12px;">
+                    <div style="background: #e5e7eb; border-radius: 6px; height: 8px; overflow: hidden; margin-bottom: 6px;">
+                        <div id="progressBar-${card.id}" style="background: linear-gradient(90deg, #3b82f6, #10b981); height: 100%; width: ${card.expected_student_count > 0 ? Math.round((card.processed_student_count / card.expected_student_count) * 100) : 0}%; transition: width 0.3s;"></div>
+                    </div>
+                    <div id="progressText-${card.id}" style="font-size: 0.8rem; color: #6b7280; text-align: center;">
+                        ${card.processed_student_count || 0} / ${card.expected_student_count || 0} ogrenci isleniyor...
+                    </div>
+                </div>
+                ` : ''}
+                
+                <div class="card-stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="studentCount-${card.id}">${card.student_count || 0}</div>
+                        <div class="stat-label">Öğrenci</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${card.class_name || (card.grade_level ? card.grade_level + '. Sınıflar' : '-')}</div>
+                        <div class="stat-label">Sınıf</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${formatDate(card.upload_date)}</div>
+                        <div class="stat-label">Yükleme</div>
+                    </div>
+                </div>
+                
+                ${card.parse_error && card.parse_status === 'failed' ? `<p style="color: #dc2626; font-size: 0.85rem; margin-bottom: 12px;">Hata: ${card.parse_error}</p>` : ''}
+                ${card.parse_error && card.parse_status === 'completed' ? `<p style="color: #10b981; font-size: 0.85rem; margin-bottom: 12px;">Sonuç: ${card.parse_error}</p>` : ''}
+                
+                <div class="card-actions">
+                    <button class="btn-view" data-id="${card.id}" data-name="${card.exam_name}">
+                        👁 Öğrenciler
+                    </button>
+                    ${userRole === 'admin' ? `<button class="btn-delete" data-id="${card.id}">🗑 Sil</button>` : ''}
+                </div>
+            </div>
+        `).join('');
+        
+        // Use onclick attributes directly to avoid duplicate listeners
+        grid.querySelectorAll('.btn-view').forEach(btn => {
+            btn.onclick = function() { viewStudents(this.dataset.id, this.dataset.name); };
+        });
+        grid.querySelectorAll('.btn-delete').forEach(btn => {
+            btn.onclick = function() { deleteCard(this.dataset.id); };
+        });
+        
+        // Start polling for processing cards
+        cards.filter(c => c.parse_status === 'processing').forEach(card => {
+            startCardPolling(card.id);
+        });
+        
+    } catch (error) {
+        console.error('Load error:', error);
+        grid.innerHTML = '<div class="empty-state"><p>Yüklenirken hata oluştu</p></div>';
+    }
+}
+
+function getStatusText(status) {
+    const texts = {
+        'pending': 'Bekliyor',
+        'processing': 'İşleniyor...',
+        'completed': 'Tamamlandı',
+        'failed': 'Hata'
+    };
+    return texts[status] || status;
+}
+
+// Active polling tracker to prevent duplicates
+const activePolls = new Set();
+
+function startCardPolling(cardId) {
+    if (activePolls.has(cardId)) return;
+    activePolls.add(cardId);
+    
+    let retryCount = 0;
+    const maxRetries = 30;
+    
+    const poll = async () => {
+        if (retryCount >= maxRetries) {
+            activePolls.delete(cardId);
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/admin/report-cards/api/status/${cardId}`);
+            
+            if (response.status === 429) {
+                retryCount++;
+                setTimeout(poll, 10000);
+                return;
+            }
+            
+            if (!response.ok) {
+                retryCount++;
+                setTimeout(poll, 8000);
+                return;
+            }
+            
+            const result = await response.json();
+            retryCount = 0;
+            
+            const progressBar = document.getElementById(`progressBar-${cardId}`);
+            const progressText = document.getElementById(`progressText-${cardId}`);
+            const statusBadge = document.getElementById(`status-${cardId}`);
+            const studentCount = document.getElementById(`studentCount-${cardId}`);
+            
+            if (progressBar && progressText && result.expected_student_count > 0) {
+                const percent = Math.round((result.processed_student_count / result.expected_student_count) * 100);
+                progressBar.style.width = percent + '%';
+                progressText.textContent = `${result.processed_student_count} / ${result.expected_student_count} ogrenci (${percent}%)`;
+            }
+            
+            if (result.parse_status === 'completed') {
+                activePolls.delete(cardId);
+                if (statusBadge) {
+                    statusBadge.textContent = 'Tamamlandi';
+                    statusBadge.className = 'status-badge status-completed';
+                }
+                if (studentCount) studentCount.textContent = result.student_count || 0;
+                
+                const progressContainer = document.getElementById(`progress-${cardId}`);
+                if (progressContainer) progressContainer.remove();
+                
+                showSuccessPopup(result.student_count, result.parse_error);
+                loadReportCards();
+                return;
+            }
+            
+            if (result.parse_status === 'failed') {
+                activePolls.delete(cardId);
+                if (statusBadge) {
+                    statusBadge.textContent = 'Hata';
+                    statusBadge.className = 'status-badge status-failed';
+                }
+                loadReportCards();
+                return;
+            }
+            
+            setTimeout(poll, 5000);
+        } catch (error) {
+            console.error('Polling error:', error);
+            retryCount++;
+            if (retryCount < maxRetries) {
+                setTimeout(poll, 8000);
+            } else {
+                activePolls.delete(cardId);
+            }
+        }
+    };
+    
+    poll();
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' });
+}
+
+async function handleDynamicUpload(e) {
+    e.preventDefault();
+    
+    const fileInput = document.getElementById('dynPdfFile');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('Lütfen bir PDF dosyası seçin');
+        return;
+    }
+    
+    const submitBtn = document.getElementById('dynSubmitBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Yükleniyor...';
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('exam_name', document.getElementById('dynExamName').value);
+    formData.append('publisher', document.getElementById('dynPublisher').value);
+    formData.append('class_name', document.getElementById('dynUploadClass').value);
+    
+    try {
+        console.log('Uploading file:', file.name, 'Size:', file.size);
+        const response = await fetch('/admin/report-cards/api/upload', {
+            method: 'POST',
+            body: formData,
+            credentials: 'include'
+        });
+        
+        console.log('Response status:', response.status);
+        
+        if (!response.ok) {
+            const text = await response.text();
+            console.error('Upload failed:', text);
+            alert('Yükleme başarısız: ' + response.status);
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Yükle ve İşle';
+            return;
+        }
+        
+        const result = await response.json();
+        console.log('Upload result:', result);
+        
+        if (result.success) {
+            closeDynamicModal();
+            loadReportCards();
+            pollParseStatus(result.report_card_id);
+        } else {
+            alert('Hata: ' + result.error);
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Yükle ve İşle';
+        }
+    } catch (error) {
+        console.error('Upload error:', error);
+        alert('Yükleme hatası: ' + error.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Yükle ve İşle';
+    }
+}
+
+// Çoklu PDF Sıralı Yükleme
+async function handleBatchUpload(e) {
+    e.preventDefault();
+    
+    const fileInput = document.getElementById('dynPdfFiles');
+    const files = Array.from(fileInput.files);
+    
+    if (files.length === 0) {
+        alert('Lütfen en az bir PDF dosyası seçin');
+        return;
+    }
+    
+    const publisher = document.getElementById('dynPublisher').value;
+    const className = document.getElementById('dynUploadClass').value;
+    const submitBtn = document.getElementById('dynSubmitBtn');
+    const queueDiv = document.getElementById('uploadQueue');
+    
+    // Dosyaları alfabetik sırala
+    files.sort((a, b) => a.name.localeCompare(b.name));
+    
+    // Kuyruk görünümünü oluştur
+    queueDiv.style.display = 'block';
+    queueDiv.innerHTML = files.map((f, i) => `
+        <div id="queue_${i}" style="display: flex; align-items: center; padding: 8px; margin-bottom: 4px; background: white; border-radius: 6px; border: 1px solid #e5e7eb;">
+            <span style="flex: 1;">${f.name.replace('.pdf', '')}</span>
+            <span id="status_${i}" style="font-size: 0.85rem; color: #6b7280;">Bekliyor</span>
+        </div>
+    `).join('');
+    
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Yükleniyor... (0/${files.length})';
+    
+    let successCount = 0;
+    let failCount = 0;
+    const reportCardIds = [];
+    
+    // Sıralı yükleme
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const examName = file.name.replace('.pdf', '').replace('.PDF', '');
+        const statusEl = document.getElementById(`status_${i}`);
+        const queueEl = document.getElementById(`queue_${i}`);
+        
+        // Durumu güncelle
+        statusEl.textContent = 'Yükleniyor...';
+        statusEl.style.color = '#3b82f6';
+        queueEl.style.borderColor = '#3b82f6';
+        
+        submitBtn.textContent = `Yükleniyor... (${i + 1}/${files.length})`;
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('exam_name', examName);
+        formData.append('publisher', publisher);
+        formData.append('class_name', className);
+        
+        try {
+            const response = await fetch('/admin/report-cards/api/upload', {
+                method: 'POST',
+                body: formData,
+                credentials: 'include'
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                successCount++;
+                reportCardIds.push(result.report_card_id);
+                statusEl.textContent = 'Yüklendi, işleniyor...';
+                statusEl.style.color = '#f59e0b';
+                queueEl.style.borderColor = '#f59e0b';
+                
+                // Parse durumunu takip et
+                pollBatchStatus(result.report_card_id, i);
+            } else {
+                failCount++;
+                statusEl.textContent = 'Hata: ' + (result.error || 'Bilinmeyen');
+                statusEl.style.color = '#ef4444';
+                queueEl.style.borderColor = '#ef4444';
+            }
+        } catch (error) {
+            failCount++;
+            statusEl.textContent = 'Hata: ' + error.message;
+            statusEl.style.color = '#ef4444';
+            queueEl.style.borderColor = '#ef4444';
+        }
+        
+        // Kısa bekleme (sunucu yükünü azaltmak için)
+        await new Promise(r => setTimeout(r, 500));
+    }
+    
+    submitBtn.textContent = `Tamamlandı: ${successCount} başarılı, ${failCount} hatalı`;
+    submitBtn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+    
+    // 2 saniye sonra listeyi güncelle
+    setTimeout(() => {
+        loadReportCards();
+    }, 2000);
+}
+
+// Batch için parse durumu takibi
+function pollBatchStatus(reportCardId, queueIndex) {
+    const statusEl = document.getElementById(`status_${queueIndex}`);
+    const queueEl = document.getElementById(`queue_${queueIndex}`);
+    
+    const checkStatus = async () => {
+        try {
+            const response = await fetch(`/admin/report-cards/api/status/${reportCardId}`);
+            const data = await response.json();
+            
+            if (data.parse_status === 'completed') {
+                statusEl.textContent = `Tamamlandı (${data.student_count} öğrenci)`;
+                statusEl.style.color = '#10b981';
+                queueEl.style.borderColor = '#10b981';
+                queueEl.style.background = '#f0fdf4';
+            } else if (data.parse_status === 'failed') {
+                statusEl.textContent = 'İşleme hatası';
+                statusEl.style.color = '#ef4444';
+                queueEl.style.borderColor = '#ef4444';
+            } else if (data.parse_status === 'processing') {
+                const progress = data.expected_student_count ? 
+                    Math.round((data.processed_student_count / data.expected_student_count) * 100) : 0;
+                statusEl.textContent = `İşleniyor... ${progress}%`;
+                setTimeout(checkStatus, 2000);
+            } else {
+                setTimeout(checkStatus, 2000);
+            }
+        } catch (error) {
+            console.error('Status check error:', error);
+        }
+    };
+    
+    setTimeout(checkStatus, 1000);
+}
+
+function closeUploadModal() {
+    const modal = document.getElementById('uploadModal');
+    modal.style.cssText = '';
+    modal.classList.remove('active');
+    const modalBox = modal.querySelector('.modal');
+    if (modalBox) modalBox.style.cssText = '';
+    document.body.style.overflow = '';
+    document.getElementById('uploadForm').reset();
+    selectedFile = null;
+    document.getElementById('dropZone').classList.remove('has-file');
+    document.getElementById('dropText').textContent = 'PDF dosyasını sürükleyin veya tıklayın';
+}
+
+function openFmtUploadModal() {
+    const modal = document.getElementById('fmtUploadModal');
+    modal.classList.add('active');
+    modal.style.cssText = 'display: flex !important; opacity: 1 !important; visibility: visible !important; pointer-events: auto !important;';
+    document.body.style.overflow = 'hidden';
+}
+
+function closeFmtUploadModal() {
+    const modal = document.getElementById('fmtUploadModal');
+    modal.style.cssText = '';
+    modal.classList.remove('active');
+    document.body.style.overflow = '';
+    document.getElementById('fmtUploadForm').reset();
+    selectedFmtFiles = [];
+    document.getElementById('fmtFileList').innerHTML = '';
+    document.getElementById('fmtDropText').innerHTML = 'FMT dosyalarını sürükleyin veya tıklayın<br><small>5, 6, 7, 8. sınıf dosyalarını aynı anda seçebilirsiniz</small>';
+    document.getElementById('fmtCaDropTextInline').innerHTML = '<strong>Excel dosyasını sürükleyin veya tıklayın</strong><br><small style="color: #666;">Format: Soru No | Kazanım | A Cevabı | B Soru No</small>';
+    document.getElementById('fmtCaDropZoneInline').style.borderColor = '#8b5cf6';
+    document.getElementById('fmtCaDropZoneInline').style.background = 'white';
+}
+
+function openFmtCaModal() {
+    const modal = document.getElementById('fmtCaModal');
+    modal.style.cssText = 'display: flex !important; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 10001; align-items: center; justify-content: center; background: rgba(0,0,0,0.5);';
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    document.getElementById('fmtCaResult').style.display = 'none';
+}
+
+function closeFmtCaModal() {
+    const modal = document.getElementById('fmtCaModal');
+    modal.style.cssText = '';
+    modal.classList.remove('active');
+    document.body.style.overflow = '';
+    document.getElementById('fmtCaUploadForm').reset();
+    document.getElementById('fmtCaDropText').innerHTML = 'Excel dosyasını sürükleyin veya tıklayın<br><small style="color: #666;">Format: Soru No | Kazanım | A Cevabı | B Soru No</small>';
+    document.getElementById('fmtCaResult').style.display = 'none';
+}
+
+function handleFmtCaFileSelect(input) {
+    const file = input.files[0];
+    if (file) {
+        document.getElementById('fmtCaDropText').innerHTML = `<strong>${file.name}</strong><br><small style="color: #22c55e;">Dosya seçildi</small>`;
+    }
+}
+
+function handleFmtCaFileSelectInline(input) {
+    const file = input.files[0];
+    if (file) {
+        document.getElementById('fmtCaDropTextInline').innerHTML = `<strong style="color: #22c55e;">${file.name}</strong><br><small style="color: #22c55e;">✓ Cevap anahtarı seçildi</small>`;
+        document.getElementById('fmtCaDropZoneInline').style.borderColor = '#22c55e';
+        document.getElementById('fmtCaDropZoneInline').style.background = '#f0fdf4';
+    }
+}
+
+async function handleFmtCaUpload(e) {
+    e.preventDefault();
+    
+    const fileInput = document.getElementById('fmtCaFile');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('Lütfen bir Excel dosyası seçin');
+        return;
+    }
+    
+    const examName = document.getElementById('fmtCaExamName').value;
+    const publisher = document.getElementById('fmtCaPublisher').value;
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('exam_name', examName);
+    formData.append('publisher', publisher);
+    
+    const submitBtn = document.getElementById('fmtCaSubmitBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Yükleniyor...';
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/upload-fmt-answer-key', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            const resultDiv = document.getElementById('fmtCaResult');
+            resultDiv.innerHTML = `
+                <h4 style="margin: 0 0 10px 0; color: #166534;">Cevap Anahtarı Yüklendi!</h4>
+                <p style="margin: 5px 0;"><strong>Sınav:</strong> ${data.exam_name}</p>
+                <p style="margin: 5px 0;"><strong>Sınıf:</strong> ${data.grade || 'Belirtilmemiş'}. Sınıf</p>
+                <p style="margin: 5px 0;"><strong>Toplam Soru:</strong> ${data.total_questions}</p>
+                <p style="margin: 5px 0;"><strong>Dersler:</strong></p>
+                <ul style="margin: 5px 0; padding-left: 20px;">
+                    ${data.subjects.map(s => `<li>${s}</li>`).join('')}
+                </ul>
+                ${data.has_kazanimlar ? '<p style="margin: 5px 0; color: #059669;"><strong>Kazanım bilgileri kaydedildi</strong></p>' : ''}
+            `;
+            resultDiv.style.display = 'block';
+            
+            document.getElementById('fmtCaUploadForm').reset();
+            document.getElementById('fmtCaDropText').innerHTML = 'Excel dosyasını sürükleyin veya tıklayın<br><small style="color: #666;">Format: Soru No | Kazanım | A Cevabı | B Soru No</small>';
+        } else {
+            alert('Hata: ' + (data.error || 'Bilinmeyen hata'));
+        }
+    } catch (error) {
+        console.error('FMT CA upload error:', error);
+        alert('Yükleme hatası: ' + error.message);
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Yükle ve Kaydet';
+    }
+}
+
+function handleFmtFileSelect(input) {
+    const files = Array.from(input.files);
+    if (files.length > 0) {
+        selectedFmtFiles = files;
+        const fileListHtml = files.map(f => `<div style="padding: 5px 10px; background: #e8f5e9; border-radius: 4px; margin: 2px 0;">📋 ${f.name}</div>`).join('');
+        document.getElementById('fmtFileList').innerHTML = fileListHtml;
+        document.getElementById('fmtDropText').innerHTML = `<strong>${files.length} dosya seçildi</strong>`;
+    }
+}
+
+function updateFmtQuestionCounts() {
+    const grade = document.getElementById('fmtGradeSelect').value;
+    const link = document.getElementById('downloadTemplateLink');
+    link.href = `/admin/report-cards/api/fmt-answer-key-template?grade=${grade}`;
+    
+    if (grade === '5' || grade === '6') {
+        document.getElementById('qTurkce').textContent = '15';
+        document.getElementById('qSosyal').textContent = '10';
+        document.getElementById('qDin').textContent = '10';
+        document.getElementById('qIng').textContent = '10';
+        document.getElementById('qMat').textContent = '15';
+        document.getElementById('qFen').textContent = '15';
+        
+        document.getElementById('answerTurkceA').maxLength = 15;
+        document.getElementById('answerTurkceB').maxLength = 15;
+        document.getElementById('answerMatematikA').maxLength = 15;
+        document.getElementById('answerMatematikB').maxLength = 15;
+        document.getElementById('answerFenA').maxLength = 15;
+        document.getElementById('answerFenB').maxLength = 15;
+    } else {
+        document.getElementById('qTurkce').textContent = '20';
+        document.getElementById('qSosyal').textContent = '10';
+        document.getElementById('qDin').textContent = '10';
+        document.getElementById('qIng').textContent = '10';
+        document.getElementById('qMat').textContent = '20';
+        document.getElementById('qFen').textContent = '20';
+        
+        document.getElementById('answerTurkceA').maxLength = 20;
+        document.getElementById('answerTurkceB').maxLength = 20;
+        document.getElementById('answerMatematikA').maxLength = 20;
+        document.getElementById('answerMatematikB').maxLength = 20;
+        document.getElementById('answerFenA').maxLength = 20;
+        document.getElementById('answerFenB').maxLength = 20;
+    }
+}
+
+async function handleFmtUpload(e) {
+    e.preventDefault();
+    
+    const fileInput = document.getElementById('fmtFiles');
+    const files = fileInput ? fileInput.files : selectedFmtFiles;
+    
+    if (!files || files.length === 0) {
+        alert('Lütfen en az bir FMT dosyası seçin');
+        return;
+    }
+    
+    const fmtCaFile = document.getElementById('fmtCaFileInline').files[0];
+    if (!fmtCaFile) {
+        alert('Lütfen kazanımlı cevap anahtarı (FMT CA) Excel dosyası seçin');
+        return;
+    }
+    
+    const examName = document.getElementById('fmtExamName').value;
+    const publisher = document.getElementById('fmtPublisher').value;
+    
+    const formData = new FormData();
+    formData.append('exam_name', examName);
+    formData.append('publisher', publisher);
+    formData.append('answer_key_excel', fmtCaFile);
+    
+    for (let i = 0; i < files.length; i++) {
+        formData.append('files[]', files[i]);
+    }
+    
+    const submitBtn = document.getElementById('fmtSubmitBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Yükleniyor...';
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/upload-fmt', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            let msg = `Başarılı! ${data.student_count} öğrenci işleniyor...`;
+            if (data.has_answer_key_a || data.has_answer_key_b) {
+                msg += '\nCevap anahtarı kullanılarak skorlar hesaplandı.';
+                if (data.has_answer_key_a && data.has_answer_key_b) {
+                    msg += ' (A ve B kitapçık)';
+                } else if (data.has_answer_key_a) {
+                    msg += ' (Sadece A kitapçık)';
+                }
+            } else {
+                msg += '\nCevap anahtarı girilmedi, sadece öğrenci cevapları kaydedildi.';
+            }
+            alert(msg);
+            closeFmtUploadModal();
+            loadReportCards();
+        } else {
+            alert('Hata: ' + (data.error || 'Bilinmeyen hata'));
+        }
+    } catch (error) {
+        console.error('FMT upload error:', error);
+        alert('Yükleme hatası: ' + error.message);
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Yükle ve İşle';
+    }
+}
+
+function handleFileSelect(input) {
+    const file = input.files[0];
+    if (file) {
+        selectedFile = file;
+        document.getElementById('dropZone').classList.add('has-file');
+        document.getElementById('dropText').textContent = `✓ ${file.name}`;
+    }
+}
+
+async function handleUpload(e) {
+    e.preventDefault();
+    
+    // Dinamik formdan dosyayı al
+    const fileInput = document.getElementById('pdfFile');
+    const file = fileInput ? fileInput.files[0] : selectedFile;
+    
+    if (!file) {
+        alert('Lütfen bir PDF dosyası seçin');
+        return;
+    }
+    
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Yükleniyor...';
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('exam_name', document.getElementById('examName').value);
+    formData.append('publisher', document.getElementById('publisher').value);
+    formData.append('class_name', document.getElementById('uploadClass').value);
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/upload', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            closeDynamicModal();
+            loadReportCards();
+            
+            // Parse durumunu takip et
+            pollParseStatus(result.report_card_id);
+        } else {
+            alert('Hata: ' + result.error);
+        }
+    } catch (error) {
+        alert('Yükleme hatası: ' + error.message);
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Yükle ve İşle';
+    }
+}
+
+async function pollParseStatus(reportCardId) {
+    // İlerleme modalını göster
+    showProgressModal();
+    
+    const checkStatus = async () => {
+        try {
+            const response = await fetch(`/admin/report-cards/api/status/${reportCardId}`);
+            const result = await response.json();
+            
+            // İlerleme göstergesini güncelle
+            updateProgress(result.processed_student_count || 0, result.expected_student_count || 0);
+            
+            if (result.parse_status === 'completed') {
+                closeProgressModal();
+                loadReportCards();
+                // Başarı popup'ı göster
+                showSuccessPopup(result.student_count, result.parse_error);
+                return;
+            }
+            
+            if (result.parse_status === 'failed') {
+                closeProgressModal();
+                loadReportCards();
+                alert('Karne işleme hatası: ' + (result.parse_error || 'Bilinmeyen hata'));
+                return;
+            }
+            
+            // Hala işleniyor, tekrar kontrol et
+            setTimeout(checkStatus, 2000);
+        } catch (error) {
+            console.error('Status check error:', error);
+        }
+    };
+    
+    checkStatus();
+}
+
+function showProgressModal() {
+    let modal = document.getElementById('progressModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'progressModal';
+        modal.className = 'modal active';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 400px; text-align: center;">
+                <h2 style="margin-bottom: 20px;">PDF İşleniyor</h2>
+                <div style="background: #e5e7eb; border-radius: 10px; height: 24px; overflow: hidden; margin-bottom: 15px;">
+                    <div id="progressBar" style="background: linear-gradient(90deg, #3b82f6, #10b981); height: 100%; width: 0%; transition: width 0.3s ease; border-radius: 10px;"></div>
+                </div>
+                <div id="progressText" style="font-size: 18px; font-weight: 600; color: #374151;">0 / 0 öğrenci</div>
+                <p style="color: #6b7280; margin-top: 10px; font-size: 14px;">Lütfen bekleyin, bu işlem birkaç dakika sürebilir...</p>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+    modal.classList.add('active');
+}
+
+function updateProgress(processed, expected) {
+    const bar = document.getElementById('progressBar');
+    const text = document.getElementById('progressText');
+    if (bar && text) {
+        const percent = expected > 0 ? Math.round((processed / expected) * 100) : 0;
+        bar.style.width = percent + '%';
+        text.textContent = `${processed} / ${expected} öğrenci (${percent}%)`;
+    }
+}
+
+function closeProgressModal() {
+    const modal = document.getElementById('progressModal');
+    if (modal) modal.classList.remove('active');
+}
+
+function showSuccessPopup(studentCount, statsMessage) {
+    const modal = document.getElementById('successModal');
+    document.getElementById('successStudentCount').textContent = studentCount || 0;
+    document.getElementById('successStats').textContent = statsMessage || 'İşlem tamamlandı';
+    modal.classList.add('active');
+}
+
+function closeSuccessModal() {
+    document.getElementById('successModal').classList.remove('active');
+}
+
+async function viewStudents(reportCardId, examName) {
+    // Remove existing modal if any
+    const existing = document.getElementById('dynamicStudentsModal');
+    if (existing) existing.remove();
+    
+    // Create dynamic modal
+    const modal = document.createElement('div');
+    modal.id = 'dynamicStudentsModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;justify-content:center;align-items:center;z-index:2147483647;';
+    modal.innerHTML = `
+        <div style="background:white;border-radius:16px;padding:24px;width:90%;max-width:700px;max-height:90vh;overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <h2 style="font-size:1.25rem;font-weight:600;margin:0;">${examName} - Öğrenciler</h2>
+                <button onclick="document.getElementById('dynamicStudentsModal').remove()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:#6b7280;">&times;</button>
+            </div>
+            <div id="dynamicStudentsList"><p style="text-align:center;padding:20px;">Yükleniyor...</p></div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    
+    try {
+        const response = await fetch(`/admin/report-cards/api/students/${reportCardId}`);
+        const students = await response.json();
+        
+        if (students.length === 0) {
+            document.getElementById('dynamicStudentsList').innerHTML = '<p style="text-align:center; padding:20px;">Öğrenci bulunamadı</p>';
+            return;
+        }
+        
+        document.getElementById('dynamicStudentsList').innerHTML = students.map(s => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid #e5e7eb;">
+                <div>
+                    <div style="font-weight:500;">${s.student_name}</div>
+                    <small style="color:#6b7280;">${s.class_name || ''} ${s.matched_user_name ? '✓ Eşleşti' : '⚠ Eşleşmedi'}</small>
+                </div>
+                <div style="display:flex;gap:16px;font-size:0.875rem;">
+                    <span>Net: ${s.total_net || 0}</span>
+                    <span>LGS: ${s.lgs_score || '-'}</span>
+                    <span>%${s.percentile || '-'}</span>
+                </div>
+            </div>
+        `).join('');
+        
+    } catch (error) {
+        document.getElementById('dynamicStudentsList').innerHTML = '<p style="text-align:center; padding:20px; color:#dc2626;">Hata oluştu</p>';
+    }
+}
+
+function closeStudentsModal() {
+    document.getElementById('studentsModal').classList.remove('active');
+}
+
+async function deleteCard(reportCardId) {
+    if (!confirm('Bu karneyi silmek istediğinizden emin misiniz? Tüm öğrenci verileri de silinecek.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/admin/report-cards/api/delete/${reportCardId}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            loadReportCards();
+        } else {
+            alert('Silme hatası: ' + result.error);
+        }
+    } catch (error) {
+        alert('Silme hatası: ' + error.message);
+    }
+}
+
+async function reprocessAllPDFs() {
+    if (!confirm('Tüm PDF karneler yeniden işlenecek. Bu işlem biraz zaman alabilir. Devam etmek istiyor musunuz?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/reprocess-all', {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(result.message);
+            setTimeout(() => loadReportCards(), 2000);
+        } else {
+            alert('Yeniden işleme hatası: ' + result.error);
+        }
+    } catch (error) {
+        alert('Hata: ' + error.message);
+    }
+}
+
+async function migrateLocalPDFs() {
+    if (!confirm('Yerel PDF dosyaları Object Storage\'a aktarılacak ve veritabanına eklenecek. Devam etmek istiyor musunuz?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/migrate-local-pdfs', {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(result.message + '\n\nToplam: ' + result.total_files + ' dosya\nAktarılan: ' + result.migrated);
+            setTimeout(() => loadReportCards(), 2000);
+        } else {
+            alert('Aktarım hatası: ' + result.error);
+        }
+    } catch (error) {
+        alert('Hata: ' + error.message);
+    }
+}
+
+async function reprocessSinglePDF(reportCardId) {
+    if (!confirm('Bu sınavın PDF dosyası yeniden işlenecek. Devam etmek istiyor musunuz?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/admin/report-cards/api/reprocess/${reportCardId}`, {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(result.message);
+            setTimeout(() => loadReportCards(), 2000);
+        } else {
+            alert('Yeniden işleme hatası: ' + result.error);
+        }
+    } catch (error) {
+        alert('Hata: ' + error.message);
+    }
+}
+
+let errorReportExams = [];
+let errorReportStudents = [];
+
+function openErrorReportModal() {
+    const existing = document.getElementById('dynamicErrorReportModal');
+    if (existing) existing.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'dynamicErrorReportModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;justify-content:center;align-items:center;z-index:2147483647;';
+    modal.innerHTML = `
+        <div style="background:white;border-radius:16px;padding:24px;width:90%;max-width:600px;max-height:90vh;overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <h2 style="font-size:1.25rem;font-weight:600;margin:0;">Hata Karnesi Oluştur</h2>
+                <button onclick="closeErrorReportModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:#6b7280;">&times;</button>
+            </div>
+            <div style="margin-bottom:16px;">
+                <label style="display:block;font-weight:500;margin-bottom:6px;">Sınav Seçin *</label>
+                <select id="errorReportExam" onchange="loadStudentsForExam()" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:0.95rem;box-sizing:border-box;">
+                    <option value="">Sınav Yükleniyor...</option>
+                </select>
+            </div>
+            <div style="margin-bottom:16px;">
+                <label style="display:block;font-weight:500;margin-bottom:6px;">Öğrenci Seçin</label>
+                <select id="errorReportStudent" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:0.95rem;box-sizing:border-box;">
+                    <option value="">Önce sınav seçin</option>
+                </select>
+            </div>
+            <button onclick="generateNewErrorReport()" style="width:100%;padding:12px;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;border:none;border-radius:8px;font-size:1rem;font-weight:500;cursor:pointer;">
+                Hata Karnesi Görüntüle
+            </button>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    loadExamsForErrorReportNew();
+}
+
+async function loadExamsForErrorReportNew() {
+    const select = document.getElementById('errorReportExam');
+    try {
+        const response = await fetch('/admin/report-cards/api/exams-list');
+        const data = await response.json();
+        
+        select.innerHTML = '<option value="">-- Sınav Seçin --</option>';
+        if (data.exams && data.exams.length > 0) {
+            data.exams.forEach(e => {
+                select.innerHTML += `<option value="${e.id}">${e.exam_name} (${e.student_count} öğrenci)</option>`;
+            });
+        } else {
+            select.innerHTML = '<option value="">Sınav bulunamadı</option>';
+        }
+    } catch (err) {
+        select.innerHTML = '<option value="">Hata: ' + err.message + '</option>';
+    }
+}
+
+async function loadStudentsForExam() {
+    const examId = document.getElementById('errorReportExam').value;
+    const select = document.getElementById('errorReportStudent');
+    
+    if (!examId) {
+        select.innerHTML = '<option value="">Önce sınav seçin</option>';
+        return;
+    }
+    
+    select.innerHTML = '<option value="">Yükleniyor...</option>';
+    
+    try {
+        const response = await fetch(`/admin/report-cards/api/exam-students/${examId}`);
+        if (!response.ok) {
+            const text = await response.text();
+            console.error('API error:', response.status, text);
+            select.innerHTML = '<option value="">API hatası: ' + response.status + '</option>';
+            return;
+        }
+        const data = await response.json();
+        
+        select.innerHTML = '<option value="">-- Öğrenci Seçin --</option>';
+        if (data.students && data.students.length > 0) {
+            data.students.forEach(s => {
+                select.innerHTML += `<option value="${s.id}">${s.student_name} (${s.class_name})</option>`;
+            });
+        } else {
+            select.innerHTML = '<option value="">Öğrenci bulunamadı</option>';
+        }
+    } catch (err) {
+        console.error('Fetch error:', err);
+        select.innerHTML = '<option value="">Hata: ' + err.message + '</option>';
+    }
+}
+
+async function generateNewErrorReport() {
+    const resultId = document.getElementById('errorReportStudent').value;
+    if (!resultId) {
+        alert('Lütfen bir öğrenci seçin');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/admin/report-cards/api/student-error-report/${resultId}`);
+        const data = await response.json();
+        
+        if (data.error) {
+            alert('Hata: ' + data.error);
+            return;
+        }
+        
+        showErrorReportResult(data, resultId);
+    } catch (err) {
+        alert('Hata: ' + err.message);
+    }
+}
+
+function showErrorReportResult(data, resultId) {
+    closeErrorReportModal();
+    
+    let html = `<h3>${data.student_name} - ${data.class_name}</h3><h4>${data.exam_name}</h4>`;
+    
+    for (const [subj, info] of Object.entries(data.errors_by_subject || {})) {
+        html += `<div style="margin-top:16px;"><strong>${info.subject_label || subj}</strong>`;
+        html += `<p>Doğru: ${info.correct_count}, Yanlış: ${info.wrong_count}, Boş: ${info.blank_count}</p>`;
+        if (info.wrong_answers && info.wrong_answers.length > 0) {
+            html += '<p style="color:#ef4444;">Yanlış: ' + info.wrong_answers.map(w => `S${w.question_number}`).join(', ') + '</p>';
+        }
+        html += '</div>';
+    }
+    
+    html += `<div style="margin-top:20px;"><a href="/admin/report-cards/api/student-error-pdf/${resultId}" target="_blank" style="display:inline-block;padding:10px 20px;background:#ef4444;color:white;border-radius:8px;text-decoration:none;">PDF İndir</a></div>`;
+    
+    const modal = document.createElement('div');
+    modal.id = 'errorResultModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;justify-content:center;align-items:center;z-index:2147483647;';
+    modal.innerHTML = `<div style="background:white;border-radius:16px;padding:24px;width:90%;max-width:700px;max-height:90vh;overflow-y:auto;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;"><h2 style="margin:0;">Hata Karnesi</h2><button onclick="document.getElementById('errorResultModal').remove()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;">&times;</button></div>${html}</div>`;
+    document.body.appendChild(modal);
+}
+
+function closeErrorReportModal() {
+    const modal = document.getElementById('dynamicErrorReportModal');
+    if (modal) modal.remove();
+}
+
+async function loadExamsForErrorReport() {
+    const className = document.getElementById('errorReportClass').value;
+    const checkboxContainer = document.getElementById('examCheckboxes');
+    const studentSelect = document.getElementById('errorReportStudent');
+    
+    if (!className) {
+        checkboxContainer.innerHTML = '<p style="color: #6b7280;">Önce sınıf seçin</p>';
+        studentSelect.innerHTML = '<option value="">Tüm Sınıf</option>';
+        return;
+    }
+    
+    checkboxContainer.innerHTML = '<p style="color: #6b7280;">Yükleniyor...</p>';
+    
+    try {
+        const response = await fetch(`/admin/report-cards/api/list?class_name=${encodeURIComponent(className)}`);
+        errorReportExams = await response.json();
+        
+        if (errorReportExams.length === 0) {
+            checkboxContainer.innerHTML = '<p style="color: #6b7280;">Bu sınıf için karne bulunamadı</p>';
+            return;
+        }
+        
+        checkboxContainer.innerHTML = errorReportExams
+            .filter(e => e.parse_status === 'completed')
+            .map(exam => `
+                <label style="display: block; padding: 8px; cursor: pointer;">
+                    <input type="checkbox" class="exam-checkbox" value="${exam.id}" onchange="updateStudentListForExams()">
+                    ${exam.exam_name} (${exam.student_count} öğrenci)
+                </label>
+            `).join('');
+        
+        // İlk yükleme için öğrenci listesini temizle
+        studentSelect.innerHTML = '<option value="">Önce sınav seçin</option>';
+        
+    } catch (error) {
+        console.error('Load exams error:', error);
+        checkboxContainer.innerHTML = '<p style="color: #dc2626;">Yüklenirken hata oluştu</p>';
+    }
+}
+
+async function updateStudentListForExams() {
+    const selectedExams = Array.from(document.querySelectorAll('.exam-checkbox:checked')).map(cb => parseInt(cb.value));
+    const studentSelect = document.getElementById('errorReportStudent');
+    
+    if (selectedExams.length === 0) {
+        studentSelect.innerHTML = '<option value="">Önce sınav seçin</option>';
+        return;
+    }
+    
+    studentSelect.innerHTML = '<option value="">Yükleniyor...</option>';
+    
+    try {
+        const classFilter = document.getElementById('classFilter').value;
+        const response = await fetch('/admin/report-cards/api/students-by-exams', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ report_card_ids: selectedExams, class_name: classFilter })
+        });
+        
+        errorReportStudents = await response.json();
+        
+        studentSelect.innerHTML = '<option value="">Tüm Sınıf</option>';
+        errorReportStudents.forEach(s => {
+            const inAllExams = s.in_all_exams ? '' : ' (bazı sınavlarda yok)';
+            const optionValue = s.user_id ? `id:${s.user_id}` : `name:${s.student_name}`;
+            studentSelect.innerHTML += `<option value="${optionValue}" ${!s.in_all_exams ? 'style="color:#f59e0b"' : ''}>${s.student_name}${inAllExams}</option>`;
+        });
+    } catch (error) {
+        console.error('Load students error:', error);
+        studentSelect.innerHTML = '<option value="">Hata oluştu</option>';
+    }
+}
+
+function generateErrorReportPDF() {
+    const selectedExams = Array.from(document.querySelectorAll('.exam-checkbox:checked')).map(cb => cb.value);
+    const studentValue = document.getElementById('errorReportStudent').value;
+    
+    if (selectedExams.length === 0) {
+        alert('En az bir sınav seçin');
+        return;
+    }
+    
+    let params = new URLSearchParams();
+    params.append('report_card_ids', selectedExams.join(','));
+    
+    if (studentValue) {
+        if (studentValue.startsWith('id:')) {
+            params.append('student_user_id', studentValue.replace('id:', ''));
+        } else if (studentValue.startsWith('name:')) {
+            params.append('student_name_filter', studentValue.replace('name:', ''));
+        }
+    }
+    
+    // GET ile PDF indir - APK uyumlu
+    window.open('/admin/report-cards/api/error-report-pdf?' + params.toString(), '_blank');
+    closeErrorReportModal();
+}
+
+function openOutcomesModal() {
+    const existing = document.getElementById('dynamicOutcomesModal');
+    if (existing) existing.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'dynamicOutcomesModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;justify-content:center;align-items:center;z-index:2147483647;';
+    modal.innerHTML = `
+        <div style="background:white;border-radius:16px;padding:24px;width:90%;max-width:600px;max-height:90vh;overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <h2 style="font-size:1.25rem;font-weight:600;margin:0;">Kazanım Yönetimi</h2>
+                <button onclick="closeOutcomesModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:#6b7280;">&times;</button>
+            </div>
+            <div id="outcomesStats" style="background:#f3f4f6;padding:16px;border-radius:8px;margin-bottom:16px;">
+                <p style="color:#6b7280;">Yükleniyor...</p>
+            </div>
+            <div style="background:#eff6ff;padding:12px;border-radius:8px;margin-bottom:16px;">
+                <p style="margin:0 0 8px 0;font-weight:500;color:#1e40af;">📥 Önce şablonu indirin:</p>
+                <button onclick="window.open('/admin/report-cards/api/outcomes/template','_blank')" style="padding:10px 20px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:500;">
+                    📄 Excel Şablonu İndir
+                </button>
+            </div>
+            <div style="margin-bottom:16px;">
+                <label style="display:block;font-weight:500;margin-bottom:6px;">Kazanım Dosyası (Excel/CSV)</label>
+                <input type="file" id="outcomesFile" accept=".xlsx,.xls,.csv,.json" style="width:100%;padding:10px;border:2px dashed #d1d5db;border-radius:8px;box-sizing:border-box;">
+            </div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                <button onclick="uploadOutcomes()" style="flex:1;min-width:120px;padding:12px;background:linear-gradient(135deg,#10b981,#059669);color:white;border:none;border-radius:8px;font-size:1rem;font-weight:500;cursor:pointer;">
+                    Yükle
+                </button>
+                <button onclick="fixSubjectNames()" style="flex:1;min-width:120px;padding:12px;background:linear-gradient(135deg,#f59e0b,#d97706);color:white;border:none;border-radius:8px;font-size:1rem;font-weight:500;cursor:pointer;">
+                    🔧 Dersleri Düzelt
+                </button>
+                <button onclick="syncOutcomeTexts()" style="flex:1;min-width:120px;padding:12px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:white;border:none;border-radius:8px;font-size:1rem;font-weight:500;cursor:pointer;">
+                    🔄 Güncelle
+                </button>
+                <button onclick="clearOutcomes()" style="flex:1;min-width:120px;padding:12px;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;border:none;border-radius:8px;font-size:1rem;font-weight:500;cursor:pointer;">
+                    Tümünü Sil
+                </button>
+            </div>
+            <p style="color:#6b7280;font-size:0.85rem;margin-top:12px;">💡 "Dersleri Düzelt" butonu farklı isimleri (Din/Din Kültürü gibi) birleştirir. "Güncelle" sınav verileriyle eşleştirir.</p>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    loadOutcomes();
+}
+
+function closeOutcomesModal() {
+    const modal = document.getElementById('dynamicOutcomesModal');
+    if (modal) modal.remove();
+}
+
+async function loadOutcomes() {
+    const container = document.getElementById('outcomesStats');
+    try {
+        const response = await fetch('/admin/report-cards/api/outcomes');
+        const data = await response.json();
+        
+        if (data.total === 0) {
+            container.innerHTML = '<p style="color: #6b7280;">Henüz kazanım yüklenmemiş</p>';
+        } else {
+            let html = `<p style="margin-bottom: 12px;"><strong>Toplam ${data.total} kazanım kayıtlı</strong></p><div style="display: flex; flex-wrap: wrap; gap: 8px;">`;
+            const subjectNames = {'turkce': 'Türkçe', 'matematik': 'Matematik', 'fen': 'Fen', 'inkilap': 'İnkılap', 'din': 'Din', 'ingilizce': 'İngilizce'};
+            for (const [subj, items] of Object.entries(data.by_subject)) {
+                html += `<span style="background: #e5e7eb; padding: 4px 12px; border-radius: 16px; font-size: 0.85rem;">${subjectNames[subj] || subj}: ${items.length}</span>`;
+            }
+            html += '</div>';
+            container.innerHTML = html;
+        }
+    } catch (error) {
+        container.innerHTML = '<p style="color: #ef4444;">Yüklenirken hata oluştu</p>';
+    }
+}
+
+async function uploadOutcomes() {
+    const fileInput = document.getElementById('outcomesFile');
+    if (!fileInput.files[0]) {
+        alert('Lütfen bir dosya seçin');
+        return;
+    }
+    
+    const btn = document.querySelector('#dynamicOutcomesModal button[onclick="uploadOutcomes()"]');
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Yükleniyor...';
+    }
+    
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/outcomes/upload', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            alert(`Başarılı! ${result.inserted} yeni kazanım eklendi, ${result.updated} güncellendi.`);
+            loadOutcomes();
+            fileInput.value = '';
+        } else {
+            alert('Hata: ' + result.error);
+        }
+    } catch (error) {
+        alert('Yükleme hatası: ' + error.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Yükle';
+        }
+    }
+}
+
+async function syncOutcomeTexts() {
+    if (!confirm('Yüklenen kazanım isimleri sınav verileriyle eşleştirilecek. Devam edilsin mi?')) return;
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/outcomes/sync', { method: 'POST' });
+        const result = await response.json();
+        
+        if (response.ok) {
+            let msg = `${result.message}\n\n`;
+            msg += `Güncellenen kayıt: ${result.updated_records}\n`;
+            if (result.auto_added_outcomes > 0) {
+                msg += `PDF'lerden eklenen yeni kazanım: ${result.auto_added_outcomes}\n`;
+            }
+            msg += `Veritabanındaki kazanım: ${result.total_outcomes_in_db}\n`;
+            msg += `Eşleşen: ${result.matched_outcomes}/${result.total_outcomes_in_exams}`;
+            
+            if (result.unmatched_samples && result.unmatched_samples.length > 0) {
+                msg += `\n\nEşleşmeyen kazanım örnekleri:\n${result.unmatched_samples.join(', ')}`;
+            }
+            alert(msg);
+        } else {
+            alert('Hata: ' + result.error);
+        }
+    } catch (error) {
+        alert('Güncelleme hatası: ' + error.message);
+    }
+}
+
+async function fixSubjectNames() {
+    // Ders birleştirme modalını aç
+    const existing = document.getElementById('mergeSubjectsModal');
+    if (existing) existing.remove();
+    
+    // Mevcut ders adlarını getir
+    try {
+        const response = await fetch('/admin/report-cards/api/outcomes/subjects');
+        const data = await response.json();
+        
+        if (!data.subjects || data.subjects.length === 0) {
+            alert('Henüz kayıtlı ders yok');
+            return;
+        }
+        
+        const modal = document.createElement('div');
+        modal.id = 'mergeSubjectsModal';
+        modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;justify-content:center;align-items:center;z-index:2147483648;';
+        modal.innerHTML = `
+            <div style="background:white;border-radius:16px;padding:24px;width:90%;max-width:500px;max-height:90vh;overflow-y:auto;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                    <h2 style="font-size:1.25rem;font-weight:600;margin:0;">Dersleri Birleştir</h2>
+                    <button onclick="document.getElementById('mergeSubjectsModal').remove()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:#6b7280;">&times;</button>
+                </div>
+                <p style="color:#6b7280;margin-bottom:16px;">Birleştirilecek dersleri seçin, sonra hedef ders adını girin:</p>
+                <div id="subjectCheckboxes" style="max-height:200px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin-bottom:16px;">
+                    ${data.subjects.map(s => `
+                        <label style="display:flex;align-items:center;padding:8px;cursor:pointer;border-bottom:1px solid #f3f4f6;">
+                            <input type="checkbox" name="mergeSubject" value="${s.subject}" style="margin-right:12px;">
+                            <span style="flex:1;">${s.subject}</span>
+                            <span style="background:#e5e7eb;padding:2px 8px;border-radius:12px;font-size:0.85rem;">${s.count}</span>
+                        </label>
+                    `).join('')}
+                </div>
+                <div style="margin-bottom:16px;">
+                    <label style="display:block;font-weight:500;margin-bottom:6px;">Hedef Ders Adı *</label>
+                    <input type="text" id="targetSubjectName" placeholder="Örn: din, fen, matematik" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:0.95rem;box-sizing:border-box;">
+                    <p style="font-size:0.8rem;color:#6b7280;margin-top:4px;">Seçtiğiniz tüm dersler bu ada dönüştürülecek</p>
+                </div>
+                <button onclick="executeMergeSubjects()" style="width:100%;padding:12px;background:linear-gradient(135deg,#f59e0b,#d97706);color:white;border:none;border-radius:8px;font-size:1rem;font-weight:500;cursor:pointer;">
+                    Birleştir
+                </button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    } catch (error) {
+        alert('Ders listesi yüklenemedi: ' + error.message);
+    }
+}
+
+async function executeMergeSubjects() {
+    const checkboxes = document.querySelectorAll('input[name="mergeSubject"]:checked');
+    const sources = Array.from(checkboxes).map(cb => cb.value);
+    const target = document.getElementById('targetSubjectName').value.trim();
+    
+    if (sources.length === 0) {
+        alert('Lütfen en az bir ders seçin');
+        return;
+    }
+    if (!target) {
+        alert('Lütfen hedef ders adı girin');
+        return;
+    }
+    
+    if (!confirm(`${sources.length} ders "${target}" olarak birleştirilecek. Devam?`)) return;
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/outcomes/merge-subjects', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sources, target })
+        });
+        const result = await response.json();
+        
+        if (response.ok) {
+            let msg = `${result.merged} kazanım birleştirildi`;
+            if (result.duplicates_removed > 0) {
+                msg += `, ${result.duplicates_removed} tekrar kaldırıldı`;
+            }
+            msg += '\n\nYeni durum:\n';
+            result.subjects.forEach(s => {
+                msg += `${s.subject}: ${s.count}\n`;
+            });
+            alert(msg);
+            document.getElementById('mergeSubjectsModal').remove();
+            loadOutcomes();
+        } else {
+            alert('Hata: ' + result.error);
+        }
+    } catch (error) {
+        alert('Birleştirme hatası: ' + error.message);
+    }
+}
+
+async function clearOutcomes() {
+    // Ders seçme modalı göster
+    const existing = document.getElementById('deleteOutcomesModal');
+    if (existing) existing.remove();
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/outcomes/subjects');
+        const data = await response.json();
+        
+        if (!data.subjects || data.subjects.length === 0) {
+            alert('Silinecek kazanım bulunamadı');
+            return;
+        }
+        
+        const modal = document.createElement('div');
+        modal.id = 'deleteOutcomesModal';
+        modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10001;';
+        
+        let checkboxes = data.subjects.map(s => `
+            <label style="display:flex;align-items:center;gap:8px;padding:8px;background:#f3f4f6;border-radius:6px;cursor:pointer;">
+                <input type="checkbox" name="deleteSubject" value="${s.subject}" style="width:18px;height:18px;">
+                <span>${s.subject}</span>
+                <span style="color:#6b7280;font-size:0.85rem;">(${s.count} kazanım)</span>
+            </label>
+        `).join('');
+        
+        modal.innerHTML = `
+            <div style="background:white;padding:24px;border-radius:12px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto;">
+                <h3 style="margin:0 0 16px 0;">🗑️ Kazanım Sil</h3>
+                <p style="color:#6b7280;margin-bottom:16px;">Silmek istediğiniz dersleri seçin:</p>
+                <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px;">
+                    ${checkboxes}
+                </div>
+                <div style="display:flex;gap:12px;">
+                    <button onclick="deleteSelectedOutcomes()" style="flex:1;padding:12px;background:#ef4444;color:white;border:none;border-radius:8px;font-weight:500;cursor:pointer;">
+                        Seçilenleri Sil
+                    </button>
+                    <button onclick="deleteAllOutcomes()" style="flex:1;padding:12px;background:#dc2626;color:white;border:none;border-radius:8px;font-weight:500;cursor:pointer;">
+                        Tümünü Sil
+                    </button>
+                    <button onclick="document.getElementById('deleteOutcomesModal').remove()" style="padding:12px 24px;background:#6b7280;color:white;border:none;border-radius:8px;cursor:pointer;">
+                        İptal
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    } catch (error) {
+        alert('Hata: ' + error.message);
+    }
+}
+
+async function deleteSelectedOutcomes() {
+    const checkboxes = document.querySelectorAll('input[name="deleteSubject"]:checked');
+    if (checkboxes.length === 0) {
+        alert('Lütfen en az bir ders seçin');
+        return;
+    }
+    
+    const subjects = Array.from(checkboxes).map(cb => cb.value);
+    if (!confirm(`${subjects.join(', ')} dersleri silinecek. Emin misiniz?`)) return;
+    
+    try {
+        const params = subjects.map(s => `subjects=${encodeURIComponent(s)}`).join('&');
+        const response = await fetch(`/admin/report-cards/api/outcomes/clear?${params}`, { method: 'DELETE' });
+        const result = await response.json();
+        if (response.ok) {
+            alert(`${result.deleted} kazanım silindi`);
+            document.getElementById('deleteOutcomesModal').remove();
+            loadOutcomes();
+        }
+    } catch (error) {
+        alert('Silme hatası: ' + error.message);
+    }
+}
+
+async function deleteAllOutcomes() {
+    if (!confirm('TÜM kazanımlar silinecek. Bu işlem geri alınamaz. Emin misiniz?')) return;
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/outcomes/clear', { method: 'DELETE' });
+        const result = await response.json();
+        if (response.ok) {
+            alert(`${result.deleted} kazanım silindi`);
+            document.getElementById('deleteOutcomesModal').remove();
+            loadOutcomes();
+        }
+    } catch (error) {
+        alert('Silme hatası: ' + error.message);
+    }
+}
+</script>
+
+<!-- outcomesModal removed - using dynamic modal -->
+
+<!-- Static modals removed - using dynamic modals instead -->
+
+<script>
+function openStudentOutcomeModal() {
+    const existing = document.getElementById('dynamicStudentOutcomeModal');
+    if (existing) existing.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'dynamicStudentOutcomeModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;justify-content:center;align-items:center;z-index:2147483647;';
+    modal.innerHTML = `
+        <div style="background:white;border-radius:16px;padding:24px;max-width:95%;width:1200px;max-height:90vh;overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <h2 style="margin:0;color:#1f2937;">👤 Öğrenci Kazanım Analizi</h2>
+                <button onclick="closeStudentOutcomeModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;">✕</button>
+            </div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;">
+                <div>
+                    <label style="font-weight:600;display:block;margin-bottom:6px;">Sınav:</label>
+                    <select id="soExamSelect" onchange="loadStudentsForOutcomeNew()" style="padding:10px;border:1px solid #d1d5db;border-radius:8px;min-width:250px;">
+                        <option value="">Sınav Yükleniyor...</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-weight:600;display:block;margin-bottom:6px;">Öğrenci:</label>
+                    <select id="soStudentSelect" style="padding:10px;border:1px solid #d1d5db;border-radius:8px;min-width:250px;">
+                        <option value="">Önce sınav seçin</option>
+                    </select>
+                </div>
+                <div style="display:flex;align-items:flex-end;">
+                    <button onclick="loadStudentOutcomeNew()" style="padding:10px 20px;background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:500;">
+                        Analizi Getir
+                    </button>
+                </div>
+                <div style="display:flex;align-items:flex-end;">
+                    <button onclick="downloadStudentOutcomePdfNew()" style="padding:10px 20px;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:500;">
+                        PDF Indir
+                    </button>
+                </div>
+            </div>
+            <div id="studentOutcomeResults" style="background:#f9fafb;padding:16px;border-radius:8px;">
+                <p style="color:#6b7280;text-align:center;">Sınav ve ogrenci secip analizi getirin</p>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    loadExamsForStudentOutcome();
+}
+
+async function loadExamsForStudentOutcome() {
+    const select = document.getElementById('soExamSelect');
+    try {
+        const response = await fetch('/admin/report-cards/api/exams-list');
+        const data = await response.json();
+        
+        select.innerHTML = '<option value="">-- Sınav Seçin --</option>';
+        if (data.exams && data.exams.length > 0) {
+            data.exams.forEach(e => {
+                select.innerHTML += `<option value="${e.id}">${e.exam_name} (${e.student_count} öğrenci)</option>`;
+            });
+        }
+    } catch (err) {
+        select.innerHTML = '<option value="">Hata</option>';
+    }
+}
+
+async function loadStudentsForOutcomeNew() {
+    const examId = document.getElementById('soExamSelect').value;
+    const select = document.getElementById('soStudentSelect');
+    
+    if (!examId) {
+        select.innerHTML = '<option value="">Önce sınav seçin</option>';
+        return;
+    }
+    
+    select.innerHTML = '<option value="">Yükleniyor...</option>';
+    
+    try {
+        const response = await fetch(`/admin/report-cards/api/exam-students/${examId}`);
+        const data = await response.json();
+        
+        select.innerHTML = '<option value="">-- Öğrenci Seçin --</option>';
+        if (data.students) {
+            data.students.forEach(s => {
+                select.innerHTML += `<option value="${s.id}">${s.student_name} (${s.class_name})</option>`;
+            });
+        }
+    } catch (err) {
+        select.innerHTML = '<option value="">Hata</option>';
+    }
+}
+
+async function loadStudentOutcomeNew() {
+    const resultId = document.getElementById('soStudentSelect').value;
+    const container = document.getElementById('studentOutcomeResults');
+    
+    if (!resultId) {
+        alert('Lütfen öğrenci seçin');
+        return;
+    }
+    
+    container.innerHTML = '<p style="text-align:center;">Yükleniyor...</p>';
+    
+    try {
+        const response = await fetch(`/admin/report-cards/api/student-outcome-report/${resultId}`);
+        const data = await response.json();
+        
+        if (data.error) {
+            container.innerHTML = `<p style="color:#ef4444;">${data.error}</p>`;
+            return;
+        }
+        
+        let html = `<h3>${data.student_name} - ${data.class_name}</h3><h4>${data.exam_name}</h4>`;
+        
+        for (const [subj, info] of Object.entries(data.outcome_analysis || {})) {
+            html += `<div style="margin-top:16px;padding:12px;background:white;border-radius:8px;"><h4 style="margin-bottom:12px;">${info.subject_label || subj}</h4>`;
+            
+            for (const [outcome, stats] of Object.entries(info.outcomes || {})) {
+                const rate = stats.correct + stats.wrong + stats.blank > 0 
+                    ? Math.round((stats.correct / (stats.correct + stats.wrong + stats.blank)) * 100) : 0;
+                const color = rate >= 70 ? '#10b981' : rate >= 40 ? '#f59e0b' : '#ef4444';
+                html += `<div style="padding:8px;border-bottom:1px solid #e5e7eb;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span style="flex:1;font-size:0.9rem;">${outcome}</span>
+                        <span style="color:${color};font-weight:600;">%${rate}</span>
+                    </div>
+                    <small style="color:#6b7280;">D: ${stats.correct} | Y: ${stats.wrong} | B: ${stats.blank}</small>
+                </div>`;
+            }
+            html += '</div>';
+        }
+        
+        container.innerHTML = html;
+    } catch (err) {
+        container.innerHTML = `<p style="color:#ef4444;">Hata: ${err.message}</p>`;
+    }
+}
+
+function closeStudentOutcomeModal() {
+    const modal = document.getElementById('dynamicStudentOutcomeModal');
+    if (modal) modal.remove();
+}
+
+async function loadStudentsForOutcome() {
+    const classSelect = document.getElementById('soClassSelect');
+    const studentSelect = document.getElementById('soStudentSelect');
+    const className = classSelect.value;
+    
+    console.log('loadStudentsForOutcome called, className:', className);
+    
+    if (!className) {
+        studentSelect.innerHTML = '<option value="">Önce sınıf seçin</option>';
+        return;
+    }
+    
+    studentSelect.innerHTML = '<option value="">Yükleniyor...</option>';
+    
+    try {
+        const url = `/admin/report-cards/api/class-students?class_name=${encodeURIComponent(className)}`;
+        console.log('Fetching:', url);
+        const response = await fetch(url, { credentials: 'include' });
+        console.log('Response status:', response.status);
+        
+        if (response.status === 302 || response.redirected) {
+            console.error('Session expired or unauthorized');
+            studentSelect.innerHTML = '<option value="">Oturum hatası - sayfayı yenileyin</option>';
+            return;
+        }
+        const students = await response.json();
+        console.log('Students received:', students);
+        
+        if (!students || students.length === 0) {
+            studentSelect.innerHTML = '<option value="">Bu sınıfta öğrenci yok</option>';
+            return;
+        }
+        
+        studentSelect.innerHTML = '<option value="">Öğrenci Seçin</option>';
+        students.forEach(s => {
+            studentSelect.innerHTML += `<option value="${s.student_no}" data-name="${s.student_name}">${s.student_no} - ${s.student_name}</option>`;
+        });
+    } catch (error) {
+        console.error('Error loading students:', error);
+        studentSelect.innerHTML = '<option value="">Hata oluştu</option>';
+    }
+}
+
+async function loadStudentOutcomeAnalysis() {
+    const classSelect = document.getElementById('soClassSelect');
+    const studentSelect = document.getElementById('soStudentSelect');
+    const resultsDiv = document.getElementById('studentOutcomeResults');
+    
+    const className = classSelect.value;
+    const studentNo = studentSelect.value;
+    const studentName = studentSelect.options[studentSelect.selectedIndex]?.dataset?.name || '';
+    
+    if (!className || !studentNo) {
+        alert('Lütfen sınıf ve öğrenci seçin');
+        return;
+    }
+    
+    resultsDiv.innerHTML = '<p style="text-align:center;">Yükleniyor...</p>';
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/student-outcome-analysis', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ class_name: className, student_no: studentNo })
+        });
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            resultsDiv.innerHTML = `<p style="color:#ef4444;text-align:center;">${data.error}</p>`;
+            return;
+        }
+        
+        const subjectNames = {
+            'turkce': 'Türkçe', 'matematik': 'Matematik', 'fen': 'Fen Bilimleri',
+            'inkilap': 'İnkılap Tarihi', 'din': 'Din Kültürü', 'ingilizce': 'İngilizce'
+        };
+        
+        let html = `<h3 style="margin-bottom:16px;color:#1f2937;">📊 ${studentName} - Kazanım Analizi</h3>`;
+        
+        // Öncelikli Konular
+        if (data.priority_topics && data.priority_topics.length > 0) {
+            html += `<div style="background:linear-gradient(135deg,#fef3c7,#fde68a);padding:16px;border-radius:12px;margin-bottom:20px;">`;
+            html += `<h4 style="color:#92400e;margin-bottom:12px;">🔥 Öncelikli Konular (Telafi Gerekli)</h4>`;
+            html += `<ol style="margin-left:20px;">`;
+            data.priority_topics.slice(0, 10).forEach((t, i) => {
+                const icon = i < 3 ? '🔴' : (i < 6 ? '🟠' : '🟡');
+                html += `<li style="margin-bottom:6px;">${icon} <strong>${subjectNames[t.subject] || t.subject}</strong>: ${t.outcome_text} <span style="background:#dc2626;color:white;padding:2px 8px;border-radius:12px;font-size:0.8rem;margin-left:8px;">${t.total_errors} hata</span></li>`;
+            });
+            html += `</ol></div>`;
+        }
+        
+        // Kazanım Analizi
+        html += `<h4 style="color:#1f2937;margin-bottom:12px;">🎯 Kazanım Detayları</h4>`;
+        
+        for (const [subject, outcomes] of Object.entries(data.by_subject || {})) {
+            const weak = outcomes.filter(o => o.success_rate < 50);
+            const strong = outcomes.filter(o => o.success_rate >= 80);
+            
+            html += `<div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:12px;">`;
+            html += `<h5 style="color:#3b82f6;margin-bottom:10px;">${subjectNames[subject] || subject}</h5>`;
+            
+            if (weak.length > 0) {
+                html += `<div style="background:#fef2f2;padding:10px;border-radius:8px;margin-bottom:8px;">`;
+                html += `<strong style="color:#dc2626;">Geliştirilmesi Gereken (${weak.length}):</strong>`;
+                html += `<ul style="margin:6px 0 0 20px;font-size:0.9rem;">`;
+                weak.slice(0, 5).forEach(o => {
+                    html += `<li>${o.outcome_text} - %${o.success_rate}</li>`;
+                });
+                html += `</ul></div>`;
+            }
+            
+            if (strong.length > 0) {
+                html += `<div style="background:#f0fdf4;padding:10px;border-radius:8px;">`;
+                html += `<strong style="color:#16a34a;">Güçlü Alanlar (${strong.length}):</strong>`;
+                html += `<ul style="margin:6px 0 0 20px;font-size:0.9rem;">`;
+                strong.slice(0, 5).forEach(o => {
+                    html += `<li>${o.outcome_text} - %${o.success_rate}</li>`;
+                });
+                html += `</ul></div>`;
+            }
+            
+            html += `</div>`;
+        }
+        
+        resultsDiv.innerHTML = html;
+        
+    } catch (error) {
+        resultsDiv.innerHTML = `<p style="color:#ef4444;text-align:center;">Hata: ${error.message}</p>`;
+    }
+}
+
+function downloadStudentOutcomePDF() {
+    const classSelect = document.getElementById('soClassSelect');
+    const studentSelect = document.getElementById('soStudentSelect');
+    
+    const className = classSelect.value;
+    const studentNo = studentSelect.value;
+    
+    if (!className || !studentNo) {
+        alert('Lütfen sınıf ve öğrenci seçin');
+        return;
+    }
+    
+    window.open(`/admin/report-cards/api/student-outcome-pdf?class_name=${encodeURIComponent(className)}&student_no=${encodeURIComponent(studentNo)}`, '_blank');
+}
+
+function openOutcomeAnalyticsModal() {
+    const existing = document.getElementById('dynamicOutcomeAnalyticsModal');
+    if (existing) existing.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'dynamicOutcomeAnalyticsModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;justify-content:center;align-items:center;z-index:2147483647;';
+    modal.innerHTML = `
+        <div style="background:white;border-radius:16px;padding:24px;max-width:95%;width:1200px;max-height:90vh;overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <h2 style="margin:0;color:#1f2937;">🎯 Sınıf Kazanım Analizi</h2>
+                <button onclick="closeOutcomeAnalyticsModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;">✕</button>
+            </div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;">
+                <div>
+                    <label style="font-weight:600;display:block;margin-bottom:6px;">Sınav:</label>
+                    <select id="analyticsExamSelect" style="padding:10px;border:1px solid #d1d5db;border-radius:8px;min-width:250px;">
+                        <option value="">Sınav Yükleniyor...</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-weight:600;display:block;margin-bottom:6px;">Sınıf (opsiyonel):</label>
+                    <select id="analyticsClassSelect" style="padding:10px;border:1px solid #d1d5db;border-radius:8px;min-width:150px;">
+                        <option value="">Tüm Sınıflar</option>
+                        ${(Array.isArray(classes) ? classes : []).map(c => '<option value="' + c + '">' + c + '</option>').join('')}
+                    </select>
+                </div>
+                <div style="display:flex;align-items:flex-end;">
+                    <button onclick="loadClassOutcomeNew()" style="padding:10px 20px;background:linear-gradient(135deg,#f59e0b,#d97706);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:500;">
+                        Analizi Getir
+                    </button>
+                </div>
+                <div style="display:flex;align-items:flex-end;">
+                    <button onclick="downloadClassOutcomePdfNew()" style="padding:10px 20px;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:500;">
+                        PDF Indir
+                    </button>
+                </div>
+            </div>
+            <div id="analyticsResults" style="background:#f9fafb;padding:16px;border-radius:8px;">
+                <p style="color:#6b7280;text-align:center;">Sinav secip analizi getirin</p>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    loadExamsForClassOutcome();
+}
+
+async function loadExamsForClassOutcome() {
+    const select = document.getElementById('analyticsExamSelect');
+    try {
+        const response = await fetch('/admin/report-cards/api/exams-list');
+        const data = await response.json();
+        
+        select.innerHTML = '<option value="">-- Sınav Seçin --</option>';
+        if (data.exams && data.exams.length > 0) {
+            data.exams.forEach(e => {
+                select.innerHTML += `<option value="${e.id}">${e.exam_name} (${e.student_count} öğrenci)</option>`;
+            });
+        }
+    } catch (err) {
+        select.innerHTML = '<option value="">Hata</option>';
+    }
+}
+
+async function loadClassOutcomeNew() {
+    const examId = document.getElementById('analyticsExamSelect').value;
+    const className = document.getElementById('analyticsClassSelect').value;
+    const container = document.getElementById('analyticsResults');
+    
+    if (!examId) {
+        alert('Lütfen sınav seçin');
+        return;
+    }
+    
+    container.innerHTML = '<p style="text-align:center;">Yükleniyor...</p>';
+    
+    try {
+        let url = `/admin/report-cards/api/class-outcome-report/${examId}`;
+        if (className) url += `?class_name=${encodeURIComponent(className)}`;
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.error) {
+            container.innerHTML = `<p style="color:#ef4444;">${data.error}</p>`;
+            return;
+        }
+        
+        let html = `<h3>Toplam ${data.student_count} Öğrenci</h3>`;
+        
+        for (const [subj, outcomes] of Object.entries(data.outcome_stats || {})) {
+            html += `<div style="margin-top:16px;padding:12px;background:white;border-radius:8px;"><h4 style="margin-bottom:12px;">${subj}</h4>`;
+            
+            for (const [outcome, stats] of Object.entries(outcomes)) {
+                const color = stats.success_rate >= 70 ? '#10b981' : stats.success_rate >= 40 ? '#f59e0b' : '#ef4444';
+                html += `<div style="padding:8px;border-bottom:1px solid #e5e7eb;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span style="flex:1;font-size:0.9rem;">${outcome}</span>
+                        <span style="color:${color};font-weight:600;">%${stats.success_rate}</span>
+                    </div>
+                    <small style="color:#6b7280;">D: ${stats.correct} | Y: ${stats.wrong} | B: ${stats.blank} | Toplam: ${stats.total}</small>
+                </div>`;
+            }
+            html += '</div>';
+        }
+        
+        container.innerHTML = html || '<p>Kazanım verisi bulunamadı</p>';
+    } catch (err) {
+        container.innerHTML = `<p style="color:#ef4444;">Hata: ${err.message}</p>`;
+    }
+}
+
+function closeOutcomeAnalyticsModal() {
+    const modal = document.getElementById('dynamicOutcomeAnalyticsModal');
+    if (modal) modal.remove();
+}
+
+function downloadStudentOutcomePdfNew() {
+    const resultId = document.getElementById('soStudentSelect').value;
+    if (!resultId) {
+        alert('Lutfen ogrenci secin');
+        return;
+    }
+    window.open(`/admin/report-cards/api/student-outcome-pdf-new/${resultId}`, '_blank');
+}
+
+function downloadClassOutcomePdfNew() {
+    const examId = document.getElementById('analyticsExamSelect').value;
+    const className = document.getElementById('analyticsClassSelect').value;
+    if (!examId) {
+        alert('Lutfen sinav secin');
+        return;
+    }
+    let url = `/admin/report-cards/api/class-outcome-pdf-new/${examId}`;
+    if (className) url += `?class_name=${encodeURIComponent(className)}`;
+    window.open(url, '_blank');
+}
+
+function downloadClassOutcomePDF() {
+    const classId = document.getElementById('analyticsClassSelect').value;
+    if (!classId) {
+        alert('Lütfen sınıf seçin');
+        return;
+    }
+    window.open(`/admin/report-cards/api/class-outcome-pdf?class_name=${encodeURIComponent(classId)}`, '_blank');
+}
+
+function populateMultiExamClasses() {
+    const select = document.getElementById('multiExamClassSelect');
+    select.innerHTML = '<option value="">Sınıf Seçin</option>';
+    classes.forEach(cls => {
+        select.innerHTML += `<option value="${cls}">${cls}</option>`;
+    });
+}
+
+function populateAnalyticsClasses() {
+    const select = document.getElementById('analyticsClassSelect');
+    select.innerHTML = '<option value="">Sınıf Seçin</option>';
+    classes.forEach(cls => {
+        select.innerHTML += `<option value="${cls}">${cls}</option>`;
+    });
+}
+
+async function loadMultiExamProgress() {
+    const selectEl = document.getElementById('multiExamClassSelect');
+    console.log('Select element:', selectEl);
+    console.log('Select value:', selectEl ? selectEl.value : 'NOT FOUND');
+    const classId = selectEl ? selectEl.value : '';
+    if (!classId) {
+        alert('Lütfen sınıf seçin');
+        return;
+    }
+    
+    const resultsDiv = document.getElementById('multiExamResults');
+    resultsDiv.innerHTML = '<p style="text-align: center;">Yükleniyor...</p>';
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/multi-exam-progress', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ class_id: classId })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            resultsDiv.innerHTML = `<p style="color: #ef4444; text-align: center;">${data.error}</p>`;
+            return;
+        }
+        
+        const examNames = data.exam_names;
+        const students = data.students;
+        
+        let html = `<h3 style="margin-bottom: 16px;">Sınavlar: ${examNames.join(' → ')}</h3>`;
+        html += '<div style="overflow-x: auto;">';
+        html += '<table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">';
+        html += '<thead><tr style="background: #3b82f6; color: white;">';
+        html += '<th style="padding: 12px; text-align: left; border: 1px solid #e5e7eb;">Öğrenci</th>';
+        
+        examNames.forEach(name => {
+            html += `<th style="padding: 12px; text-align: center; border: 1px solid #e5e7eb;">${name}<br><small>(Net)</small></th>`;
+        });
+        
+        html += '<th style="padding: 12px; text-align: center; border: 1px solid #e5e7eb;">Gelişim</th>';
+        html += '</tr></thead><tbody>';
+        
+        students.sort((a, b) => b.net_change - a.net_change);
+        
+        students.forEach((student, idx) => {
+            const rowBg = idx % 2 === 0 ? '#ffffff' : '#f9fafb';
+            html += `<tr style="background: ${rowBg};">`;
+            html += `<td style="padding: 10px; border: 1px solid #e5e7eb; font-weight: 500;">${student.student_name}</td>`;
+            
+            examNames.forEach(name => {
+                const examData = student.exams[name];
+                if (examData) {
+                    html += `<td style="padding: 10px; border: 1px solid #e5e7eb; text-align: center;">
+                        <strong>${examData.total_net}</strong>
+                        <br><small style="color: #6b7280;">${examData.total_correct}D ${examData.total_wrong}Y</small>
+                    </td>`;
+                } else {
+                    html += '<td style="padding: 10px; border: 1px solid #e5e7eb; text-align: center; color: #9ca3af;">-</td>';
+                }
+            });
+            
+            const changeColor = student.net_change > 0 ? '#10b981' : (student.net_change < 0 ? '#ef4444' : '#6b7280');
+            const changeSign = student.net_change > 0 ? '+' : '';
+            html += `<td style="padding: 10px; border: 1px solid #e5e7eb; text-align: center; font-weight: 600; color: ${changeColor};">
+                ${changeSign}${student.net_change}
+            </td>`;
+            html += '</tr>';
+        });
+        
+        html += '</tbody></table></div>';
+        resultsDiv.innerHTML = html;
+        
+    } catch (error) {
+        resultsDiv.innerHTML = `<p style="color: #ef4444; text-align: center;">Hata: ${error.message}</p>`;
+    }
+}
+
+async function loadOutcomeAnalytics() {
+    const classId = document.getElementById('analyticsClassSelect').value;
+    if (!classId) {
+        alert('Lütfen sınıf seçin');
+        return;
+    }
+    
+    const resultsDiv = document.getElementById('analyticsResults');
+    resultsDiv.innerHTML = '<p style="text-align: center;">Yükleniyor...</p>';
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/outcome-analytics', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ class_id: classId })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            resultsDiv.innerHTML = `<p style="color: #ef4444; text-align: center;">${data.error}</p>`;
+            return;
+        }
+        
+        const subjectNames = {
+            'turkce': 'Türkçe',
+            'matematik': 'Matematik',
+            'fen': 'Fen Bilimleri',
+            'inkilap': 'T.C. İnkılap Tarihi',
+            'din': 'Din Kültürü',
+            'ingilizce': 'İngilizce'
+        };
+        
+        let html = '<div style="margin-bottom: 20px;">';
+        html += '<h3 style="margin-bottom: 12px;">Ders Bazlı Özet</h3>';
+        html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px;">';
+        
+        for (const [subject, totals] of Object.entries(data.subject_totals)) {
+            const subjectName = subjectNames[subject] || subject;
+            html += `<div style="background: white; padding: 16px; border-radius: 8px; border: 1px solid #e5e7eb;">
+                <div style="font-weight: 600; color: #1f2937;">${subjectName}</div>
+                <div style="font-size: 1.5rem; font-weight: 700; color: #3b82f6;">${totals.average_accuracy}%</div>
+                <div style="font-size: 0.85rem; color: #6b7280;">${totals.total_correct}/${totals.total_questions} doğru</div>
+            </div>`;
+        }
+        html += '</div></div>';
+        
+        for (const [subject, outcomes] of Object.entries(data.by_subject)) {
+            const subjectName = subjectNames[subject] || subject;
+            html += `<div style="margin-bottom: 24px;">`;
+            html += `<h3 style="margin-bottom: 12px; color: #1f2937;">${subjectName}</h3>`;
+            html += '<table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">';
+            html += '<thead><tr style="background: #f3f4f6;">';
+            html += '<th style="padding: 10px; text-align: left; border: 1px solid #e5e7eb;">Kazanım</th>';
+            html += '<th style="padding: 10px; text-align: center; border: 1px solid #e5e7eb; width: 80px;">Soru</th>';
+            html += '<th style="padding: 10px; text-align: center; border: 1px solid #e5e7eb; width: 80px;">Doğru</th>';
+            html += '<th style="padding: 10px; text-align: center; border: 1px solid #e5e7eb; width: 80px;">Başarı</th>';
+            html += '</tr></thead><tbody>';
+            
+            outcomes.forEach((outcome, idx) => {
+                const rowBg = idx % 2 === 0 ? '#ffffff' : '#f9fafb';
+                const accuracyColor = outcome.accuracy >= 70 ? '#10b981' : (outcome.accuracy >= 50 ? '#f59e0b' : '#ef4444');
+                html += `<tr style="background: ${rowBg};">`;
+                html += `<td style="padding: 10px; border: 1px solid #e5e7eb;">
+                    <strong>${outcome.outcome_code}</strong>
+                    <br><small style="color: #6b7280;">${outcome.description || ''}</small>
+                </td>`;
+                html += `<td style="padding: 10px; border: 1px solid #e5e7eb; text-align: center;">${outcome.total_questions}</td>`;
+                html += `<td style="padding: 10px; border: 1px solid #e5e7eb; text-align: center;">${outcome.total_correct}</td>`;
+                html += `<td style="padding: 10px; border: 1px solid #e5e7eb; text-align: center; font-weight: 600; color: ${accuracyColor};">${outcome.accuracy}%</td>`;
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table></div>';
+        }
+        
+        if (data.total_outcomes === 0) {
+            html = '<p style="color: #6b7280; text-align: center;">Bu sınıf için kazanım verisi bulunamadı</p>';
+        }
+        
+        resultsDiv.innerHTML = html;
+        
+    } catch (error) {
+        resultsDiv.innerHTML = `<p style="color: #ef4444; text-align: center;">Hata: ${error.message}</p>`;
+    }
+}
+
+// Toplu Gelişim Modal
+function openMultiExamModal() {
+    const existing = document.getElementById('dynamicMultiExamModal');
+    if (existing) existing.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'dynamicMultiExamModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;justify-content:center;align-items:center;z-index:2147483647;';
+    modal.innerHTML = `
+        <div style="background:white;border-radius:16px;padding:24px;max-width:95%;width:1200px;max-height:90vh;overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <h2 style="margin:0;color:#1f2937;">📈 Toplu Sınav Gelişim Raporu</h2>
+                <button onclick="closeMultiExamModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;">✕</button>
+            </div>
+            <div style="margin-bottom:20px;">
+                <label style="font-weight:600;display:block;margin-bottom:8px;">Sınıf Seçin:</label>
+                <select id="multiExamClassSelect" style="padding:10px;border:1px solid #d1d5db;border-radius:8px;min-width:200px;">
+                    <option value="">Sınıf Seçin</option>
+                    ${classes.map(c => '<option value="' + c + '">' + c + '</option>').join('')}
+                </select>
+                <button onclick="loadMultiExamProgress()" style="margin-left:12px;padding:10px 20px;background:linear-gradient(135deg,#6366f1,#4f46e5);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:500;">
+                    Raporu Getir
+                </button>
+            </div>
+            <div id="multiExamResults" style="background:#f9fafb;padding:16px;border-radius:8px;">
+                <p style="color:#6b7280;text-align:center;">Sınıf seçip raporu getirin</p>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function closeMultiExamModal() {
+    const modal = document.getElementById('dynamicMultiExamModal');
+    if (modal) modal.remove();
+}
+
+async function loadMultiExamProgress() {
+    const className = document.getElementById('multiExamClassSelect').value;
+    if (!className) { alert('Lütfen sınıf seçin'); return; }
+    
+    const resultsDiv = document.getElementById('multiExamResults');
+    resultsDiv.innerHTML = '<p style="text-align: center;">Yükleniyor...</p>';
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/multi-exam-progress', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ class_name: className })
+        });
+        
+        const data = await response.json();
+        if (!response.ok) { resultsDiv.innerHTML = `<p style="color: #ef4444;">${data.error}</p>`; return; }
+        
+        let html = `<h3 style="margin-bottom: 16px;">Sınavlar: ${data.exam_names.join(' → ')}</h3>`;
+        html += '<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">';
+        html += '<thead><tr style="background: #6366f1; color: white;"><th style="padding: 12px;">Öğrenci</th>';
+        data.exam_names.forEach(name => { html += `<th style="padding: 12px;">${name}<br><small>(Net)</small></th>`; });
+        html += '<th style="padding: 12px;">Gelişim</th></tr></thead><tbody>';
+        
+        data.students.sort((a, b) => b.net_change - a.net_change);
+        data.students.forEach((student, idx) => {
+            const rowBg = idx % 2 === 0 ? '#fff' : '#f9fafb';
+            html += `<tr style="background: ${rowBg};"><td style="padding: 10px; border: 1px solid #e5e7eb;">${student.student_name}</td>`;
+            data.exam_names.forEach(name => {
+                const examData = student.exams[name];
+                html += examData ? `<td style="padding: 10px; border: 1px solid #e5e7eb; text-align: center;"><strong>${examData.total_net}</strong><br><small>${examData.total_correct}D ${examData.total_wrong}Y</small></td>` : '<td style="padding: 10px; border: 1px solid #e5e7eb; text-align: center; color: #9ca3af;">-</td>';
+            });
+            const changeColor = student.net_change > 0 ? '#10b981' : (student.net_change < 0 ? '#ef4444' : '#6b7280');
+            html += `<td style="padding: 10px; border: 1px solid #e5e7eb; text-align: center; font-weight: 600; color: ${changeColor};">${student.net_change > 0 ? '+' : ''}${student.net_change}</td></tr>`;
+        });
+        html += '</tbody></table></div>';
+        
+        if (data.students.length === 0) {
+            html = '<p style="color: #6b7280; text-align: center;">Bu sınıf için veri bulunamadı</p>';
+        }
+        
+        resultsDiv.innerHTML = html;
+    } catch (error) { resultsDiv.innerHTML = `<p style="color: #ef4444;">Hata: ${error.message}</p>`; }
+}
+
+// Çift Kayıt Yönetimi
+function openDuplicatesModal() {
+    const existing = document.getElementById('dynamicDuplicatesModal');
+    if (existing) existing.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'dynamicDuplicatesModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;justify-content:center;align-items:center;z-index:2147483647;';
+    modal.innerHTML = `
+        <div style="background:white;border-radius:16px;padding:24px;max-width:95%;width:900px;max-height:90vh;overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <h2 style="margin:0;color:#1f2937;">🔄 Çift Kayıt Yönetimi</h2>
+                <button onclick="closeDuplicatesModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;">✕</button>
+            </div>
+            <div style="margin-bottom:16px;">
+                <p style="color:#6b7280;margin-bottom:12px;">Aynı öğrenci numarasına sahip farklı isimli kayıtlar tespit edilir ve birleştirilir.</p>
+                <button onclick="loadDuplicates()" style="padding:10px 20px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:500;margin-right:8px;">
+                    Çift Kayıtları Tara
+                </button>
+                <button onclick="mergeAllDuplicates()" style="padding:10px 20px;background:linear-gradient(135deg,#dc2626,#b91c1c);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:500;">
+                    Tümünü Birleştir (Son İsim)
+                </button>
+            </div>
+            <div id="duplicatesResults" style="background:#f9fafb;padding:16px;border-radius:8px;">
+                <p style="color:#6b7280;text-align:center;">Tarama için butona tıklayın</p>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function closeDuplicatesModal() {
+    const modal = document.getElementById('dynamicDuplicatesModal');
+    if (modal) modal.remove();
+}
+
+async function loadDuplicates() {
+    const resultsDiv = document.getElementById('duplicatesResults');
+    resultsDiv.innerHTML = '<p style="text-align: center;">Taranıyor...</p>';
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/student-duplicates');
+        const data = await response.json();
+        
+        if (!response.ok) {
+            resultsDiv.innerHTML = `<p style="color: #ef4444;">${data.error}</p>`;
+            return;
+        }
+        
+        if (data.duplicates.length === 0) {
+            resultsDiv.innerHTML = '<p style="color: #10b981; text-align: center; font-weight: 600;">✓ Çift kayıt bulunamadı!</p>';
+            return;
+        }
+        
+        let html = `<p style="margin-bottom: 16px; font-weight: 600;">${data.total_duplicates} öğrenci için çift kayıt bulundu:</p>`;
+        html += '<table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">';
+        html += '<thead><tr style="background: #dc2626; color: white;"><th style="padding: 10px;">No</th><th style="padding: 10px;">İsim Varyasyonları</th><th style="padding: 10px;">Kayıt</th><th style="padding: 10px;">İşlem</th></tr></thead><tbody>';
+        
+        data.duplicates.forEach((dup, idx) => {
+            const rowBg = idx % 2 === 0 ? '#fff' : '#fef2f2';
+            const names = dup.name_variants.join('<br>');
+            html += `<tr style="background: ${rowBg};">
+                <td style="padding: 10px; border: 1px solid #e5e7eb; font-weight: 600;">${dup.student_no}</td>
+                <td style="padding: 10px; border: 1px solid #e5e7eb;">${names}</td>
+                <td style="padding: 10px; border: 1px solid #e5e7eb; text-align: center;">${dup.total_records}</td>
+                <td style="padding: 10px; border: 1px solid #e5e7eb;">
+                    <select id="canonical_${dup.student_no}" style="padding:4px;border-radius:4px;border:1px solid #d1d5db;">
+                        ${dup.name_variants.map(n => `<option value="${n}">${n}</option>`).join('')}
+                    </select>
+                    <button onclick="mergeSingleDuplicate('${dup.student_no}')" style="padding:4px 8px;background:#3b82f6;color:white;border:none;border-radius:4px;cursor:pointer;margin-left:4px;">Birleştir</button>
+                </td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        
+        resultsDiv.innerHTML = html;
+    } catch (error) {
+        resultsDiv.innerHTML = `<p style="color: #ef4444;">Hata: ${error.message}</p>`;
+    }
+}
+
+async function mergeSingleDuplicate(studentNo) {
+    const select = document.getElementById('canonical_' + studentNo);
+    const canonicalName = select.value;
+    
+    if (!confirm(`${studentNo} numaralı öğrencinin tüm kayıtları "${canonicalName}" olarak güncellenecek. Devam?`)) return;
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/student-duplicates/merge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ student_no: studentNo, canonical_name: canonicalName })
+        });
+        
+        const data = await response.json();
+        if (response.ok) {
+            alert(data.message);
+            loadDuplicates();
+        } else {
+            alert('Hata: ' + data.error);
+        }
+    } catch (error) {
+        alert('Hata: ' + error.message);
+    }
+}
+
+async function mergeAllDuplicates() {
+    if (!confirm('TÜM çift kayıtlar en son kullanılan isimle birleştirilecek. Bu işlem geri alınamaz. Devam?')) return;
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/student-duplicates/merge-all', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await response.json();
+        if (response.ok) {
+            alert(data.message);
+            loadDuplicates();
+        } else {
+            alert('Hata: ' + data.error);
+        }
+    } catch (error) {
+        alert('Hata: ' + error.message);
+    }
+}
+
+// Eksik Kayıt Tamamlama
+function openIncompleteModal() {
+    const existing = document.getElementById('dynamicIncompleteModal');
+    if (existing) existing.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'dynamicIncompleteModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;justify-content:center;align-items:center;z-index:2147483647;';
+    modal.innerHTML = `
+        <div style="background:white;border-radius:16px;padding:24px;max-width:95%;width:900px;max-height:90vh;overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <h2 style="margin:0;color:#1f2937;">🔧 Eksik Kayıt Tamamlama</h2>
+                <button onclick="closeIncompleteModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;">✕</button>
+            </div>
+            <div style="margin-bottom:16px;">
+                <p style="color:#6b7280;margin-bottom:12px;">Daha önce yüklenen sınavlarda eksik kalan öğrencileri tespit eder ve aynı PDF'i yükleyerek tamamlar.</p>
+                <button onclick="loadIncompleteExams()" style="padding:10px 20px;background:linear-gradient(135deg,#f97316,#ea580c);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:500;">
+                    Eksik Sınavları Tara
+                </button>
+            </div>
+            <div id="incompleteResults" style="background:#f9fafb;padding:16px;border-radius:8px;">
+                <p style="color:#6b7280;text-align:center;">Tarama için butona tıklayın</p>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function closeIncompleteModal() {
+    const modal = document.getElementById('dynamicIncompleteModal');
+    if (modal) modal.remove();
+}
+
+async function loadIncompleteExams() {
+    const resultsDiv = document.getElementById('incompleteResults');
+    resultsDiv.innerHTML = '<p style="text-align: center;">Taranıyor...</p>';
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/incomplete-exams');
+        const data = await response.json();
+        
+        if (!response.ok) {
+            resultsDiv.innerHTML = `<p style="color: #ef4444;">${data.error}</p>`;
+            return;
+        }
+        
+        if (data.incomplete_exams.length === 0) {
+            resultsDiv.innerHTML = '<p style="color: #10b981; text-align: center; font-weight: 600;">✓ Eksik kayıt bulunamadı! Tüm sınavlar eksiksiz.</p>';
+            return;
+        }
+        
+        let html = `<p style="margin-bottom: 16px; font-weight: 600;">${data.total} sınavda eksik kayıt bulundu:</p>`;
+        html += '<div style="display: flex; flex-direction: column; gap: 12px;">';
+        
+        data.incomplete_exams.forEach(exam => {
+            html += `
+                <div style="background: #fff; border: 2px solid #f97316; border-radius: 12px; padding: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <div>
+                            <strong style="color: #1f2937; font-size: 1.1rem;">${exam.exam_name}</strong>
+                            <span style="color: #6b7280; margin-left: 8px;">${exam.class_name || 'Sınıf: ' + exam.grade_level}</span>
+                            <div style="color: #ef4444; font-weight: 600; margin-top: 4px;">
+                                Eksik: ${exam.missing_count} öğrenci (${exam.student_count || 0}/${exam.expected_student_count})
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <input type="file" id="pdf_${exam.id}" accept=".pdf" style="display:none;" onchange="reprocessExam(${exam.id}, this)">
+                            <button onclick="document.getElementById('pdf_${exam.id}').click()" 
+                                style="padding:10px 16px;background:linear-gradient(135deg,#10b981,#059669);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:500;">
+                                PDF Yükle ve Tamamla
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        
+        resultsDiv.innerHTML = html;
+    } catch (error) {
+        resultsDiv.innerHTML = `<p style="color: #ef4444;">Hata: ${error.message}</p>`;
+    }
+}
+
+async function reprocessExam(examId, fileInput) {
+    const file = fileInput.files[0];
+    if (!file) return;
+    
+    const formData = new FormData();
+    formData.append('pdf_file', file);
+    
+    const btn = fileInput.previousElementSibling;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = 'Yükleniyor...';
+    btn.disabled = true;
+    
+    try {
+        const response = await fetch(`/admin/report-cards/api/reprocess/${examId}`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            alert(data.message);
+            loadIncompleteExams();
+            loadReportCards(); // Ana listeyi de güncelle
+        } else {
+            alert('Hata: ' + data.error);
+        }
+    } catch (error) {
+        alert('Hata: ' + error.message);
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        fileInput.value = '';
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,617 @@
+{% set breadcrumbs = [{'text': 'Sistem Raporları', 'url': ''}] %}
+{% extends "base_dashboard.html" %}
+
+{% block title %}Sistem Raporları{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/admin-modern.css">
+<style>
+    .dashboard-content {
+        padding: 24px 28px;
+    }
+    
+    .report-section {
+        background: white;
+        border-radius: var(--radius-xl);
+        padding: 24px;
+        margin-bottom: 20px;
+        box-shadow: var(--shadow-md);
+        border: 1px solid var(--gray-100);
+    }
+    
+    .report-section h2 {
+        color: var(--gray-800);
+        font-size: 1.2rem;
+        margin-bottom: 20px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid var(--gray-100);
+    }
+    
+    .detail-section {
+        display: none;
+        background: var(--gray-50);
+        padding: 20px;
+        margin-top: 10px;
+        border-radius: var(--radius-lg);
+        border-left: 4px solid var(--primary-500);
+    }
+    
+    .detail-section.active {
+        display: block;
+    }
+    
+    .content-list {
+        margin-top: 15px;
+    }
+    
+    .content-item {
+        background: white;
+        padding: 16px;
+        margin-bottom: 12px;
+        border-radius: var(--radius-md);
+        border-left: 4px solid var(--success-500);
+        box-shadow: var(--shadow-sm);
+        transition: all var(--transition-fast);
+    }
+    
+    .content-item:hover {
+        box-shadow: var(--shadow-md);
+    }
+    
+    .content-item h4 {
+        margin: 0 0 8px 0;
+        color: var(--gray-800);
+        font-weight: 600;
+    }
+    
+    .content-item p {
+        margin: 5px 0;
+        color: var(--gray-600);
+        font-size: 0.9rem;
+    }
+    
+    .content-item .meta {
+        color: var(--gray-400);
+        font-size: 0.8rem;
+        margin-top: 10px;
+    }
+    
+    .empty-content {
+        text-align: center;
+        padding: 30px;
+        color: var(--gray-400);
+    }
+    
+    .btn-detail {
+        background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        font-size: 0.85rem;
+        transition: all var(--transition-fast);
+    }
+    
+    .btn-detail:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    
+    .btn-delete {
+        background: var(--error-500);
+        color: white;
+        border: none;
+        padding: 6px 14px;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        font-size: 0.8rem;
+        margin-top: 10px;
+        transition: all var(--transition-fast);
+    }
+    
+    .btn-delete:hover {
+        background: var(--error-600);
+    }
+    
+    .content-item-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+    }
+    
+    .bulk-actions {
+        margin-bottom: 16px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        padding: 12px;
+        background: var(--gray-50);
+        border-radius: var(--radius-md);
+    }
+    
+    .btn-bulk-delete {
+        background: var(--error-500);
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        font-size: 0.85rem;
+        transition: all var(--transition-fast);
+    }
+    
+    .btn-bulk-delete:hover {
+        background: var(--error-600);
+    }
+    
+    .btn-bulk-delete:disabled {
+        background: var(--gray-300);
+        cursor: not-allowed;
+    }
+    
+    .select-all-label {
+        font-size: 0.9rem;
+        color: var(--gray-600);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .item-checkbox {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+    }
+    
+    @media (max-width: 768px) {
+        .dashboard-content {
+            padding: 16px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-content">
+    <div class="page-header-modern">
+        <h1>📊 Sistem Raporları</h1>
+        <p>Öğretmen aktivitelerini ve içerik raporlarını görüntüleyin</p>
+    </div>
+
+    <div class="report-section">
+        <h2>👨‍🏫 Öğretmen Raporları</h2>
+        
+        <div id="teacherLoading" style="text-align: center; padding: 40px; color: var(--gray-400);">
+            <div class="loading-spinner" style="margin: 0 auto 16px;"></div>
+            <p>Raporlar yükleniyor...</p>
+        </div>
+        
+        <table class="table-modern" id="teacherTable" style="display:none">
+            <thead>
+                <tr>
+                    <th>Öğretmen</th>
+                    <th>Sınav Sayısı</th>
+                    <th>Ödev Sayısı</th>
+                    <th>Duyuru Sayısı</th>
+                    <th style="text-align: right;">Detaylar</th>
+                </tr>
+            </thead>
+            <tbody id="teacherBody"></tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let allTeacherData = {};
+
+    function showToast(message, type = 'info') {
+        const container = document.querySelector('.toast-container') || createToastContainer();
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.innerHTML = `
+            <span style="font-size: 1.2rem;">${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
+            <span style="flex: 1;">${message}</span>
+        `;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 4000);
+    }
+
+    function createToastContainer() {
+        const container = document.createElement('div');
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+        return container;
+    }
+
+    async function loadReports() {
+        try {
+            const response = await fetch('/api/admin/teacher-reports');
+            const data = await response.json();
+            
+            const tbody = document.getElementById('teacherBody');
+            tbody.innerHTML = '';
+            
+            data.teachers.forEach((teacher, index) => {
+                allTeacherData[teacher.teacher_id] = teacher;
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-weight: 600;">${teacher.full_name}</td>
+                    <td><span class="badge badge-primary">${teacher.exam_count}</span></td>
+                    <td><span class="badge badge-success">${teacher.assignment_count}</span></td>
+                    <td><span class="badge badge-warning">${teacher.announcement_count}</span></td>
+                    <td style="text-align: right;">
+                        <button class="btn-detail" onclick="toggleDetails(${teacher.teacher_id})">
+                            📋 Detayları Gör
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+                
+                const detailRow = tbody.insertRow();
+                detailRow.id = `detail-${teacher.teacher_id}`;
+                const detailCell = detailRow.insertCell();
+                detailCell.colSpan = 5;
+                detailCell.innerHTML = `
+                    <div id="details-content-${teacher.teacher_id}" class="detail-section">
+                        <div id="details-loading-${teacher.teacher_id}" style="text-align: center; padding: 20px; color: var(--gray-400);">
+                            <div class="loading-spinner" style="margin: 0 auto 12px;"></div>
+                            <p>Detaylar yükleniyor...</p>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            document.getElementById('teacherLoading').style.display = 'none';
+            document.getElementById('teacherTable').style.display = 'table';
+        } catch (error) {
+            document.getElementById('teacherLoading').innerHTML = `
+                <div style="font-size: 3rem; margin-bottom: 16px;">😕</div>
+                <p>Yükleme hatası: ${error.message}</p>
+            `;
+        }
+    }
+
+    async function toggleDetails(teacherId) {
+        const detailDiv = document.getElementById(`details-content-${teacherId}`);
+        
+        if (detailDiv.classList.contains('active')) {
+            detailDiv.classList.remove('active');
+            return;
+        }
+        
+        document.querySelectorAll('.detail-section.active').forEach(el => {
+            el.classList.remove('active');
+        });
+        
+        detailDiv.classList.add('active');
+        
+        if (detailDiv.dataset.loaded) {
+            return;
+        }
+        
+        await loadTeacherDetails(teacherId);
+    }
+
+    async function loadTeacherDetails(teacherId) {
+        const loadingDiv = document.getElementById(`details-loading-${teacherId}`);
+        const contentDiv = document.getElementById(`details-content-${teacherId}`);
+        
+        try {
+            const examsResponse = await fetch(`/api/admin/teacher/${teacherId}/exams`);
+            const examsData = await examsResponse.json();
+            
+            const assignmentsResponse = await fetch(`/api/admin/teacher/${teacherId}/assignments`);
+            const assignmentsData = await assignmentsResponse.json();
+            
+            const announcementsResponse = await fetch(`/api/admin/teacher/${teacherId}/announcements`);
+            const announcementsData = await announcementsResponse.json();
+            
+            let html = '<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap:20px;">';
+            
+            html += '<div><h3 style="color: var(--primary-600); margin-bottom:15px;">📝 Sınavlar</h3>';
+            if (examsData.exams && examsData.exams.length > 0) {
+                html += `
+                    <div class="bulk-actions">
+                        <label class="select-all-label">
+                            <input type="checkbox" class="item-checkbox" onchange="toggleSelectAllExams(this, ${teacherId})">
+                            Tümünü Seç
+                        </label>
+                        <button class="btn-bulk-delete" onclick="bulkDeleteExams(${teacherId})" disabled id="bulkDeleteExamsBtn-${teacherId}">
+                            🗑️ Seçilenleri Sil (<span id="examSelectedCount-${teacherId}">0</span>)
+                        </button>
+                    </div>
+                `;
+                html += '<div class="content-list">';
+                examsData.exams.forEach(exam => {
+                    html += `
+                        <div class="content-item" id="exam-${exam.id}">
+                            <div class="content-item-header">
+                                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                    <input type="checkbox" class="item-checkbox exam-checkbox-${teacherId}" value="${exam.id}" onchange="updateExamSelection(${teacherId})">
+                                    <h4 style="margin: 0;">${exam.title}</h4>
+                                </label>
+                            </div>
+                            <p><strong>Sınıflar:</strong> ${exam.target_class || 'Tüm sınıflar'}</p>
+                            <p><strong>Soru Sayısı:</strong> ${exam.question_count}</p>
+                            <p><strong>Süre:</strong> ${exam.duration_minutes} dakika</p>
+                            <p class="meta">📅 ${new Date(exam.start_time).toLocaleString('tr-TR')}</p>
+                            <button class="btn-delete" onclick="deleteExam('${exam.id}')">🗑️ Sil</button>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            } else {
+                html += '<div class="empty-content">Henüz sınav oluşturulmamış</div>';
+            }
+            html += '</div>';
+            
+            html += '<div><h3 style="color: var(--success-600); margin-bottom:15px;">📚 Ödevler</h3>';
+            if (assignmentsData.assignments && assignmentsData.assignments.length > 0) {
+                html += `
+                    <div class="bulk-actions">
+                        <label class="select-all-label">
+                            <input type="checkbox" class="item-checkbox" onchange="toggleSelectAllAssignments(this, ${teacherId})">
+                            Tümünü Seç
+                        </label>
+                        <button class="btn-bulk-delete" onclick="bulkDeleteAssignments(${teacherId})" disabled id="bulkDeleteAssignmentsBtn-${teacherId}">
+                            🗑️ Seçilenleri Sil (<span id="assignmentSelectedCount-${teacherId}">0</span>)
+                        </button>
+                    </div>
+                `;
+                html += '<div class="content-list">';
+                assignmentsData.assignments.forEach(assignment => {
+                    html += `
+                        <div class="content-item" style="border-left-color: var(--success-500);" id="assignment-${assignment.id}">
+                            <div class="content-item-header">
+                                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                    <input type="checkbox" class="item-checkbox assignment-checkbox-${teacherId}" value="${assignment.id}" onchange="updateAssignmentSelection(${teacherId})">
+                                    <h4 style="margin: 0;">${assignment.title}</h4>
+                                </label>
+                            </div>
+                            <p>${assignment.description || 'Açıklama yok'}</p>
+                            <p><strong>Sınıflar:</strong> ${assignment.target_class || 'Tüm sınıflar'}</p>
+                            <p class="meta">📅 Son Tarih: ${new Date(assignment.due_date).toLocaleString('tr-TR')}</p>
+                            <button class="btn-delete" onclick="deleteAssignment(${assignment.id})">🗑️ Sil</button>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            } else {
+                html += '<div class="empty-content">Henüz ödev oluşturulmamış</div>';
+            }
+            html += '</div>';
+            
+            html += '<div><h3 style="color: var(--warning-600); margin-bottom:15px;">📢 Duyurular</h3>';
+            if (announcementsData.announcements && announcementsData.announcements.length > 0) {
+                html += `
+                    <div class="bulk-actions">
+                        <label class="select-all-label">
+                            <input type="checkbox" class="item-checkbox" onchange="toggleSelectAllAnnouncements(this, ${teacherId})">
+                            Tümünü Seç
+                        </label>
+                        <button class="btn-bulk-delete" onclick="bulkDeleteAnnouncements(${teacherId})" disabled id="bulkDeleteAnnouncementsBtn-${teacherId}">
+                            🗑️ Seçilenleri Sil (<span id="announcementSelectedCount-${teacherId}">0</span>)
+                        </button>
+                    </div>
+                `;
+                html += '<div class="content-list">';
+                announcementsData.announcements.forEach(announcement => {
+                    html += `
+                        <div class="content-item" style="border-left-color: var(--warning-500);" id="announcement-${announcement.id}">
+                            <div class="content-item-header">
+                                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                    <input type="checkbox" class="item-checkbox announcement-checkbox-${teacherId}" value="${announcement.id}" onchange="updateAnnouncementSelection(${teacherId})">
+                                    <h4 style="margin: 0;">${announcement.title}</h4>
+                                </label>
+                            </div>
+                            <p>${announcement.content || ''}</p>
+                            <p class="meta">📅 ${new Date(announcement.created_at).toLocaleString('tr-TR')}</p>
+                            <button class="btn-delete" onclick="deleteAnnouncement(${announcement.id})">🗑️ Sil</button>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            } else {
+                html += '<div class="empty-content">Henüz duyuru oluşturulmamış</div>';
+            }
+            html += '</div>';
+            
+            html += '</div>';
+            
+            loadingDiv.style.display = 'none';
+            contentDiv.innerHTML = html;
+            contentDiv.dataset.loaded = 'true';
+            
+        } catch (error) {
+            loadingDiv.innerHTML = `<p style="color: var(--error-500);">Detaylar yüklenemedi: ${error.message}</p>`;
+        }
+    }
+    
+    async function deleteExam(examId) {
+        if (!confirm('Bu sınavı silmek istediğinizden emin misiniz?')) return;
+        
+        try {
+            const response = await fetch(`/api/admin/exams/${examId}`, { method: 'DELETE' });
+            const data = await response.json();
+            
+            if (data.success) {
+                showToast('Sınav silindi!', 'success');
+                const element = document.getElementById(`exam-${examId}`);
+                if (element) element.remove();
+                loadReports();
+            } else {
+                showToast('Hata: ' + data.error, 'error');
+            }
+        } catch (error) {
+            showToast('Silme hatası: ' + error.message, 'error');
+        }
+    }
+    
+    async function deleteAssignment(assignmentId) {
+        if (!confirm('Bu ödevi silmek istediğinizden emin misiniz?')) return;
+        
+        try {
+            const response = await fetch(`/api/admin/assignments/${assignmentId}`, { method: 'DELETE' });
+            const data = await response.json();
+            
+            if (data.success) {
+                showToast('Ödev silindi!', 'success');
+                const element = document.getElementById(`assignment-${assignmentId}`);
+                if (element) element.remove();
+                loadReports();
+            } else {
+                showToast('Hata: ' + data.error, 'error');
+            }
+        } catch (error) {
+            showToast('Silme hatası: ' + error.message, 'error');
+        }
+    }
+    
+    async function deleteAnnouncement(announcementId) {
+        if (!confirm('Bu duyuruyu silmek istediğinizden emin misiniz?')) return;
+        
+        try {
+            const response = await fetch(`/api/admin/announcements/${announcementId}`, { method: 'DELETE' });
+            const data = await response.json();
+            
+            if (data.success) {
+                showToast('Duyuru silindi!', 'success');
+                const element = document.getElementById(`announcement-${announcementId}`);
+                if (element) element.remove();
+                loadReports();
+            } else {
+                showToast('Hata: ' + data.error, 'error');
+            }
+        } catch (error) {
+            showToast('Silme hatası: ' + error.message, 'error');
+        }
+    }
+    
+    function toggleSelectAllExams(checkbox, teacherId) {
+        document.querySelectorAll(`.exam-checkbox-${teacherId}`).forEach(cb => cb.checked = checkbox.checked);
+        updateExamSelection(teacherId);
+    }
+    
+    function updateExamSelection(teacherId) {
+        const checkboxes = document.querySelectorAll(`.exam-checkbox-${teacherId}:checked`);
+        const count = checkboxes.length;
+        const btn = document.getElementById(`bulkDeleteExamsBtn-${teacherId}`);
+        const countSpan = document.getElementById(`examSelectedCount-${teacherId}`);
+        if (countSpan) countSpan.textContent = count;
+        if (btn) btn.disabled = count === 0;
+    }
+    
+    async function bulkDeleteExams(teacherId) {
+        const checkboxes = document.querySelectorAll(`.exam-checkbox-${teacherId}:checked`);
+        const ids = Array.from(checkboxes).map(cb => cb.value);
+        
+        if (ids.length === 0) { showToast('Lütfen en az bir sınav seçin!', 'error'); return; }
+        if (!confirm(`${ids.length} sınavı silmek istediğinizden emin misiniz?`)) return;
+        
+        let successCount = 0;
+        for (const examId of ids) {
+            try {
+                const response = await fetch(`/api/admin/exams/${examId}`, { method: 'DELETE' });
+                const data = await response.json();
+                if (data.success) {
+                    successCount++;
+                    const element = document.getElementById(`exam-${examId}`);
+                    if (element) element.remove();
+                }
+            } catch (error) {}
+        }
+        
+        if (successCount > 0) {
+            showToast(`${successCount} sınav silindi!`, 'success');
+            loadReports();
+        }
+    }
+    
+    function toggleSelectAllAssignments(checkbox, teacherId) {
+        document.querySelectorAll(`.assignment-checkbox-${teacherId}`).forEach(cb => cb.checked = checkbox.checked);
+        updateAssignmentSelection(teacherId);
+    }
+    
+    function updateAssignmentSelection(teacherId) {
+        const checkboxes = document.querySelectorAll(`.assignment-checkbox-${teacherId}:checked`);
+        const count = checkboxes.length;
+        const btn = document.getElementById(`bulkDeleteAssignmentsBtn-${teacherId}`);
+        const countSpan = document.getElementById(`assignmentSelectedCount-${teacherId}`);
+        if (countSpan) countSpan.textContent = count;
+        if (btn) btn.disabled = count === 0;
+    }
+    
+    async function bulkDeleteAssignments(teacherId) {
+        const checkboxes = document.querySelectorAll(`.assignment-checkbox-${teacherId}:checked`);
+        const ids = Array.from(checkboxes).map(cb => cb.value);
+        
+        if (ids.length === 0) { showToast('Lütfen en az bir ödev seçin!', 'error'); return; }
+        if (!confirm(`${ids.length} ödevi silmek istediğinizden emin misiniz?`)) return;
+        
+        let successCount = 0;
+        for (const assignmentId of ids) {
+            try {
+                const response = await fetch(`/api/admin/assignments/${assignmentId}`, { method: 'DELETE' });
+                const data = await response.json();
+                if (data.success) {
+                    successCount++;
+                    const element = document.getElementById(`assignment-${assignmentId}`);
+                    if (element) element.remove();
+                }
+            } catch (error) {}
+        }
+        
+        if (successCount > 0) {
+            showToast(`${successCount} ödev silindi!`, 'success');
+            loadReports();
+        }
+    }
+    
+    function toggleSelectAllAnnouncements(checkbox, teacherId) {
+        document.querySelectorAll(`.announcement-checkbox-${teacherId}`).forEach(cb => cb.checked = checkbox.checked);
+        updateAnnouncementSelection(teacherId);
+    }
+    
+    function updateAnnouncementSelection(teacherId) {
+        const checkboxes = document.querySelectorAll(`.announcement-checkbox-${teacherId}:checked`);
+        const count = checkboxes.length;
+        const btn = document.getElementById(`bulkDeleteAnnouncementsBtn-${teacherId}`);
+        const countSpan = document.getElementById(`announcementSelectedCount-${teacherId}`);
+        if (countSpan) countSpan.textContent = count;
+        if (btn) btn.disabled = count === 0;
+    }
+    
+    async function bulkDeleteAnnouncements(teacherId) {
+        const checkboxes = document.querySelectorAll(`.announcement-checkbox-${teacherId}:checked`);
+        const ids = Array.from(checkboxes).map(cb => cb.value);
+        
+        if (ids.length === 0) { showToast('Lütfen en az bir duyuru seçin!', 'error'); return; }
+        if (!confirm(`${ids.length} duyuruyu silmek istediğinizden emin misiniz?`)) return;
+        
+        let successCount = 0;
+        for (const announcementId of ids) {
+            try {
+                const response = await fetch(`/api/admin/announcements/${announcementId}`, { method: 'DELETE' });
+                const data = await response.json();
+                if (data.success) {
+                    successCount++;
+                    const element = document.getElementById(`announcement-${announcementId}`);
+                    if (element) element.remove();
+                }
+            } catch (error) {}
+        }
+        
+        if (successCount > 0) {
+            showToast(`${successCount} duyuru silindi!`, 'success');
+            loadReports();
+        }
+    }
+    
+    loadReports();
+</script>
+{% endblock %}

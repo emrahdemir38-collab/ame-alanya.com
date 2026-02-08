@@ -1,0 +1,1719 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Karne Analizi{% endblock %}
+
+{% block extra_css %}
+<style>
+    .report-cards-container {
+        padding: 20px;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+    
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+    
+    .page-title {
+        font-size: 1.75rem;
+        font-weight: 600;
+        color: #1f2937;
+    }
+    
+    .controls {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    
+    .filter-select {
+        padding: 10px 16px;
+        border-radius: 8px;
+        font-size: 0.95rem;
+        border: 1px solid #d1d5db;
+        background: white;
+        min-width: 180px;
+    }
+    
+    .action-btn {
+        padding: 10px 18px;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        border: none;
+        color: white;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s;
+    }
+    
+    .action-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    
+    .btn-primary { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+    .btn-success { background: linear-gradient(135deg, #10b981, #059669); }
+    .btn-warning { background: linear-gradient(135deg, #f59e0b, #d97706); }
+    .btn-danger { background: linear-gradient(135deg, #ef4444, #dc2626); }
+    .btn-purple { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+    .btn-indigo { background: linear-gradient(135deg, #6366f1, #4f46e5); }
+    .btn-green { background: linear-gradient(135deg, #22c55e, #16a34a); }
+    
+    .content-card {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        margin-bottom: 20px;
+    }
+    
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    
+    .card-title {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #1f2937;
+    }
+    
+    .exams-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .exams-table th, .exams-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .exams-table th {
+        background: #f9fafb;
+        font-weight: 600;
+        color: #374151;
+    }
+    
+    .exams-table tr:hover {
+        background: #f9fafb;
+    }
+    
+    .students-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .students-table th, .students-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .students-table th {
+        background: #f3f4f6;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+    
+    .students-table tr:hover {
+        background: #f9fafb;
+    }
+    
+    .correct { color: #10b981; font-weight: 500; }
+    .wrong { color: #ef4444; font-weight: 500; }
+    .blank { color: #6b7280; }
+    .net { color: #3b82f6; font-weight: 600; }
+    
+    .btn-small {
+        padding: 6px 12px;
+        font-size: 0.8rem;
+        border-radius: 6px;
+        cursor: pointer;
+        border: none;
+        color: white;
+        margin-right: 4px;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #6b7280;
+    }
+    
+    .empty-icon {
+        font-size: 3rem;
+        margin-bottom: 16px;
+    }
+    
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.7);
+        justify-content: center;
+        align-items: center;
+        z-index: 2147483647;
+    }
+    
+    .modal-content {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        max-width: 95%;
+        width: 1200px;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    
+    .modal-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #1f2937;
+    }
+    
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: #6b7280;
+    }
+    
+    .outcome-grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    }
+    
+    .subject-block {
+        background: #f9fafb;
+        padding: 16px;
+        border-radius: 12px;
+    }
+    
+    .subject-title {
+        font-weight: 600;
+        color: #2563eb;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .outcome-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .outcome-table th, .outcome-table td {
+        padding: 8px;
+        text-align: left;
+        border-bottom: 1px solid #e5e7eb;
+        word-wrap: break-word;
+        word-break: break-word;
+    }
+    
+    .outcome-table td:first-child {
+        max-width: 400px;
+        white-space: normal;
+    }
+    
+    .outcome-table th {
+        background: #f3f4f6;
+        font-size: 0.8rem;
+    }
+    
+    .error-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+    }
+    
+    .error-table th, .error-table td {
+        padding: 10px;
+        text-align: left;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .error-table th {
+        background: #fef2f2;
+    }
+    
+    .error-row {
+        background: #fff5f5;
+    }
+    
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #f3f4f6;
+        border-top: 4px solid #3b82f6;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 16px;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .view-btn {
+        padding: 6px 12px;
+        background: #3b82f6;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        margin-right: 6px;
+    }
+    
+    .view-btn:hover {
+        background: #2563eb;
+    }
+    
+    .download-btn {
+        padding: 6px 12px;
+        background: #10b981;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.85rem;
+    }
+    
+    .download-btn:hover {
+        background: #059669;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="report-cards-container">
+    <div class="page-header">
+        <h1 class="page-title">📊 Karne Analizi</h1>
+        <div class="controls">
+            <button class="action-btn btn-indigo" onclick="openMultiExamModal()">
+                📈 Toplu Gelisim Raporu
+            </button>
+            <button class="action-btn btn-purple" onclick="openClassOutcomeModal()">
+                🎯 Sinif Kazanim Analizi
+            </button>
+            <button class="action-btn btn-danger" onclick="openClassErrorModal()">
+                📋 Sinif Hata Analizi
+            </button>
+            <button class="action-btn btn-warning" onclick="openStudentOutcomeModal()">
+                🎯 Ogrenci Kazanim Analizi
+            </button>
+            <button class="action-btn btn-green" onclick="openStudentErrorModal()">
+                ❌ Ogrenci Hata Karnesi
+            </button>
+        </div>
+    </div>
+    
+    <div class="content-card">
+        <div class="card-header">
+            <h2 class="card-title">Sinavlar</h2>
+            <div class="controls">
+                <select id="classFilter" class="filter-select" onchange="filterExamsByClass()">
+                    <option value="">Tum Siniflar</option>
+                </select>
+            </div>
+        </div>
+        <div id="examsListContainer">
+            <div class="empty-state">
+                <div class="spinner"></div>
+                <p>Sinavlar yukleniyor...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="studentsModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 class="modal-title" id="studentsModalTitle">Ogrenci Listesi</h2>
+            <button class="modal-close" onclick="closeModal('studentsModal')">&times;</button>
+        </div>
+        <div id="studentsContainer"></div>
+    </div>
+</div>
+
+<div id="outcomeModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 class="modal-title" id="outcomeModalTitle">Kazanim Analizi</h2>
+            <div>
+                <button class="download-btn" id="outcomePdfBtn" style="display:none;">PDF Indir</button>
+                <button class="modal-close" onclick="closeModal('outcomeModal')">&times;</button>
+            </div>
+        </div>
+        <div id="outcomeContent"></div>
+    </div>
+</div>
+
+<div id="errorModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 class="modal-title" id="errorModalTitle">Hata Karnesi</h2>
+            <div>
+                <button class="download-btn" id="errorPdfBtn" style="display:none;">PDF Indir</button>
+                <button class="modal-close" onclick="closeModal('errorModal')">&times;</button>
+            </div>
+        </div>
+        <div id="errorContent"></div>
+    </div>
+</div>
+
+<script>
+let exams = [];
+let classes = [];
+const userRole = '{{ current_user.role }}';
+
+document.addEventListener('DOMContentLoaded', loadData);
+
+async function loadData() {
+    try {
+        const response = await fetch('/admin/report-cards/api/teacher-class-exams');
+        if (!response.ok) throw new Error('API hatasi');
+        
+        const data = await response.json();
+        exams = data.exams || [];
+        classes = data.classes || [];
+        
+        const classFilter = document.getElementById('classFilter');
+        classFilter.innerHTML = '<option value="">Tum Siniflar</option>' + 
+            classes.map(c => `<option value="${c}">${c}</option>`).join('');
+        
+        renderExamsList(exams);
+    } catch (error) {
+        console.error('Yukleme hatasi:', error);
+        document.getElementById('examsListContainer').innerHTML = 
+            '<div class="empty-state"><div class="empty-icon">⚠️</div><p>Veriler yuklenemedi</p></div>';
+    }
+}
+
+function filterExamsByClass() {
+    const selectedClass = document.getElementById('classFilter').value;
+    if (!selectedClass) {
+        renderExamsList(exams);
+    } else {
+        renderExamsList(exams);
+    }
+}
+
+function renderExamsList(examList) {
+    const container = document.getElementById('examsListContainer');
+    
+    if (!examList || examList.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div><p>Henuz sinav yuklenmemis</p></div>';
+        return;
+    }
+    
+    let html = `
+        <table class="exams-table">
+            <thead>
+                <tr>
+                    <th>Sinav Adi</th>
+                    <th>Seviye</th>
+                    <th>Ogrenci Sayisi</th>
+                    <th>Yukleme Tarihi</th>
+                    <th>Islemler</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    examList.forEach(exam => {
+        const date = exam.upload_date ? new Date(exam.upload_date).toLocaleDateString('tr-TR') : '-';
+        html += `
+            <tr>
+                <td><strong>${exam.exam_name || 'Isimsiz'}</strong></td>
+                <td>${exam.grade_level || '-'}. Sinif</td>
+                <td>${exam.student_count || 0} ogrenci</td>
+                <td>${date}</td>
+                <td>
+                    <button class="view-btn" onclick="viewExamStudents(${exam.id}, '${exam.exam_name || ''}')">
+                        👁 Goruntule
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+async function viewExamStudents(examId, examName) {
+    const selectedClass = document.getElementById('classFilter').value;
+    document.getElementById('studentsModalTitle').textContent = examName + ' - Ogrenci Listesi';
+    openModal('studentsModal');
+    
+    const container = document.getElementById('studentsContainer');
+    container.innerHTML = '<div style="text-align: center; padding: 40px;"><div class="spinner"></div><p>Yukleniyor...</p></div>';
+    
+    try {
+        let url = `/admin/report-cards/api/exam-students/${examId}`;
+        if (selectedClass) url += `?class_name=${encodeURIComponent(selectedClass)}`;
+        
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('API hatasi');
+        
+        const data = await response.json();
+        const students = data.students || [];
+        
+        if (students.length === 0) {
+            container.innerHTML = '<div class="empty-state"><p>Ogrenci bulunamadi</p></div>';
+            return;
+        }
+        
+        let html = `
+            <table class="students-table">
+                <thead>
+                    <tr>
+                        <th>No</th>
+                        <th>Ogrenci</th>
+                        <th>Sinif</th>
+                        <th class="correct">Dogru</th>
+                        <th class="wrong">Hatali</th>
+                        <th class="blank">Bos</th>
+                        <th class="net">Net</th>
+                        <th>Islemler</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        students.forEach(s => {
+            html += `
+                <tr>
+                    <td>${s.student_no || '-'}</td>
+                    <td><strong>${s.student_name || '-'}</strong></td>
+                    <td>${s.class_name || '-'}</td>
+                    <td class="correct">${s.total_correct || 0}</td>
+                    <td class="wrong">${s.total_wrong || 0}</td>
+                    <td class="blank">${s.total_blank || 0}</td>
+                    <td class="net">${(s.total_net || 0).toFixed(2)}</td>
+                    <td>
+                        <button class="btn-small btn-warning" onclick="showOutcome(${s.id}, '${s.student_name}')">🎯 Kazanim</button>
+                        <button class="btn-small btn-danger" onclick="showError(${s.id}, '${s.student_name}')">❌ Hata</button>
+                        <button class="btn-small btn-purple" onclick="openStudentMultiExamModal('${s.student_no}', '${s.student_name}', '${s.class_name}')">📊 Coklu</button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table>';
+        container.innerHTML = html;
+        
+    } catch (error) {
+        container.innerHTML = `<div class="empty-state"><p>Hata: ${error.message}</p></div>`;
+    }
+}
+
+async function showOutcome(resultId, studentName) {
+    document.getElementById('outcomeModalTitle').textContent = studentName + ' - Kazanim Analizi';
+    openModal('outcomeModal');
+    
+    const content = document.getElementById('outcomeContent');
+    content.innerHTML = '<div style="text-align: center; padding: 40px;"><div class="spinner"></div></div>';
+    
+    const pdfBtn = document.getElementById('outcomePdfBtn');
+    pdfBtn.style.display = 'inline-block';
+    pdfBtn.onclick = () => window.open(`/admin/report-cards/api/student-outcome-pdf/${resultId}`, '_blank');
+    
+    try {
+        const response = await fetch(`/admin/report-cards/api/student-outcome-analysis/${resultId}`);
+        if (!response.ok) throw new Error('API hatasi');
+        
+        const data = await response.json();
+        renderOutcomeAnalysis(data, content);
+    } catch (error) {
+        content.innerHTML = `<div class="empty-state"><p>Hata: ${error.message}</p></div>`;
+    }
+}
+
+function renderOutcomeAnalysis(data, container) {
+    const outcomeData = data.outcome_data || data.subjects || {};
+    if (Object.keys(outcomeData).length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>Kazanim verisi bulunamadi</p></div>';
+        return;
+    }
+    
+    let html = '<div class="outcome-grid">';
+    
+    for (const [subject, outcomes] of Object.entries(outcomeData)) {
+        html += `
+            <div class="subject-block">
+                <div class="subject-title">📚 ${subject}</div>
+                <table class="outcome-table">
+                    <thead>
+                        <tr>
+                            <th>Kazanim</th>
+                            <th>Dogru</th>
+                            <th>Hatali</th>
+                            <th>Basari</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        for (const [outcomeName, stats] of Object.entries(outcomes)) {
+            const successRate = stats.success_rate || 0;
+            const successClass = successRate >= 70 ? 'correct' : (successRate >= 50 ? 'blank' : 'wrong');
+            html += `
+                <tr>
+                    <td style="font-size: 0.85rem;">${outcomeName}</td>
+                    <td class="correct">${stats.correct || 0}</td>
+                    <td class="wrong">${stats.wrong || 0}</td>
+                    <td class="${successClass}">${successRate}%</td>
+                </tr>
+            `;
+        }
+        
+        html += '</tbody></table></div>';
+    }
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+async function showError(resultId, studentName) {
+    document.getElementById('errorModalTitle').textContent = studentName + ' - Hata Karnesi';
+    openModal('errorModal');
+    
+    const content = document.getElementById('errorContent');
+    content.innerHTML = '<div style="text-align: center; padding: 40px;"><div class="spinner"></div></div>';
+    
+    const pdfBtn = document.getElementById('errorPdfBtn');
+    pdfBtn.style.display = 'inline-block';
+    pdfBtn.onclick = () => window.open(`/admin/report-cards/api/student-error-pdf/${resultId}`, '_blank');
+    
+    try {
+        const response = await fetch(`/admin/report-cards/api/student-error-report/${resultId}`);
+        if (!response.ok) throw new Error('API hatasi');
+        
+        const data = await response.json();
+        renderErrorReport(data, content);
+    } catch (error) {
+        content.innerHTML = `<div class="empty-state"><p>Hata: ${error.message}</p></div>`;
+    }
+}
+
+function renderErrorReport(data, container) {
+    const errorsBySubject = data.errors_by_subject || data.subjects || {};
+    const totals = data.totals || {};
+    
+    if (Object.keys(errorsBySubject).length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>Hata verisi bulunamadi</p></div>';
+        return;
+    }
+    
+    const totalCorrect = totals.correct_count || totals.correct || 0;
+    const totalWrong = totals.wrong_count || totals.wrong || 0;
+    const totalBlank = totals.blank_count || totals.blank || 0;
+    const totalNet = totals.net_score || totals.net || 0;
+    
+    let html = `
+        <div style="background: #fef2f2; padding: 16px; border-radius: 12px; margin-bottom: 20px;">
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; text-align: center;">
+                <div><div class="correct" style="font-size: 1.5rem; font-weight: 600;">${totalCorrect}</div><div style="color: #6b7280;">Dogru</div></div>
+                <div><div class="wrong" style="font-size: 1.5rem; font-weight: 600;">${totalWrong}</div><div style="color: #6b7280;">Hatali</div></div>
+                <div><div class="blank" style="font-size: 1.5rem; font-weight: 600;">${totalBlank}</div><div style="color: #6b7280;">Bos</div></div>
+                <div><div class="net" style="font-size: 1.5rem; font-weight: 600;">${Number(totalNet).toFixed(2)}</div><div style="color: #6b7280;">Net</div></div>
+            </div>
+        </div>
+    `;
+    
+    html += '<div class="outcome-grid">';
+    
+    for (const [subjectKey, subjectData] of Object.entries(errorsBySubject)) {
+        const subjectName = subjectData.subject_label || subjectKey;
+        html += `
+            <div class="subject-block">
+                <div class="subject-title">📕 ${subjectName}</div>
+                <table class="error-table">
+                    <thead>
+                        <tr>
+                            <th>S.No</th>
+                            <th>Cevap</th>
+                            <th>Dogru</th>
+                            <th>Sonuc</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        (subjectData.errors || []).forEach(e => {
+            const isWrong = e.status === 'wrong';
+            const statusText = isWrong ? 'Hatali' : 'Bos';
+            const resultClass = isWrong ? 'wrong' : 'blank';
+            html += `
+                <tr class="error-row">
+                    <td>${e.question_number || '-'}</td>
+                    <td>${e.student_answer || '-'}</td>
+                    <td>${e.correct_answer || '-'}</td>
+                    <td class="${resultClass}">${statusText}</td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table></div>';
+    }
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function openMultiExamModal() {
+    const existing = document.getElementById('multiExamModal');
+    if (existing) existing.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'multiExamModal';
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">📈 Toplu Sinav Gelisim Raporu</h2>
+                <button class="modal-close" onclick="closeModal('multiExamModal')">&times;</button>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <label style="font-weight: 600; display: block; margin-bottom: 8px;">Sinif Secin:</label>
+                <select id="multiExamClassSelect" class="filter-select">
+                    <option value="">Sinif Secin</option>
+                    ${classes.map(c => '<option value="' + c + '">' + c + '</option>').join('')}
+                </select>
+                <button class="action-btn btn-indigo" onclick="loadMultiExamProgress()" style="margin-left: 12px;">
+                    Raporu Getir
+                </button>
+            </div>
+            <div id="multiExamResults" style="background: #f9fafb; padding: 16px; border-radius: 8px;">
+                <p style="color: #6b7280; text-align: center;">Sinif secip raporu getirin</p>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+async function loadMultiExamProgress() {
+    const className = document.getElementById('multiExamClassSelect').value;
+    if (!className) { alert('Lutfen sinif secin'); return; }
+    
+    const resultsDiv = document.getElementById('multiExamResults');
+    resultsDiv.innerHTML = '<div style="text-align: center;"><div class="spinner"></div><p>Yukleniyor...</p></div>';
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/multi-exam-progress', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ class_name: className })
+        });
+        
+        const data = await response.json();
+        if (!response.ok) { resultsDiv.innerHTML = `<p style="color: #ef4444;">${data.error}</p>`; return; }
+        
+        if (!data.students || data.students.length === 0) {
+            resultsDiv.innerHTML = '<p style="color: #6b7280; text-align: center;">Bu sinif icin veri bulunamadi</p>';
+            return;
+        }
+        
+        let html = `<h3 style="margin-bottom: 16px;">Sinavlar: ${data.exam_names.join(' → ')}</h3>`;
+        html += '<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">';
+        html += '<thead><tr style="background: #6366f1; color: white;"><th style="padding: 12px;">Ogrenci</th>';
+        data.exam_names.forEach(name => { html += `<th style="padding: 12px;">${name}<br><small>(Net)</small></th>`; });
+        html += '<th style="padding: 12px;">Gelisim</th></tr></thead><tbody>';
+        
+        data.students.sort((a, b) => b.net_change - a.net_change);
+        data.students.forEach((student, idx) => {
+            const rowBg = idx % 2 === 0 ? '#fff' : '#f9fafb';
+            html += `<tr style="background: ${rowBg};"><td style="padding: 10px; border: 1px solid #e5e7eb;">${student.student_name}</td>`;
+            data.exam_names.forEach(name => {
+                const examData = student.exams[name];
+                html += examData ? `<td style="padding: 10px; border: 1px solid #e5e7eb; text-align: center;"><strong>${examData.total_net}</strong><br><small>${examData.total_correct}D ${examData.total_wrong}Y</small></td>` : '<td style="padding: 10px; border: 1px solid #e5e7eb; text-align: center; color: #9ca3af;">-</td>';
+            });
+            const changeColor = student.net_change > 0 ? '#10b981' : (student.net_change < 0 ? '#ef4444' : '#6b7280');
+            html += `<td style="padding: 10px; border: 1px solid #e5e7eb; text-align: center; font-weight: 600; color: ${changeColor};">${student.net_change > 0 ? '+' : ''}${student.net_change}</td></tr>`;
+        });
+        html += '</tbody></table></div>';
+        
+        resultsDiv.innerHTML = html;
+    } catch (error) { 
+        resultsDiv.innerHTML = `<p style="color: #ef4444;">Hata: ${error.message}</p>`; 
+    }
+}
+
+function openClassOutcomeModal() {
+    const existing = document.getElementById('classOutcomeModal');
+    if (existing) existing.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'classOutcomeModal';
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">🎯 Sinif Kazanim Analizi</h2>
+                <button class="modal-close" onclick="closeModal('classOutcomeModal')">&times;</button>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <label style="font-weight: 600; display: block; margin-bottom: 8px;">Önce Sinif Secin:</label>
+                <select id="classOutcomeClassSelect" class="filter-select" style="width: 100%;" onchange="filterOutcomeExamsByClass()">
+                    <option value="">Sinif Secin</option>
+                    ${classes.map(c => '<option value="' + c + '">' + c + '</option>').join('')}
+                </select>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <label style="font-weight: 600; display: block; margin-bottom: 8px;">Sinavlar (birden fazla secilebilir):</label>
+                <div id="classOutcomeExamCheckboxes" style="max-height: 200px; overflow-y: auto; border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; background: #f9fafb;">
+                    <p style="color: #6b7280; text-align: center;">Önce sinif secin</p>
+                </div>
+            </div>
+            <div style="margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap;">
+                <button class="action-btn btn-purple" onclick="loadClassOutcome()">
+                    Analizi Getir
+                </button>
+                <button class="action-btn btn-success" id="classOutcomePdfBtn" style="display: none;" onclick="downloadClassOutcomePdf()">
+                    📄 PDF Indir
+                </button>
+            </div>
+            <div id="classOutcomeResults" style="background: #f9fafb; padding: 16px; border-radius: 8px;">
+                <p style="color: #6b7280; text-align: center;">Sinif ve sinav(lar) secip analizi getirin</p>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function filterOutcomeExamsByClass() {
+    const selectedClass = document.getElementById('classOutcomeClassSelect').value;
+    const container = document.getElementById('classOutcomeExamCheckboxes');
+    
+    if (!selectedClass) {
+        container.innerHTML = '<p style="color: #6b7280; text-align: center;">Önce sinif secin</p>';
+        return;
+    }
+    
+    const gradeLevel = selectedClass.replace(/[^0-9]/g, '').charAt(0);
+    const filteredExams = exams.filter(e => {
+        const examGrade = String(e.grade_level || '');
+        const examNameGrade = (e.exam_name || '').match(/^(\d)/);
+        return examGrade === gradeLevel || (examNameGrade && examNameGrade[1] === gradeLevel);
+    });
+    
+    if (filteredExams.length === 0) {
+        container.innerHTML = `<p style="color: #6b7280; text-align: center;">${gradeLevel}. sinif icin sinav bulunamadi</p>`;
+        return;
+    }
+    
+    container.innerHTML = filteredExams.map(e => `
+        <label style="display: flex; align-items: center; gap: 8px; padding: 6px 0; cursor: pointer;">
+            <input type="checkbox" class="outcome-exam-checkbox" value="${e.id}">
+            <span>${e.exam_name}</span>
+        </label>
+    `).join('');
+}
+
+async function loadClassOutcome() {
+    const className = document.getElementById('classOutcomeClassSelect').value;
+    if (!className) { alert('Lutfen önce bir sinif secin'); return; }
+    
+    const selectedExams = Array.from(document.querySelectorAll('.outcome-exam-checkbox:checked')).map(cb => cb.value);
+    if (selectedExams.length === 0) { alert('Lutfen en az bir sinav secin'); return; }
+    
+    const resultsDiv = document.getElementById('classOutcomeResults');
+    resultsDiv.innerHTML = '<div style="text-align: center;"><div class="spinner"></div><p>Yukleniyor...</p></div>';
+    
+    try {
+        let url = `/admin/report-cards/api/class-outcome-analysis-multi?exam_ids=${selectedExams.join(',')}`;
+        if (className) url += `&class_name=${encodeURIComponent(className)}`;
+        
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('API hatasi');
+        
+        const data = await response.json();
+        
+        if (!data.subjects || Object.keys(data.subjects).length === 0) {
+            resultsDiv.innerHTML = '<p style="color: #6b7280; text-align: center;">Kazanim verisi bulunamadi</p>';
+            return;
+        }
+        
+        let html = '<div class="outcome-grid">';
+        
+        for (const [subject, outcomes] of Object.entries(data.subjects)) {
+            html += `
+                <div class="subject-block">
+                    <div class="subject-title">📚 ${subject}</div>
+                    <table class="outcome-table">
+                        <thead>
+                            <tr>
+                                <th>Kazanim</th>
+                                <th>Dogru</th>
+                                <th>Hatali</th>
+                                <th>Basari %</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            outcomes.forEach(o => {
+                const successRate = o.total > 0 ? ((o.correct / o.total) * 100).toFixed(1) : 0;
+                const successClass = successRate >= 70 ? 'correct' : (successRate >= 50 ? 'blank' : 'wrong');
+                html += `
+                    <tr>
+                        <td style="font-size: 0.85rem;">${o.outcome || '-'}</td>
+                        <td class="correct">${o.correct || 0}</td>
+                        <td class="wrong">${o.wrong || 0}</td>
+                        <td class="${successClass}">${successRate}%</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table></div>';
+        }
+        
+        html += '</div>';
+        resultsDiv.innerHTML = html;
+        
+        document.getElementById('classOutcomePdfBtn').style.display = 'inline-flex';
+        
+    } catch (error) {
+        resultsDiv.innerHTML = `<p style="color: #ef4444;">Hata: ${error.message}</p>`;
+        document.getElementById('classOutcomePdfBtn').style.display = 'none';
+    }
+}
+
+function downloadClassOutcomePdf() {
+    const className = document.getElementById('classOutcomeClassSelect').value;
+    const selectedExams = Array.from(document.querySelectorAll('.outcome-exam-checkbox:checked')).map(cb => cb.value);
+    if (selectedExams.length === 0) { alert('Lutfen en az bir sinav secin'); return; }
+    
+    let url = `/admin/report-cards/api/class-outcome-pdf?exam_ids=${selectedExams.join(',')}`;
+    if (className) url += `&class_name=${encodeURIComponent(className)}`;
+    window.open(url, '_blank');
+}
+
+function openClassErrorModal() {
+    const existing = document.getElementById('classErrorModal');
+    if (existing) existing.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'classErrorModal';
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">📋 Sinif Hata Analizi</h2>
+                <button class="modal-close" onclick="closeModal('classErrorModal')">&times;</button>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <label style="font-weight: 600; display: block; margin-bottom: 8px;">Önce Sinif Secin:</label>
+                <select id="classErrorClassSelect" class="filter-select" style="width: 100%;" onchange="filterErrorExamsByClass()">
+                    <option value="">Sinif Secin</option>
+                    ${classes.map(c => '<option value="' + c + '">' + c + '</option>').join('')}
+                </select>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <label style="font-weight: 600; display: block; margin-bottom: 8px;">Sinavlar (birden fazla secilebilir):</label>
+                <div id="classErrorExamCheckboxes" style="max-height: 200px; overflow-y: auto; border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; background: #f9fafb;">
+                    <p style="color: #6b7280; text-align: center;">Önce sinif secin</p>
+                </div>
+            </div>
+            <div style="margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap;">
+                <button class="action-btn btn-danger" onclick="loadClassError()">
+                    Analizi Getir
+                </button>
+                <button class="action-btn btn-success" id="classErrorPdfBtn" style="display: none;" onclick="downloadClassErrorPdf()">
+                    📄 PDF Indir
+                </button>
+            </div>
+            <div id="classErrorResults" style="background: #f9fafb; padding: 16px; border-radius: 8px;">
+                <p style="color: #6b7280; text-align: center;">Sinif ve sinav(lar) secip analizi getirin</p>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function filterErrorExamsByClass() {
+    const selectedClass = document.getElementById('classErrorClassSelect').value;
+    const container = document.getElementById('classErrorExamCheckboxes');
+    
+    if (!selectedClass) {
+        container.innerHTML = '<p style="color: #6b7280; text-align: center;">Önce sinif secin</p>';
+        return;
+    }
+    
+    const gradeLevel = selectedClass.replace(/[^0-9]/g, '').charAt(0);
+    const filteredExams = exams.filter(e => {
+        const examGrade = String(e.grade_level || '');
+        const examNameGrade = (e.exam_name || '').match(/^(\d)/);
+        return examGrade === gradeLevel || (examNameGrade && examNameGrade[1] === gradeLevel);
+    });
+    
+    if (filteredExams.length === 0) {
+        container.innerHTML = `<p style="color: #6b7280; text-align: center;">${gradeLevel}. sinif icin sinav bulunamadi</p>`;
+        return;
+    }
+    
+    container.innerHTML = filteredExams.map(e => `
+        <label style="display: flex; align-items: center; gap: 8px; padding: 6px 0; cursor: pointer;">
+            <input type="checkbox" class="error-exam-checkbox" value="${e.id}">
+            <span>${e.exam_name}</span>
+        </label>
+    `).join('');
+}
+
+async function loadClassError() {
+    const className = document.getElementById('classErrorClassSelect').value;
+    if (!className) { alert('Lutfen önce bir sinif secin'); return; }
+    
+    const selectedExams = Array.from(document.querySelectorAll('.error-exam-checkbox:checked')).map(cb => cb.value);
+    if (selectedExams.length === 0) { alert('Lutfen en az bir sinav secin'); return; }
+    
+    const resultsDiv = document.getElementById('classErrorResults');
+    resultsDiv.innerHTML = '<div style="text-align: center;"><div class="spinner"></div><p>Yukleniyor...</p></div>';
+    
+    try {
+        let url = `/admin/report-cards/api/class-error-analysis-multi?exam_ids=${selectedExams.join(',')}`;
+        if (className) url += `&class_name=${encodeURIComponent(className)}`;
+        
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('API hatasi');
+        
+        const data = await response.json();
+        
+        if (!data.subjects || Object.keys(data.subjects).length === 0) {
+            resultsDiv.innerHTML = '<p style="color: #6b7280; text-align: center;">Hata verisi bulunamadi</p>';
+            return;
+        }
+        
+        let html = `
+            <div style="background: #fef2f2; padding: 16px; border-radius: 12px; margin-bottom: 20px;">
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; text-align: center;">
+                    <div><div class="correct" style="font-size: 1.5rem; font-weight: 600;">${data.totals?.correct || 0}</div><div style="color: #6b7280;">Dogru</div></div>
+                    <div><div class="wrong" style="font-size: 1.5rem; font-weight: 600;">${data.totals?.wrong || 0}</div><div style="color: #6b7280;">Hatali</div></div>
+                    <div><div class="blank" style="font-size: 1.5rem; font-weight: 600;">${data.totals?.blank || 0}</div><div style="color: #6b7280;">Bos</div></div>
+                    <div><div style="font-size: 1.5rem; font-weight: 600; color: #3b82f6;">${data.student_count || 0}</div><div style="color: #6b7280;">Ogrenci</div></div>
+                </div>
+            </div>
+        `;
+        
+        html += '<div class="outcome-grid">';
+        
+        for (const [subject, questions] of Object.entries(data.subjects)) {
+            html += `
+                <div class="subject-block">
+                    <div class="subject-title">📕 ${subject}</div>
+                    <table class="error-table">
+                        <thead>
+                            <tr>
+                                <th>Sinav</th>
+                                <th>S.No</th>
+                                <th>Kazanim</th>
+                                <th>Hatali</th>
+                                <th>Bos</th>
+                                <th>Hata %</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            questions.forEach(q => {
+                const errorRate = q.total > 0 ? (((q.wrong + q.blank) / q.total) * 100).toFixed(1) : 0;
+                const errorClass = errorRate >= 50 ? 'wrong' : (errorRate >= 30 ? 'blank' : 'correct');
+                html += `
+                    <tr>
+                        <td style="font-size: 0.75rem; white-space: nowrap;">${q.exam_name || '-'}</td>
+                        <td>${q.question_number || '-'}</td>
+                        <td style="font-size: 0.8rem; max-width: 200px; word-wrap: break-word;">${q.outcome || '-'}</td>
+                        <td class="wrong">${q.wrong || 0}</td>
+                        <td class="blank">${q.blank || 0}</td>
+                        <td class="${errorClass}">${errorRate}%</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table></div>';
+        }
+        
+        html += '</div>';
+        resultsDiv.innerHTML = html;
+        
+        document.getElementById('classErrorPdfBtn').style.display = 'inline-flex';
+        
+    } catch (error) {
+        resultsDiv.innerHTML = `<p style="color: #ef4444;">Hata: ${error.message}</p>`;
+        document.getElementById('classErrorPdfBtn').style.display = 'none';
+    }
+}
+
+function downloadClassErrorPdf() {
+    const className = document.getElementById('classErrorClassSelect').value;
+    const selectedExams = Array.from(document.querySelectorAll('.error-exam-checkbox:checked')).map(cb => cb.value);
+    if (selectedExams.length === 0) { alert('Lutfen en az bir sinav secin'); return; }
+    
+    let url = `/admin/report-cards/api/class-error-pdf?exam_ids=${selectedExams.join(',')}`;
+    if (className) url += `&class_name=${encodeURIComponent(className)}`;
+    window.open(url, '_blank');
+}
+
+function openModal(id) {
+    document.getElementById(id).style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function closeModal(id) {
+    const modal = document.getElementById(id);
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    document.body.style.overflow = '';
+}
+
+// ==================== ÖĞRENCİ KAZANIM ANALİZİ (ÇOKLU SINAV) ====================
+function openStudentOutcomeModal() {
+    const existing = document.getElementById('studentOutcomeModal');
+    if (existing) existing.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'studentOutcomeModal';
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="modal-header">
+                <h2 class="modal-title">🎯 Ogrenci Kazanim Analizi</h2>
+                <button class="modal-close" onclick="closeModal('studentOutcomeModal')">&times;</button>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+                <div>
+                    <label style="font-weight: 600; display: block; margin-bottom: 8px;">1. Sinif Sec:</label>
+                    <select id="stuOutcomeClassSelect" class="filter-select" style="width: 100%;" onchange="filterStudentOutcomeExams()">
+                        <option value="">-- Sinif Secin --</option>
+                        {% for cls in teacher_classes %}
+                        <option value="{{ cls }}">{{ cls }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label style="font-weight: 600; display: block; margin-bottom: 8px;">2. Sinavlar:</label>
+                    <div id="stuOutcomeExamCheckboxes" style="max-height: 150px; overflow-y: auto; border: 1px solid #d1d5db; border-radius: 8px; padding: 8px; background: #f9fafb;">
+                        <p style="text-align: center; color: #6b7280; font-size: 0.85rem;">Sinif secin</p>
+                    </div>
+                </div>
+                <div>
+                    <label style="font-weight: 600; display: block; margin-bottom: 8px;">3. Ogrenci Sec:</label>
+                    <select id="stuOutcomeStudentSelect" class="filter-select" style="width: 100%;">
+                        <option value="">-- Sinif ve sinav secin --</option>
+                    </select>
+                </div>
+            </div>
+            <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+                <button class="action-btn btn-warning" onclick="loadStudentOutcomeAnalysis()">📊 Analizi Getir</button>
+                <button class="action-btn btn-success" id="stuOutcomePdfBtn" style="display: none;" onclick="downloadStudentOutcomePdf()">📄 PDF Indir</button>
+            </div>
+            <div id="stuOutcomeResults" style="background: #f9fafb; padding: 16px; border-radius: 8px; max-height: 400px; overflow-y: auto;">
+                <p style="color: #6b7280; text-align: center;">Sinif, sinav ve ogrenci secip analizi getirin</p>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+async function filterStudentOutcomeExams() {
+    const selectedClass = document.getElementById('stuOutcomeClassSelect').value;
+    const container = document.getElementById('stuOutcomeExamCheckboxes');
+    const studentSelect = document.getElementById('stuOutcomeStudentSelect');
+    
+    if (!selectedClass) {
+        container.innerHTML = '<p style="text-align: center; color: #6b7280; font-size: 0.85rem;">Sinif secin</p>';
+        studentSelect.innerHTML = '<option value="">-- Sinif ve sinav secin --</option>';
+        return;
+    }
+    
+    const gradeLevel = selectedClass.replace(/[^0-9]/g, '').charAt(0);
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/exams-list');
+        const data = await response.json();
+        
+        const filteredExams = (data.exams || []).filter(e => {
+            if (e.grade_level) return String(e.grade_level) === gradeLevel;
+            return e.exam_name && e.exam_name.includes(gradeLevel + '.');
+        });
+        
+        if (filteredExams.length > 0) {
+            container.innerHTML = filteredExams.map(e => `
+                <label style="display: flex; align-items: center; gap: 6px; padding: 4px 0; cursor: pointer; font-size: 0.85rem;">
+                    <input type="checkbox" class="stu-outcome-exam-cb" value="${e.id}" onchange="loadStudentOutcomeStudents()">
+                    ${e.exam_name}
+                </label>
+            `).join('');
+        } else {
+            container.innerHTML = '<p style="text-align: center; color: #6b7280; font-size: 0.85rem;">Bu sinif icin sinav yok</p>';
+        }
+        
+        studentSelect.innerHTML = '<option value="">-- Sinav secin --</option>';
+        
+    } catch (error) {
+        container.innerHTML = '<p style="color: #ef4444;">Hata olustu</p>';
+    }
+}
+
+async function loadStudentOutcomeStudents() {
+    const className = document.getElementById('stuOutcomeClassSelect').value;
+    const selectedExams = Array.from(document.querySelectorAll('.stu-outcome-exam-cb:checked')).map(cb => cb.value);
+    const studentSelect = document.getElementById('stuOutcomeStudentSelect');
+    
+    if (selectedExams.length === 0) {
+        studentSelect.innerHTML = '<option value="">-- Sinav secin --</option>';
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/admin/report-cards/api/class-students?class_name=${encodeURIComponent(className)}&exam_ids=${selectedExams.join(',')}`);
+        const data = await response.json();
+        
+        if (data.students && data.students.length > 0) {
+            studentSelect.innerHTML = '<option value="">-- Ogrenci Secin --</option>' + 
+                data.students.map(s => `<option value="${s.student_no}">${s.student_name} (${s.student_no})</option>`).join('');
+        } else {
+            studentSelect.innerHTML = '<option value="">Ogrenci bulunamadi</option>';
+        }
+    } catch (error) {
+        studentSelect.innerHTML = '<option value="">Hata olustu</option>';
+    }
+}
+
+async function loadStudentOutcomeAnalysis() {
+    const className = document.getElementById('stuOutcomeClassSelect').value;
+    const studentNo = document.getElementById('stuOutcomeStudentSelect').value;
+    const selectedExams = Array.from(document.querySelectorAll('.stu-outcome-exam-cb:checked')).map(cb => cb.value);
+    const resultsDiv = document.getElementById('stuOutcomeResults');
+    
+    if (!studentNo) { alert('Ogrenci secin'); return; }
+    if (selectedExams.length === 0) { alert('En az bir sinav secin'); return; }
+    
+    resultsDiv.innerHTML = '<p style="text-align: center;">Yukleniyor...</p>';
+    
+    try {
+        const response = await fetch(`/admin/report-cards/api/student-multi-outcome?student_no=${studentNo}&exam_ids=${selectedExams.join(',')}`);
+        const data = await response.json();
+        
+        if (data.error) throw new Error(data.error);
+        
+        let html = `<h3 style="margin-bottom: 16px; color: #1f2937;">${data.student_name} - Kazanim Analizi</h3>`;
+        
+        for (const [subject, outcomes] of Object.entries(data.outcomes || {})) {
+            html += `<div style="margin-bottom: 16px;">
+                <h4 style="color: #6366f1; margin-bottom: 8px;">${subject}</h4>
+                <table class="exams-table"><thead><tr>
+                    <th>Kazanim</th><th>Dogru</th><th>Hatali</th><th>Bos</th><th>Basari %</th>
+                </tr></thead><tbody>`;
+            
+            for (const [outcome, stats] of Object.entries(outcomes)) {
+                const total = stats.total || 1;
+                const success = Math.round((stats.correct / total) * 100);
+                const color = success >= 70 ? '#22c55e' : success >= 50 ? '#f59e0b' : '#ef4444';
+                html += `<tr>
+                    <td style="max-width: 300px; word-wrap: break-word;">${outcome}</td>
+                    <td>${stats.correct}</td><td>${stats.wrong}</td><td>${stats.blank}</td>
+                    <td style="color: ${color}; font-weight: 600;">%${success}</td>
+                </tr>`;
+            }
+            html += '</tbody></table></div>';
+        }
+        
+        resultsDiv.innerHTML = html;
+        document.getElementById('stuOutcomePdfBtn').style.display = 'inline-flex';
+        
+    } catch (error) {
+        resultsDiv.innerHTML = `<p style="color: #ef4444;">Hata: ${error.message}</p>`;
+        document.getElementById('stuOutcomePdfBtn').style.display = 'none';
+    }
+}
+
+function downloadStudentOutcomePdf() {
+    const studentNo = document.getElementById('stuOutcomeStudentSelect').value;
+    const selectedExams = Array.from(document.querySelectorAll('.stu-outcome-exam-cb:checked')).map(cb => cb.value);
+    if (!studentNo || selectedExams.length === 0) { alert('Ogrenci ve sinav secin'); return; }
+    window.open(`/admin/report-cards/api/student-multi-outcome-pdf?student_no=${studentNo}&exam_ids=${selectedExams.join(',')}`, '_blank');
+}
+
+// ==================== ÖĞRENCİ HATA KARNESİ (ÇOKLU SINAV) ====================
+function openStudentErrorModal() {
+    const existing = document.getElementById('studentErrorModal');
+    if (existing) existing.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'studentErrorModal';
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="modal-header">
+                <h2 class="modal-title">❌ Ogrenci Hata Karnesi</h2>
+                <button class="modal-close" onclick="closeModal('studentErrorModal')">&times;</button>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+                <div>
+                    <label style="font-weight: 600; display: block; margin-bottom: 8px;">1. Sinif Sec:</label>
+                    <select id="stuErrorClassSelect" class="filter-select" style="width: 100%;" onchange="filterStudentErrorExams()">
+                        <option value="">-- Sinif Secin --</option>
+                        {% for cls in teacher_classes %}
+                        <option value="{{ cls }}">{{ cls }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label style="font-weight: 600; display: block; margin-bottom: 8px;">2. Sinavlar:</label>
+                    <div id="stuErrorExamCheckboxes" style="max-height: 150px; overflow-y: auto; border: 1px solid #d1d5db; border-radius: 8px; padding: 8px; background: #f9fafb;">
+                        <p style="text-align: center; color: #6b7280; font-size: 0.85rem;">Sinif secin</p>
+                    </div>
+                </div>
+                <div>
+                    <label style="font-weight: 600; display: block; margin-bottom: 8px;">3. Ogrenci Sec:</label>
+                    <select id="stuErrorStudentSelect" class="filter-select" style="width: 100%;">
+                        <option value="">-- Sinif ve sinav secin --</option>
+                    </select>
+                </div>
+            </div>
+            <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+                <button class="action-btn btn-danger" onclick="loadStudentErrorAnalysis()">📊 Analizi Getir</button>
+                <button class="action-btn btn-success" id="stuErrorPdfBtn" style="display: none;" onclick="downloadStudentErrorPdf()">📄 PDF Indir</button>
+            </div>
+            <div id="stuErrorResults" style="background: #f9fafb; padding: 16px; border-radius: 8px; max-height: 400px; overflow-y: auto;">
+                <p style="color: #6b7280; text-align: center;">Sinif, sinav ve ogrenci secip analizi getirin</p>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+async function filterStudentErrorExams() {
+    const selectedClass = document.getElementById('stuErrorClassSelect').value;
+    const container = document.getElementById('stuErrorExamCheckboxes');
+    const studentSelect = document.getElementById('stuErrorStudentSelect');
+    
+    if (!selectedClass) {
+        container.innerHTML = '<p style="text-align: center; color: #6b7280; font-size: 0.85rem;">Sinif secin</p>';
+        studentSelect.innerHTML = '<option value="">-- Sinif ve sinav secin --</option>';
+        return;
+    }
+    
+    const gradeLevel = selectedClass.replace(/[^0-9]/g, '').charAt(0);
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/exams-list');
+        const data = await response.json();
+        
+        const filteredExams = (data.exams || []).filter(e => {
+            if (e.grade_level) return String(e.grade_level) === gradeLevel;
+            return e.exam_name && e.exam_name.includes(gradeLevel + '.');
+        });
+        
+        if (filteredExams.length > 0) {
+            container.innerHTML = filteredExams.map(e => `
+                <label style="display: flex; align-items: center; gap: 6px; padding: 4px 0; cursor: pointer; font-size: 0.85rem;">
+                    <input type="checkbox" class="stu-error-exam-cb" value="${e.id}" onchange="loadStudentErrorStudents()">
+                    ${e.exam_name}
+                </label>
+            `).join('');
+        } else {
+            container.innerHTML = '<p style="text-align: center; color: #6b7280; font-size: 0.85rem;">Bu sinif icin sinav yok</p>';
+        }
+        
+        studentSelect.innerHTML = '<option value="">-- Sinav secin --</option>';
+        
+    } catch (error) {
+        container.innerHTML = '<p style="color: #ef4444;">Hata olustu</p>';
+    }
+}
+
+async function loadStudentErrorStudents() {
+    const className = document.getElementById('stuErrorClassSelect').value;
+    const selectedExams = Array.from(document.querySelectorAll('.stu-error-exam-cb:checked')).map(cb => cb.value);
+    const studentSelect = document.getElementById('stuErrorStudentSelect');
+    
+    if (selectedExams.length === 0) {
+        studentSelect.innerHTML = '<option value="">-- Sinav secin --</option>';
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/admin/report-cards/api/class-students?class_name=${encodeURIComponent(className)}&exam_ids=${selectedExams.join(',')}`);
+        const data = await response.json();
+        
+        if (data.students && data.students.length > 0) {
+            studentSelect.innerHTML = '<option value="">-- Ogrenci Secin --</option>' + 
+                data.students.map(s => `<option value="${s.student_no}">${s.student_name} (${s.student_no})</option>`).join('');
+        } else {
+            studentSelect.innerHTML = '<option value="">Ogrenci bulunamadi</option>';
+        }
+    } catch (error) {
+        studentSelect.innerHTML = '<option value="">Hata olustu</option>';
+    }
+}
+
+async function loadStudentErrorAnalysis() {
+    const className = document.getElementById('stuErrorClassSelect').value;
+    const studentNo = document.getElementById('stuErrorStudentSelect').value;
+    const selectedExams = Array.from(document.querySelectorAll('.stu-error-exam-cb:checked')).map(cb => cb.value);
+    const resultsDiv = document.getElementById('stuErrorResults');
+    
+    if (!studentNo) { alert('Ogrenci secin'); return; }
+    if (selectedExams.length === 0) { alert('En az bir sinav secin'); return; }
+    
+    resultsDiv.innerHTML = '<p style="text-align: center;">Yukleniyor...</p>';
+    
+    try {
+        const response = await fetch(`/admin/report-cards/api/student-multi-error?student_no=${studentNo}&exam_ids=${selectedExams.join(',')}`);
+        const data = await response.json();
+        
+        if (data.error) throw new Error(data.error);
+        
+        let html = `<h3 style="margin-bottom: 16px; color: #1f2937;">${data.student_name} - Hata Karnesi</h3>`;
+        html += `<p style="margin-bottom: 12px; color: #6b7280;">Toplam: ${data.summary?.correct || 0} Dogru / ${data.summary?.wrong || 0} Hatali / ${data.summary?.blank || 0} Bos</p>`;
+        
+        for (const [subject, errors] of Object.entries(data.errors || {})) {
+            html += `<div style="margin-bottom: 16px;">
+                <h4 style="color: #dc2626; margin-bottom: 8px;">${subject} (${errors.length} hata)</h4>
+                <table class="exams-table"><thead><tr>
+                    <th>Sinav</th><th>Soru</th><th>Durum</th><th>Kazanim</th><th>Cevap</th>
+                </tr></thead><tbody>`;
+            
+            for (const err of errors) {
+                const statusText = err.status === 'wrong' ? 'Hatali' : 'Bos';
+                const statusColor = err.status === 'wrong' ? '#ef4444' : '#6b7280';
+                html += `<tr>
+                    <td>${err.exam_name || '-'}</td>
+                    <td style="text-align: center;">${err.question_number}</td>
+                    <td style="color: ${statusColor}; font-weight: 600;">${statusText}</td>
+                    <td style="max-width: 250px; word-wrap: break-word; font-size: 0.85rem;">${err.outcome}</td>
+                    <td>${err.student_answer || '-'} → ${err.correct_answer}</td>
+                </tr>`;
+            }
+            html += '</tbody></table></div>';
+        }
+        
+        resultsDiv.innerHTML = html;
+        document.getElementById('stuErrorPdfBtn').style.display = 'inline-flex';
+        
+    } catch (error) {
+        resultsDiv.innerHTML = `<p style="color: #ef4444;">Hata: ${error.message}</p>`;
+        document.getElementById('stuErrorPdfBtn').style.display = 'none';
+    }
+}
+
+function downloadStudentErrorPdf() {
+    const studentNo = document.getElementById('stuErrorStudentSelect').value;
+    const selectedExams = Array.from(document.querySelectorAll('.stu-error-exam-cb:checked')).map(cb => cb.value);
+    if (!studentNo || selectedExams.length === 0) { alert('Ogrenci ve sinav secin'); return; }
+    window.open(`/admin/report-cards/api/student-multi-error-pdf?student_no=${studentNo}&exam_ids=${selectedExams.join(',')}`, '_blank');
+}
+
+function openStudentMultiExamModal(studentNo, studentName, className) {
+    const existing = document.getElementById('studentMultiExamModal');
+    if (existing) existing.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'studentMultiExamModal';
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">📊 ${studentName} - Coklu Sinav Analizi</h2>
+                <button class="modal-close" onclick="closeModal('studentMultiExamModal')">&times;</button>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <label style="font-weight: 600; display: block; margin-bottom: 8px;">Sinavlar (birden fazla secilebilir):</label>
+                <div id="studentExamCheckboxes" style="max-height: 200px; overflow-y: auto; border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; background: #f9fafb;">
+                    <p style="text-align: center; color: #6b7280;">Yukleniyor...</p>
+                </div>
+            </div>
+            <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px;">
+                <button class="action-btn btn-warning" onclick="loadStudentMultiOutcome('${studentNo}', '${studentName}')">🎯 Kazanim Analizi</button>
+                <button class="action-btn btn-danger" onclick="loadStudentMultiError('${studentNo}', '${studentName}')">❌ Hata Karnesi</button>
+            </div>
+            <div id="studentMultiResults" style="background: #f9fafb; padding: 16px; border-radius: 8px;">
+                <p style="color: #6b7280; text-align: center;">Sinavlari secip analiz butonuna tiklayin</p>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    
+    loadStudentExams(studentNo, className);
+}
+
+async function loadStudentExams(studentNo, className) {
+    const container = document.getElementById('studentExamCheckboxes');
+    
+    try {
+        const response = await fetch(`/admin/report-cards/api/student-exams?student_no=${studentNo}&class_name=${encodeURIComponent(className)}`);
+        const data = await response.json();
+        
+        if (data.exams && data.exams.length > 0) {
+            container.innerHTML = data.exams.map(e => `
+                <label style="display: flex; align-items: center; gap: 8px; padding: 6px 0; cursor: pointer;">
+                    <input type="checkbox" class="student-exam-checkbox" value="${e.result_id}" data-exam-id="${e.exam_id}">
+                    <span>${e.exam_name}</span>
+                </label>
+            `).join('');
+        } else {
+            container.innerHTML = '<p style="text-align: center; color: #6b7280;">Bu ogrenci icin sinav bulunamadi</p>';
+        }
+    } catch (error) {
+        container.innerHTML = '<p style="text-align: center; color: #ef4444;">Hata olustu</p>';
+    }
+}
+
+async function loadStudentMultiOutcome(studentNo, studentName) {
+    const selectedResults = Array.from(document.querySelectorAll('.student-exam-checkbox:checked')).map(cb => cb.value);
+    
+    if (selectedResults.length === 0) { alert('Lutfen en az bir sinav secin'); return; }
+    
+    const resultsDiv = document.getElementById('studentMultiResults');
+    resultsDiv.innerHTML = '<div style="text-align: center;"><div class="spinner"></div><p>Yukleniyor...</p></div>';
+    
+    try {
+        const response = await fetch(`/admin/report-cards/api/student-multi-outcome?result_ids=${selectedResults.join(',')}`);
+        if (!response.ok) throw new Error('API hatasi');
+        
+        const data = await response.json();
+        
+        if (!data.outcome_data || Object.keys(data.outcome_data).length === 0) {
+            resultsDiv.innerHTML = '<p style="color: #6b7280; text-align: center;">Kazanim verisi bulunamadi</p>';
+            return;
+        }
+        
+        let html = '<div class="outcome-grid">';
+        
+        for (const [subject, outcomes] of Object.entries(data.outcome_data)) {
+            html += `
+                <div class="subject-block">
+                    <div class="subject-title">📚 ${subject}</div>
+                    <table class="outcome-table">
+                        <thead>
+                            <tr>
+                                <th>Kazanim</th>
+                                <th>Dogru</th>
+                                <th>Hatali</th>
+                                <th>Basari</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            for (const [outcomeName, stats] of Object.entries(outcomes)) {
+                const successRate = stats.success_rate || 0;
+                const successClass = successRate >= 70 ? 'correct' : (successRate >= 50 ? 'blank' : 'wrong');
+                html += `
+                    <tr>
+                        <td style="font-size: 0.85rem;">${outcomeName}</td>
+                        <td class="correct">${stats.correct || 0}</td>
+                        <td class="wrong">${stats.wrong || 0}</td>
+                        <td class="${successClass}">${successRate}%</td>
+                    </tr>
+                `;
+            }
+            
+            html += '</tbody></table></div>';
+        }
+        
+        html += '</div>';
+        resultsDiv.innerHTML = html;
+        
+    } catch (error) {
+        resultsDiv.innerHTML = `<p style="color: #ef4444;">Hata: ${error.message}</p>`;
+    }
+}
+
+async function loadStudentMultiError(studentNo, studentName) {
+    const selectedResults = Array.from(document.querySelectorAll('.student-exam-checkbox:checked')).map(cb => cb.value);
+    
+    if (selectedResults.length === 0) { alert('Lutfen en az bir sinav secin'); return; }
+    
+    const resultsDiv = document.getElementById('studentMultiResults');
+    resultsDiv.innerHTML = '<div style="text-align: center;"><div class="spinner"></div><p>Yukleniyor...</p></div>';
+    
+    try {
+        const response = await fetch(`/admin/report-cards/api/student-multi-error?result_ids=${selectedResults.join(',')}`);
+        if (!response.ok) throw new Error('API hatasi');
+        
+        const data = await response.json();
+        
+        if (!data.errors_by_subject || Object.keys(data.errors_by_subject).length === 0) {
+            resultsDiv.innerHTML = '<p style="color: #6b7280; text-align: center;">Hata verisi bulunamadi</p>';
+            return;
+        }
+        
+        let html = `
+            <div style="background: #fef2f2; padding: 16px; border-radius: 12px; margin-bottom: 20px;">
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; text-align: center;">
+                    <div><div class="correct" style="font-size: 1.5rem; font-weight: 600;">${data.totals?.correct || 0}</div><div style="color: #6b7280;">Dogru</div></div>
+                    <div><div class="wrong" style="font-size: 1.5rem; font-weight: 600;">${data.totals?.wrong || 0}</div><div style="color: #6b7280;">Hatali</div></div>
+                    <div><div class="blank" style="font-size: 1.5rem; font-weight: 600;">${data.totals?.blank || 0}</div><div style="color: #6b7280;">Bos</div></div>
+                    <div><div class="net" style="font-size: 1.5rem; font-weight: 600;">${(data.totals?.net || 0).toFixed(2)}</div><div style="color: #6b7280;">Net</div></div>
+                </div>
+            </div>
+        `;
+        
+        html += '<div class="outcome-grid">';
+        
+        for (const [subjectKey, subjectData] of Object.entries(data.errors_by_subject)) {
+            const subjectName = subjectData.subject_label || subjectKey;
+            html += `
+                <div class="subject-block">
+                    <div class="subject-title">📕 ${subjectName}</div>
+                    <table class="error-table">
+                        <thead>
+                            <tr>
+                                <th>S.No</th>
+                                <th>Sinav</th>
+                                <th>Cevap</th>
+                                <th>Dogru</th>
+                                <th>Sonuc</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            (subjectData.errors || []).forEach(e => {
+                const isWrong = e.status === 'wrong';
+                const statusText = isWrong ? 'Hatali' : 'Bos';
+                const resultClass = isWrong ? 'wrong' : 'blank';
+                html += `
+                    <tr class="error-row">
+                        <td>${e.question_number || '-'}</td>
+                        <td style="font-size: 0.75rem;">${e.exam_name || '-'}</td>
+                        <td>${e.student_answer || '-'}</td>
+                        <td>${e.correct_answer || '-'}</td>
+                        <td class="${resultClass}">${statusText}</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table></div>';
+        }
+        
+        html += '</div>';
+        resultsDiv.innerHTML = html;
+        
+    } catch (error) {
+        resultsDiv.innerHTML = `<p style="color: #ef4444;">Hata: ${error.message}</p>`;
+    }
+}
+
+function openClassAnalysisDownloadModal() {
+    const existing = document.getElementById('classDownloadModal');
+    if (existing) existing.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'classDownloadModal';
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2 class="modal-title">📥 Sinif Analizi Indir</h2>
+                <button class="modal-close" onclick="closeModal('classDownloadModal')">&times;</button>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <label style="font-weight: 600; display: block; margin-bottom: 8px;">Sinif Secin:</label>
+                <select id="downloadClassSelect" class="filter-select" style="width: 100%;">
+                    <option value="">Sinif Secin</option>
+                    ${classes.map(c => '<option value="' + c + '">' + c + '</option>').join('')}
+                </select>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <label style="font-weight: 600; display: block; margin-bottom: 8px;">Sinav Secin:</label>
+                <select id="downloadExamSelect" class="filter-select" style="width: 100%;">
+                    <option value="">Sinav Secin</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                <button class="action-btn btn-success" onclick="downloadClassAnalysisPdf()">📄 PDF Indir</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    
+    document.getElementById('downloadClassSelect').addEventListener('change', function() {
+        loadExamsForDownload(this.value);
+    });
+}
+
+async function loadExamsForDownload(className) {
+    const examSelect = document.getElementById('downloadExamSelect');
+    examSelect.innerHTML = '<option value="">Yukleniyor...</option>';
+    
+    if (!className) {
+        examSelect.innerHTML = '<option value="">Sinav Secin</option>';
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/admin/report-cards/api/exams-list?class_name=${encodeURIComponent(className)}`);
+        const data = await response.json();
+        
+        if (data.exams && data.exams.length > 0) {
+            examSelect.innerHTML = '<option value="">Sinav Secin</option>' + 
+                data.exams.map(e => `<option value="${e.id}">${e.exam_name} (${e.student_count} ogrenci)</option>`).join('');
+        } else {
+            examSelect.innerHTML = '<option value="">Bu sinif icin sinav yok</option>';
+        }
+    } catch (error) {
+        examSelect.innerHTML = '<option value="">Hata olustu</option>';
+    }
+}
+
+function downloadClassAnalysisPdf() {
+    const className = document.getElementById('downloadClassSelect').value;
+    const examId = document.getElementById('downloadExamSelect').value;
+    
+    if (!className || !examId) {
+        alert('Lutfen sinif ve sinav secin');
+        return;
+    }
+    
+    window.open(`/admin/report-cards/api/class-analysis-pdf/${examId}`, '_blank');
+}
+
+window.onclick = function(event) {
+    if (event.target.classList.contains('modal')) {
+        event.target.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+</script>
+{% endblock %}

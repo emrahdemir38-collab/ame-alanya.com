@@ -1,0 +1,78 @@
+import re
+
+# [BURAYA DOSYA İÇERİĞİNİ YAPIŞTIRIN]
+raw_data = """..."""  # Yukarıdaki dosya içeriğinin tamamı
+
+# 1. Temizlik: Source etiketlerini kaldır ve tek satıra indir
+clean_text = re.sub(r'\', '', raw_data)
+clean_text = clean_text.replace('\n', '').replace('\r', '')
+
+# 2. Satırlara bölme
+rows = clean_text.split('00768146')
+parsed_data = []
+
+for row in rows:
+    if len(row) < 10: continue
+    full_row = '00768146' + row  # Kurum kodunu geri ekle
+
+    # Sabit Sütunlar
+    kurum = full_row[0:8]
+    tel = full_row[8:19].strip()
+    ogr_no = full_row[19:24]
+    oturum = full_row[24:25]
+    kitapcik = full_row[25:26]
+    
+    # İsim ve Sınıf Ayrıştırma
+    match = re.search(r'(.*?)(5\s?[A-D])', full_row[26:])
+    
+    if match:
+        isim = match.group(1).strip()
+        sinif = match.group(2).strip()
+        
+        # Kritik Bölüm: Cevap Anahtarını Bulma
+        # Sınıf adının bittiği yerden sonrasını alıyoruz
+        cevap_raw_start_index = 26 + match.end()
+        cevap_bolumu = full_row[cevap_raw_start_index:]
+        
+        # Cevap bölümünün başındaki büyük boşluk bloğunu (TAB veya çoklu space) bulup atlıyoruz.
+        # Ancak cevapların başındaki tekil boşlukları korumak için, 
+        # sadece "Sınıf ile Cevaplar arasındaki ayırıcıyı" regex ile tespit ediyoruz.
+        # Genelde 5+ boşluk varsa orası ayraçtır.
+        
+        # Regex ile büyük boşluklara göre parçalayalım ama boşlukları yemeyelim.
+        # Strateji: İlk karakterden itibaren sayarak (slicing) gitmek en güvenlisi değil çünkü aradaki boşluk değişken olabilir.
+        # Bu yüzden "En az 2 boşluk" olan yerleri ayırıcı kabul edip, blokları alacağız ve size'a göre keseceğiz.
+        
+        blocks = re.split(r'\s{2,}', cevap_bolumu)
+        # Boş stringleri temizle
+        blocks = [b for b in blocks if len(b) > 0]
+        
+    else:
+        isim = "HATA"
+        sinif = "HATA"
+        blocks = []
+
+    s2_turkce = s2_mat = s2_fen = s2_sosyal = ""
+    s1_sozel1 = s1_sozel2 = ""
+
+    # Blokları yerleştirme ve boyuta göre kesme (Ljust ile eksikse boşlukla tamamla)
+    if oturum == '2':
+        # Beklenen: 15 - 10 - 10 - 10
+        if len(blocks) >= 1: s2_turkce = blocks[0][:15].ljust(15)
+        if len(blocks) >= 2: s2_mat = blocks[1][:10].ljust(10)
+        if len(blocks) >= 3: s2_fen = blocks[2][:10].ljust(10)
+        if len(blocks) >= 4: s2_sosyal = blocks[3][:10].ljust(10)
+        
+    elif oturum == '1':
+        # Beklenen: Boşluktan sonra 15 - 15 (Genelde listenin sonunda 2 blok oluyor)
+        if len(blocks) >= 1: 
+            # Bazen tek parça halinde gelebilir, son iki bloğu alıyoruz
+            s1_sozel1 = blocks[-2][:15].ljust(15) if len(blocks) >= 2 else blocks[0][:15].ljust(15)
+            s1_sozel2 = blocks[-1][:15].ljust(15)
+
+    csv_row = f"{kurum};{tel};{ogr_no};{oturum};{kitapcik};{isim};{sinif};{s2_turkce};{s2_mat};{s2_fen};{s2_sosyal};{s1_sozel1};{s1_sozel2}"
+    parsed_data.append(csv_row)
+
+print("Kurum Kodu;Telefon;Ogrenci No;Oturum;Kitapcik;Ad Soyad;Sinif;S2_Turkce (15);S2_Mat (10);S2_Fen (10);S2_Sosyal (10);S1_Ders1 (15);S1_Ders2 (15)")
+for line in parsed_data:
+    print(line)

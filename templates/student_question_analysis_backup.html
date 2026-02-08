@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soru Analizi - AMEO</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+        }
+        .header {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header h1 { font-size: 1.8em; margin-bottom: 10px; }
+        .btn-back {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid white;
+            padding: 8px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-back:hover { background: rgba(255,255,255,0.3); }
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        .tab {
+            padding: 12px 24px;
+            background: white;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-size: 1em;
+            color: #666;
+            transition: all 0.3s;
+        }
+        .tab.active {
+            color: #10b981;
+            border-bottom-color: #10b981;
+            font-weight: 600;
+        }
+        .tab:hover { background: #f9fafb; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        .wizard {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .wizard-steps {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            position: relative;
+        }
+        .wizard-steps::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #e5e7eb;
+            z-index: 0;
+        }
+        .wizard-step {
+            text-align: center;
+            position: relative;
+            z-index: 1;
+            flex: 1;
+        }
+        .step-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: white;
+            border: 2px solid #e5e7eb;
+            margin: 0 auto 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #999;
+        }
+        .wizard-step.active .step-circle {
+            background: #10b981;
+            border-color: #10b981;
+            color: white;
+        }
+        .wizard-step.completed .step-circle {
+            background: #059669;
+            border-color: #059669;
+            color: white;
+        }
+        .step-label {
+            font-size: 0.9em;
+            color: #666;
+        }
+        .wizard-step.active .step-label { color: #10b981; font-weight: 600; }
+        
+        .step-content { display: none; }
+        .step-content.active { display: block; }
+        
+        .exam-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .exam-card {
+            background: #f9fafb;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .exam-card:hover {
+            border-color: #10b981;
+            box-shadow: 0 4px 12px rgba(16,185,129,0.15);
+        }
+        .exam-card.selected {
+            background: #d1fae5;
+            border-color: #10b981;
+        }
+        .exam-card h3 { color: #333; margin-bottom: 10px; }
+        .exam-card p { color: #666; font-size: 0.9em; }
+        
+        .subject-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .subject-btn {
+            padding: 20px;
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            font-size: 1em;
+            transition: all 0.3s;
+        }
+        .subject-btn:hover {
+            border-color: #10b981;
+            background: #f0fdf4;
+        }
+        .subject-btn.selected {
+            background: #d1fae5;
+            border-color: #10b981;
+            font-weight: 600;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #374151;
+            font-weight: 500;
+        }
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        .form-group textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 30px;
+        }
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: #10b981;
+            color: white;
+        }
+        .btn-primary:hover { background: #059669; }
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+        .btn-secondary:hover { background: #4b5563; }
+        
+        .question-list {
+            margin-top: 20px;
+        }
+        .question-item {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .question-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        .badge-pending { background: #fef3c7; color: #92400e; }
+        .badge-answered { background: #d1fae5; color: #065f46; }
+        .question-details {
+            color: #666;
+            line-height: 1.6;
+        }
+        .question-response {
+            background: #f0fdf4;
+            border-left: 4px solid #10b981;
+            padding: 15px;
+            margin-top: 15px;
+            border-radius: 5px;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        .empty-state .icon { font-size: 4em; margin-bottom: 20px; }
+        
+        @media (max-width: 768px) {
+            .exam-grid { grid-template-columns: 1fr; }
+            .subject-grid { grid-template-columns: repeat(2, 1fr); }
+            .wizard-steps { flex-wrap: wrap; }
+            .btn-group { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔍 Soru Analizi Sistemi</h1>
+        <a href="/student/dashboard" class="btn-back">← Ana Sayfa</a>
+    </div>
+
+    <div class="container">
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('new')">➕ Yeni Soru Sor</button>
+            <button class="tab" onclick="switchTab('my-questions')">📋 Sorduğum Sorular</button>
+        </div>
+
+        <div id="newQuestionTab" class="tab-content active">
+            <div class="wizard">
+                <div class="wizard-steps">
+                    <div class="wizard-step active" data-step="1">
+                        <div class="step-circle">1</div>
+                        <div class="step-label">Deneme Seç</div>
+                    </div>
+                    <div class="wizard-step" data-step="2">
+                        <div class="step-circle">2</div>
+                        <div class="step-label">Ders Seç</div>
+                    </div>
+                    <div class="wizard-step" data-step="3">
+                        <div class="step-circle">3</div>
+                        <div class="step-label">Soru Bilgisi</div>
+                    </div>
+                    <div class="wizard-step" data-step="4">
+                        <div class="step-circle">4</div>
+                        <div class="step-label">Öğretmen Seç</div>
+                    </div>
+                </div>
+
+                <div id="step1" class="step-content active">
+                    <h2 style="margin-bottom: 20px;">Hangi denemede sorun yaşadınız?</h2>
+                    <div id="examList" class="exam-grid"></div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="nextStep(2)" id="examNextBtn" disabled>İleri →</button>
+                    </div>
+                </div>
+
+                <div id="step2" class="step-content">
+                    <h2 style="margin-bottom: 20px;">Hangi derste sorun yaşadınız?</h2>
+                    <div class="subject-grid">
+                        <button class="subject-btn" onclick="selectSubject('Türkçe')">📖 Türkçe</button>
+                        <button class="subject-btn" onclick="selectSubject('Matematik')">🔢 Matematik</button>
+                        <button class="subject-btn" onclick="selectSubject('Fen Bilimleri')">🔬 Fen Bilimleri</button>
+                        <button class="subject-btn" onclick="selectSubject('Sosyal Bilgiler')">🌍 Sosyal Bilgiler</button>
+                        <button class="subject-btn" onclick="selectSubject('İngilizce')">🇬🇧 İngilizce</button>
+                        <button class="subject-btn" onclick="selectSubject('Din Kültürü')">📿 Din Kültürü</button>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-secondary" onclick="prevStep(1)">← Geri</button>
+                        <button class="btn btn-primary" onclick="nextStep(3)" id="subjectNextBtn" disabled>İleri →</button>
+                    </div>
+                </div>
+
+                <div id="step3" class="step-content">
+                    <h2 style="margin-bottom: 20px;">Soru detayları</h2>
+                    <div class="form-group">
+                        <label>Soru Numarası *</label>
+                        <input type="number" id="questionNumber" min="1" max="20" placeholder="Örn: 15" oninput="validateQuestionInputs()">
+                    </div>
+                    <div class="form-group">
+                        <label>Neden yapamadınız? *</label>
+                        <select id="reason" onchange="validateQuestionInputs()">
+                            <option value="">Seçiniz...</option>
+                            <option value="Bilgi Eksikliği">Bilgi Eksikliği</option>
+                            <option value="Soruyu Yanlış Anlama">Soruyu Yanlış Anlama</option>
+                            <option value="Diğer">Diğer</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Notunuz (Opsiyonel)</label>
+                        <textarea id="studentNote" placeholder="Soruyla ilgili eklemek istediğiniz notlar..."></textarea>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-secondary" onclick="prevStep(2)">← Geri</button>
+                        <button class="btn btn-primary" onclick="nextStep(4)" id="questionNextBtn" disabled>İleri →</button>
+                    </div>
+                </div>
+
+                <div id="step4" class="step-content">
+                    <h2 style="margin-bottom: 20px;">Hangi öğretmene sormak istersiniz?</h2>
+                    <div class="form-group">
+                        <label>Öğretmen Seçin *</label>
+                        <select id="teacherSelect">
+                            <option value="">Yükleniyor...</option>
+                        </select>
+                    </div>
+                    <div id="summaryBox" style="background: #f9fafb; padding: 20px; border-radius: 8px; margin-top: 20px;">
+                        <h3 style="margin-bottom: 15px; color: #374151;">📝 Özet</h3>
+                        <p><strong>Deneme:</strong> <span id="summaryExam">-</span></p>
+                        <p><strong>Ders:</strong> <span id="summarySubject">-</span></p>
+                        <p><strong>Soru:</strong> <span id="summaryQuestion">-</span></p>
+                        <p><strong>Neden:</strong> <span id="summaryReason">-</span></p>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-secondary" onclick="prevStep(3)">← Geri</button>
+                        <button class="btn btn-primary" onclick="submitQuestion()">📤 Gönder</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="myQuestionsTab" class="tab-content">
+            <div style="background: white; border-radius: 10px; padding: 30px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                <h2 style="margin-bottom: 20px;">Sorduğum Sorular</h2>
+                <div id="questionsList" class="question-list"></div>
+                <div id="noQuestions" class="empty-state" style="display:none;">
+                    <div class="icon">💬</div>
+                    <h3>Henüz soru sormadınız</h3>
+                    <p>Deneme sınavlarındaki sorularla ilgili öğretmenlerinize soru sorabilirsiniz.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentStep = 1;
+        let selectedExam = null;
+        let selectedSubject = null;
+        let selectedTeacher = null;
+        let exams = [];
+        let teachers = [];
+
+        async function loadExams() {
+            try {
+                const response = await fetch('/api/question-asks/practice-exams/my-exams');
+                const data = await response.json();
+                exams = data.exams || [];
+                
+                const container = document.getElementById('examList');
+                if (exams.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><div class="icon">📝</div><h3>Henüz deneme eklenmedi</h3></div>';
+                    return;
+                }
+                
+                container.innerHTML = exams.map(exam => `
+                    <div class="exam-card" onclick="selectExam(${exam.id}, ${exam.exam_number})">
+                        <h3>Deneme ${exam.exam_number}</h3>
+                        <p>Toplam Net: ${exam.total_net ? exam.total_net.toFixed(2) : '0.00'}</p>
+                        <p>LGS Puanı: ${exam.lgs_score ? exam.lgs_score.toFixed(2) : '0.00'}</p>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Denemeler yüklenemedi:', error);
+            }
+        }
+
+        async function loadTeachers() {
+            try {
+                const response = await fetch('/api/question-asks/teachers/my-teachers');
+                const data = await response.json();
+                teachers = data.teachers || [];
+                
+                const select = document.getElementById('teacherSelect');
+                if (teachers.length === 0) {
+                    select.innerHTML = '<option value="">Öğretmen bulunamadı</option>';
+                    return;
+                }
+                
+                select.innerHTML = '<option value="">Öğretmen seçiniz...</option>' + 
+                    teachers.map(t => `<option value="${t.id}">${t.full_name}</option>`).join('');
+            } catch (error) {
+                console.error('Öğretmenler yüklenemedi:', error);
+            }
+        }
+
+        async function loadMyQuestions() {
+            try {
+                const response = await fetch('/api/question-asks/student/me');
+                const data = await response.json();
+                
+                const container = document.getElementById('questionsList');
+                const emptyState = document.getElementById('noQuestions');
+                
+                if (!data.questions || data.questions.length === 0) {
+                    container.innerHTML = '';
+                    emptyState.style.display = 'block';
+                    return;
+                }
+                
+                emptyState.style.display = 'none';
+                container.innerHTML = data.questions.map(q => `
+                    <div class="question-item">
+                        <div class="question-header">
+                            <div>
+                                <strong>Deneme ${q.exam_number} - ${q.subject} - Soru ${q.question_number}</strong>
+                                <p style="color: #666; margin-top: 5px;">Öğretmen: ${q.teacher_name}</p>
+                            </div>
+                            <span class="badge badge-${q.status}">
+                                ${q.status === 'pending' ? 'Bekliyor' : 'Cevaplandı'}
+                            </span>
+                        </div>
+                        <div class="question-details">
+                            <p><strong>Neden:</strong> ${q.reason}</p>
+                            ${q.student_note ? `<p><strong>Not:</strong> ${q.student_note}</p>` : ''}
+                            <p style="font-size: 0.85em; color: #999; margin-top: 10px;">
+                                ${new Date(q.created_at).toLocaleDateString('tr-TR')}
+                            </p>
+                        </div>
+                        ${q.teacher_response ? `
+                            <div class="question-response">
+                                <strong>📌 Öğretmen Cevabı:</strong>
+                                <p style="margin-top: 10px;">${q.teacher_response}</p>
+                                <p style="font-size: 0.85em; color: #666; margin-top: 10px;">
+                                    ${new Date(q.answered_at).toLocaleDateString('tr-TR')}
+                                </p>
+                            </div>
+                        ` : ''}
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Sorular yüklenemedi:', error);
+            }
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            if (tab === 'new') {
+                document.querySelector('.tab:nth-child(1)').classList.add('active');
+                document.getElementById('newQuestionTab').classList.add('active');
+            } else {
+                document.querySelector('.tab:nth-child(2)').classList.add('active');
+                document.getElementById('myQuestionsTab').classList.add('active');
+                loadMyQuestions();
+            }
+        }
+
+        function selectExam(id, number) {
+            selectedExam = { id, number };
+            document.querySelectorAll('.exam-card').forEach(card => card.classList.remove('selected'));
+            event.currentTarget.classList.add('selected');
+            document.getElementById('examNextBtn').disabled = false;
+        }
+
+        function selectSubject(subject) {
+            selectedSubject = subject;
+            document.querySelectorAll('.subject-btn').forEach(btn => btn.classList.remove('selected'));
+            event.currentTarget.classList.add('selected');
+            document.getElementById('subjectNextBtn').disabled = false;
+        }
+
+        function validateQuestionInputs() {
+            const qNum = document.getElementById('questionNumber').value;
+            const reason = document.getElementById('reason').value;
+            const btn = document.getElementById('questionNextBtn');
+            btn.disabled = !(qNum && reason);
+        }
+
+        function nextStep(step) {
+            if (step === 2 && !selectedExam) {
+                alert('Lütfen bir deneme seçiniz');
+                return;
+            }
+            if (step === 3 && !selectedSubject) {
+                alert('Lütfen bir ders seçiniz');
+                return;
+            }
+            if (step === 4) {
+                const qNum = document.getElementById('questionNumber').value;
+                const reason = document.getElementById('reason').value;
+                if (!qNum || !reason) {
+                    alert('Lütfen soru numarası ve neden seçiniz');
+                    return;
+                }
+            }
+            
+            document.querySelectorAll('.step-content').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.wizard-step').forEach(s => s.classList.remove('active'));
+            
+            for (let i = 1; i < step; i++) {
+                document.querySelector(`.wizard-step[data-step="${i}"]`).classList.add('completed');
+            }
+            
+            document.getElementById(`step${step}`).classList.add('active');
+            document.querySelector(`.wizard-step[data-step="${step}"]`).classList.add('active');
+            currentStep = step;
+            
+            if (step === 4) {
+                loadTeachers();
+                updateSummary();
+            }
+        }
+
+        function prevStep(step) {
+            nextStep(step);
+        }
+
+        function updateSummary() {
+            document.getElementById('summaryExam').textContent = `Deneme ${selectedExam.number}`;
+            document.getElementById('summarySubject').textContent = selectedSubject;
+            document.getElementById('summaryQuestion').textContent = document.getElementById('questionNumber').value;
+            document.getElementById('summaryReason').textContent = document.getElementById('reason').value;
+        }
+
+        async function submitQuestion() {
+            const teacherId = document.getElementById('teacherSelect').value;
+            if (!teacherId) {
+                alert('Lütfen öğretmen seçiniz');
+                return;
+            }
+            
+            const data = {
+                teacher_id: parseInt(teacherId),
+                practice_exam_id: selectedExam.id,
+                subject: selectedSubject,
+                question_number: parseInt(document.getElementById('questionNumber').value),
+                reason: document.getElementById('reason').value,
+                student_note: document.getElementById('studentNote').value
+            };
+            
+            try {
+                const response = await fetch('/api/question-asks/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert(result.message || 'Sorunuz gönderildi!');
+                    resetWizard();
+                    switchTab('my-questions');
+                } else {
+                    alert(result.error || 'Hata oluştu');
+                }
+            } catch (error) {
+                console.error('Gönderme hatası:', error);
+                alert('Bağlantı hatası');
+            }
+        }
+
+        function resetWizard() {
+            currentStep = 1;
+            selectedExam = null;
+            selectedSubject = null;
+            document.querySelectorAll('.step-content').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.wizard-step').forEach(s => s.classList.remove('active', 'completed'));
+            document.getElementById('step1').classList.add('active');
+            document.querySelector('.wizard-step[data-step="1"]').classList.add('active');
+            document.getElementById('questionNumber').value = '';
+            document.getElementById('reason').value = '';
+            document.getElementById('studentNote').value = '';
+            document.getElementById('examNextBtn').disabled = true;
+            document.getElementById('subjectNextBtn').disabled = true;
+            loadExams();
+        }
+
+        loadExams();
+    </script>
+</body>
+</html>

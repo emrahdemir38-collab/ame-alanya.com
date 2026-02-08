@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ exam.title }} - SINAVDASINIZ</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f5f7fa; }
+        .header { background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .countdown-timer { background: #fef3c7; color: #92400e; padding: 10px 20px; border-radius: 8px; font-weight: bold; font-size: 1.2em; }
+        .countdown-timer.warning { background: #fed7aa; color: #7c2d12; animation: pulse 1s infinite; }
+        .countdown-timer.danger { background: #fee2e2; color: #991b1b; animation: pulse 0.5s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        
+        .container { max-width: 900px; margin: 20px auto; padding: 0 20px; }
+        
+        /* Sınav Dosyası Butonları */
+        .files-section { background: white; border-radius: 10px; padding: 25px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .files-title { font-size: 1.3em; color: #1f2937; margin-bottom: 15px; font-weight: bold; }
+        .file-buttons { display: flex; flex-direction: column; gap: 12px; }
+        .btn-view-file { background: #3b82f6; color: white; padding: 15px 25px; border: none; border-radius: 8px; cursor: pointer; font-size: 1.05em; font-weight: 500; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.3s; }
+        .btn-view-file:hover { background: #2563eb; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3); }
+        
+        .warning-box { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        
+        /* Optik Form */
+        .answer-sheet { background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .answer-sheet-title { background: #10b981; color: white; padding: 18px; border-radius: 8px 8px 0 0; margin: -25px -25px 25px -25px; font-weight: bold; text-align: center; font-size: 1.2em; }
+        
+        .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 25px; }
+        .stat-box { text-align: center; padding: 15px; background: #f9fafb; border-radius: 8px; border: 2px solid #e5e7eb; }
+        .stat-value { font-size: 2em; font-weight: bold; color: #10b981; }
+        .stat-label { font-size: 0.9em; color: #6b7280; margin-top: 5px; }
+        
+        .question-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 25px; }
+        .question-item { border: 2px solid #e5e7eb; border-radius: 10px; padding: 15px; transition: all 0.3s; }
+        .question-item.answered { border-color: #10b981; background: #f0fdf4; }
+        .question-number { font-weight: bold; color: #374151; margin-bottom: 12px; font-size: 1.1em; text-align: center; }
+        .options { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+        .option-btn { padding: 15px; border: 2px solid #d1d5db; border-radius: 8px; background: white; cursor: pointer; font-weight: 600; font-size: 1.1em; transition: all 0.2s; text-align: center; }
+        .option-btn:hover { border-color: #10b981; background: #f0fdf4; transform: scale(1.08); }
+        .option-btn.selected { border-color: #10b981; background: #10b981; color: white; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); }
+        
+        .submit-section { background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-top: 20px; }
+        .progress-bar { background: #e5e7eb; height: 35px; border-radius: 18px; overflow: hidden; margin-bottom: 20px; }
+        .progress-fill { background: linear-gradient(90deg, #10b981 0%, #059669 100%); height: 100%; transition: width 0.3s; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 1em; }
+        .btn-submit { background: #dc2626; color: white; padding: 18px 40px; border: none; border-radius: 10px; cursor: pointer; font-size: 1.2em; font-weight: bold; width: 100%; transition: all 0.3s; }
+        .btn-submit:hover { background: #991b1b; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(220, 38, 38, 0.4); }
+        
+        /* Result Modal */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; }
+        .modal.show { display: flex; }
+        .modal-content { background: white; max-width: 500px; width: 90%; padding: 40px; border-radius: 20px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3); animation: slideIn 0.3s; }
+        @keyframes slideIn { from { transform: translateY(-50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .result-icon { font-size: 5em; margin-bottom: 20px; }
+        .result-score { font-size: 3.5em; font-weight: bold; margin: 20px 0; }
+        .score-high { color: #10b981; }
+        .score-medium { color: #f59e0b; }
+        .score-low { color: #ef4444; }
+        .result-details { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 25px 0; }
+        .result-detail { background: #f9fafb; padding: 15px; border-radius: 10px; }
+        .result-detail-value { font-size: 2em; font-weight: bold; }
+        .result-detail-value.correct { color: #10b981; }
+        .result-detail-value.wrong { color: #ef4444; }
+        .result-detail-value.empty { color: #f59e0b; }
+        .result-detail-label { font-size: 0.9em; color: #6b7280; margin-top: 5px; }
+        .btn-modal { padding: 15px 40px; border: none; border-radius: 8px; cursor: pointer; font-size: 1.1em; font-weight: bold; margin: 5px; transition: all 0.3s; }
+        .btn-primary { background: #10b981; color: white; }
+        .btn-primary:hover { background: #059669; }
+        .btn-outline { background: white; color: #10b981; border: 2px solid #10b981; }
+        .btn-outline:hover { background: #f0fdf4; }
+        
+        /* Mobil Optimizasyon */
+        @media (max-width: 768px) {
+            .container { padding: 0 10px; }
+            .header { padding: 12px 15px; flex-direction: column; gap: 10px; align-items: flex-start; }
+            .countdown-timer { font-size: 1em; padding: 8px 15px; width: 100%; text-align: center; }
+            .files-section { padding: 15px; }
+            .files-title { font-size: 1.1em; }
+            .btn-view-file { padding: 12px 20px; font-size: 1em; }
+            .answer-sheet { padding: 15px; }
+            .answer-sheet-title { font-size: 1em; padding: 12px; margin: -15px -15px 15px -15px; }
+            .question-grid { grid-template-columns: 1fr; gap: 12px; }
+            .stats { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+            .stat-box { padding: 10px; }
+            .stat-value { font-size: 1.5em; }
+            .stat-label { font-size: 0.8em; }
+            .question-item { padding: 12px; }
+            .question-number { font-size: 1em; }
+            .options { gap: 8px; }
+            .option-btn { padding: 12px 8px; font-size: 1em; }
+            .submit-section { padding: 15px; }
+            .btn-submit { padding: 15px 30px; font-size: 1.05em; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div style="flex: 1;">
+            <h1>🔴 {{ exam.title }}</h1>
+            <div style="font-size: 0.9em; opacity: 0.9; margin-top: 5px;">{{ exam.question_count }} Soru | {{ exam.duration_minutes }} Dakika</div>
+        </div>
+        <div class="countdown-timer" id="examTimer">⏱️ Kalan: {{ exam.duration_minutes }}:00</div>
+    </div>
+
+    <div class="container">
+        <!-- Sınav Dosyalarını Görüntüleme -->
+        <div class="files-section">
+            <div class="files-title">📄 Sınav Dosyaları</div>
+            <div class="warning-box">
+                <strong>⚠️ NOT:</strong> Sınav sorularını görüntülemek için aşağıdaki butonlara tıklayın. Dosyalar yeni sekmede tam ekran açılacak. Soruları okuduktan sonra geri dönüp aşağıdaki optik formu doldurun.
+            </div>
+            <div class="file-buttons">
+                {% if pdf_files and pdf_files|length > 0 %}
+                    {% for pdf_file in pdf_files %}
+                    <a href="/view-file/{{ pdf_file }}" target="_blank" class="btn-view-file">
+                        🔍 {% if pdf_files|length > 1 %}Dosya {{ loop.index }}/{{ pdf_files|length }} - {% endif %}Sınavı Görüntüle
+                    </a>
+                    {% endfor %}
+                {% else %}
+                    <p style="color: #6b7280; text-align: center;">Sınav dosyası bulunamadı</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Optik Cevap Formu -->
+        <div class="answer-sheet">
+            <div class="answer-sheet-title">📝 OPTİK CEVAP FORMU</div>
+            
+            <div class="stats">
+                <div class="stat-box">
+                    <div class="stat-value" id="answeredCount">0</div>
+                    <div class="stat-label">Cevaplanmış</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="emptyCount">{{ exam.question_count }}</div>
+                    <div class="stat-label">Boş</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">{{ exam.question_count }}</div>
+                    <div class="stat-label">Toplam</div>
+                </div>
+            </div>
+
+            <div class="question-grid" id="answerSheet"></div>
+        </div>
+
+        <div class="submit-section">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressBar" style="width: 0%">0%</div>
+            </div>
+            
+            {% if exam.allow_pause %}
+            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                <button class="btn-pause" onclick="saveDraftAndExit()" style="flex: 1; background: #f59e0b; color: white; padding: 18px 30px; border: none; border-radius: 10px; cursor: pointer; font-size: 1.1em; font-weight: bold; transition: all 0.3s; min-width: 200px;">
+                    ⏸️ KAYDET ve ÇIK
+                </button>
+                <button class="btn-submit" onclick="submitExam()" style="flex: 1; min-width: 200px;">✅ TAMAMLA ve GÖNDER</button>
+            </div>
+            <p style="text-align: center; color: #6b7280; margin-top: 12px; font-size: 0.95em;">
+                💡 "Kaydet ve Çık" ile cevaplarınızı kaydedip daha sonra kaldığınız yerden devam edebilirsiniz
+            </p>
+            {% else %}
+            <button class="btn-submit" onclick="submitExam()">✅ SINAVI TESLİM ET</button>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        const examId = '{{ exam.id }}';
+        const examDuration = {{ exam.duration_minutes }};
+        const questionCount = {{ exam.question_count }};
+        const allowPause = {{ 'true' if exam.allow_pause else 'false' }};
+        let answers = {};
+        let timeRemaining = {{ remaining_seconds|default(exam.duration_minutes * 60) }}; // Sunucudan gelen kalan süre
+        let timerInterval;
+
+        // Draft cevapları yükle (varsa)
+        {% if draft_answers %}
+        const draftAnswers = {{ draft_answers | tojson | safe }};
+        Object.keys(draftAnswers).forEach(key => {
+            // Anahtarları string olarak normalize et
+            answers[String(key)] = draftAnswers[key];
+        });
+        {% endif %}
+
+        // Süre zaten 0 veya negatifse hemen teslim et
+        if (timeRemaining <= 0) {
+            alert('⏰ Sınav süreniz dolmuş! Sınavınız otomatik olarak teslim ediliyor...');
+            submitExam(true);
+        }
+
+        // Optik formu oluştur
+        function createAnswerSheet() {
+            const container = document.getElementById('answerSheet');
+            container.innerHTML = '';
+            
+            for (let i = 1; i <= questionCount; i++) {
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'question-item';
+                questionDiv.id = `q${i}`;
+                
+                questionDiv.innerHTML = `
+                    <div class="question-number">${i}.</div>
+                    <div class="options">
+                        <button class="option-btn" onclick="selectAnswer(${i}, 'A')">A</button>
+                        <button class="option-btn" onclick="selectAnswer(${i}, 'B')">B</button>
+                        <button class="option-btn" onclick="selectAnswer(${i}, 'C')">C</button>
+                        <button class="option-btn" onclick="selectAnswer(${i}, 'D')">D</button>
+                    </div>
+                `;
+                container.appendChild(questionDiv);
+            }
+            
+            // Draft cevapları varsa işaretle
+            Object.keys(answers).forEach(qNum => {
+                const questionDiv = document.getElementById(`q${qNum}`);
+                if (questionDiv) {
+                    const answer = answers[qNum];
+                    // Doğru butonu bul ve seç
+                    const buttons = questionDiv.querySelectorAll('.option-btn');
+                    buttons.forEach(btn => {
+                        if (btn.textContent.trim() === answer) {
+                            btn.classList.add('selected');
+                            questionDiv.classList.add('answered');
+                        }
+                    });
+                }
+            });
+            
+            // İstatistikleri güncelle
+            updateStats();
+        }
+        
+        // Draft kaydet ve çık
+        async function saveDraftAndExit() {
+            if (Object.keys(answers).length === 0) {
+                if (!confirm('Hiç cevap işaretlemediniz. Yine de çıkmak istiyor musunuz?')) {
+                    return;
+                }
+                window.location.href = '/student/exams';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/student/exam/${examId}/save-draft`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ answers: answers })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert('✅ Cevaplarınız kaydedildi! Daha sonra kaldığınız yerden devam edebilirsiniz.');
+                    window.onbeforeunload = null;
+                    window.location.href = '/student/exams';
+                } else {
+                    alert('❌ Hata: ' + (data.error || 'Kaydedilemedi'));
+                }
+            } catch (error) {
+                console.error('Save draft error:', error);
+                alert('❌ Bağlantı hatası! Lütfen tekrar deneyin.');
+            }
+        }
+
+        function showResultModal(score, correctCount, totalQuestions) {
+            const wrongCount = totalQuestions - correctCount - (totalQuestions - Object.keys(answers).length);
+            const emptyCount = totalQuestions - Object.keys(answers).length;
+            
+            // Puan rengini belirle
+            const scoreElement = document.getElementById('resultScore');
+            scoreElement.textContent = score.toFixed(1);
+            
+            if (score >= 70) {
+                scoreElement.className = 'result-score score-high';
+                document.getElementById('resultIcon').textContent = '🎉';
+                document.getElementById('resultTitle').textContent = 'Tebrikler! Başarılı!';
+            } else if (score >= 50) {
+                scoreElement.className = 'result-score score-medium';
+                document.getElementById('resultIcon').textContent = '👍';
+                document.getElementById('resultTitle').textContent = 'Sınavınız Teslim Edildi';
+            } else {
+                scoreElement.className = 'result-score score-low';
+                document.getElementById('resultIcon').textContent = '📝';
+                document.getElementById('resultTitle').textContent = 'Sınavınız Teslim Edildi';
+            }
+            
+            // Detayları doldur
+            document.getElementById('modalCorrect').textContent = correctCount;
+            document.getElementById('modalWrong').textContent = wrongCount;
+            document.getElementById('modalEmpty').textContent = emptyCount;
+            
+            // Modal'ı göster
+            document.getElementById('resultModal').classList.add('show');
+        }
+
+        function selectAnswer(questionNum, answer) {
+            answers[questionNum] = answer;
+            
+            // Tüm butonları temizle
+            const questionDiv = document.getElementById(`q${questionNum}`);
+            questionDiv.querySelectorAll('.option-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            
+            // Seçili butonu işaretle
+            event.target.classList.add('selected');
+            questionDiv.classList.add('answered');
+            
+            updateStats();
+        }
+
+        function updateStats() {
+            const answeredCount = Object.keys(answers).length;
+            const emptyCount = questionCount - answeredCount;
+            const progress = Math.round((answeredCount / questionCount) * 100);
+            
+            document.getElementById('answeredCount').textContent = answeredCount;
+            document.getElementById('emptyCount').textContent = emptyCount;
+            document.getElementById('progressBar').style.width = progress + '%';
+            document.getElementById('progressBar').textContent = progress + '%';
+        }
+
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                timeRemaining--;
+                
+                const minutes = Math.floor(timeRemaining / 60);
+                const seconds = timeRemaining % 60;
+                
+                const timerElement = document.getElementById('examTimer');
+                timerElement.textContent = `⏱️ Kalan: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+                
+                // Uyarı renkleri
+                if (timeRemaining <= 60) {
+                    timerElement.className = 'countdown-timer danger';
+                } else if (timeRemaining <= 300) {
+                    timerElement.className = 'countdown-timer warning';
+                }
+                
+                // Süre doldu - otomatik teslim
+                if (timeRemaining <= 0) {
+                    clearInterval(timerInterval);
+                    alert('⏰ Sınav süresi doldu! Sınavınız otomatik olarak teslim ediliyor...');
+                    submitExam(true);
+                }
+            }, 1000);
+        }
+
+        async function submitExam(autoSubmit = false) {
+            if (!autoSubmit) {
+                const answeredCount = Object.keys(answers).length;
+                const emptyCount = questionCount - answeredCount;
+                
+                if (emptyCount > 0) {
+                    if (!confirm(`${emptyCount} soru boş! Yine de teslim etmek istiyor musunuz?`)) {
+                        return;
+                    }
+                }
+                
+                if (!confirm('Sınavı teslim etmek istediğinizden emin misiniz? Bu işlem geri alınamaz!')) {
+                    return;
+                }
+            }
+            
+            clearInterval(timerInterval);
+            
+            try {
+                const response = await fetch(`/student/exam/${examId}/submit`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ answers: answers })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Modal'ı göster
+                    showResultModal(data.score, data.correct_count, questionCount);
+                } else {
+                    alert('❌ Hata: ' + (data.error || 'Teslim edilemedi'));
+                }
+            } catch (error) {
+                console.error('Submit error:', error);
+                alert('❌ Bağlantı hatası! Lütfen tekrar deneyin.');
+            }
+        }
+
+        // Sayfa yenilenmeye çalışılırsa uyar
+        window.addEventListener('beforeunload', (e) => {
+            e.preventDefault();
+            e.returnValue = 'Sınav devam ediyor! Çıkmak istediğinizden emin misiniz?';
+        });
+
+        // Başlat
+        createAnswerSheet();
+        startTimer();
+    </script>
+
+    <!-- Result Modal -->
+    <div id="resultModal" class="modal">
+        <div class="modal-content">
+            <div class="result-icon" id="resultIcon">🎉</div>
+            <h2 id="resultTitle">Sınavınız Teslim Edildi!</h2>
+            <div class="result-score" id="resultScore">-</div>
+            <p style="color:#6b7280;">Puanınız</p>
+            
+            <div class="result-details">
+                <div class="result-detail">
+                    <div class="result-detail-value correct" id="modalCorrect">-</div>
+                    <div class="result-detail-label">✅ Doğru</div>
+                </div>
+                <div class="result-detail">
+                    <div class="result-detail-value wrong" id="modalWrong">-</div>
+                    <div class="result-detail-label">❌ Yanlış</div>
+                </div>
+                <div class="result-detail">
+                    <div class="result-detail-value empty" id="modalEmpty">-</div>
+                    <div class="result-detail-label">⚪ Boş</div>
+                </div>
+            </div>
+            
+            <div style="margin-top:20px;">
+                <button class="btn-modal btn-primary" onclick="window.location.href='/student/exam/{{ exam.id }}/results'">📊 Detaylı Sonuçları Gör</button>
+                <button class="btn-modal btn-outline" onclick="window.location.href='/student/exams'">🏠 Sınavlarıma Dön</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

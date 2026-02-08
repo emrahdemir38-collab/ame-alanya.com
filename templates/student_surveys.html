@@ -1,0 +1,395 @@
+{% set breadcrumbs = [{'text': 'Anketler', 'url': ''}] %}
+{% extends "base_dashboard.html" %}
+
+{% block title %}Anketler - Öğrenci{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/admin-modern.css">
+<style>
+    .dashboard-content { padding: 24px 28px; }
+    .survey-card {
+        background: white;
+        border-radius: var(--radius-xl);
+        padding: 24px;
+        margin-bottom: 20px;
+        box-shadow: var(--shadow-lg);
+        border: 1px solid var(--gray-100);
+        border-left: 4px solid var(--primary-500);
+        transition: all var(--transition-fast);
+    }
+    .survey-card:hover { box-shadow: var(--shadow-xl); }
+    .survey-card.answered { border-left-color: var(--success-500); opacity: 0.9; }
+    .survey-card h3 { color: var(--gray-800); font-weight: 700; margin-bottom: 12px; }
+    .survey-card p { color: var(--gray-600); line-height: 1.6; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-content">
+    <div class="page-header-modern">
+        <h1>📋 Anketler</h1>
+        <p>Size gönderilen anketleri görüntüleyin ve cevaplayın</p>
+    </div>
+
+    <div style="margin-bottom: 24px;">
+        <button class="btn btn-primary" onclick="loadSurveys()">
+            🔄 Yenile
+        </button>
+    </div>
+
+    <div id="surveysList">
+        <div style="padding: 60px; text-align: center; color: var(--gray-400);">
+            <div class="loading-spinner" style="margin: 0 auto 16px;"></div>
+            <p>Anketler yükleniyor...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Anket Cevaplama Modal'ı -->
+<div id="answerSurveyModal" class="modal" style="display:none;">
+    <div class="modal-content" style="max-width: 700px;">
+        <div class="modal-header">
+            <h2 id="surveyModalTitle">Anket</h2>
+            <button class="close-btn" onclick="closeAnswerModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="surveyDescription" style="margin-bottom: 20px; padding: 15px; background: #f5f5f5; border-radius: 8px;"></div>
+            <form id="answerForm" onsubmit="submitAnswers(event)">
+                <div id="questionsList"></div>
+                
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                    <button type="button" class="btn" onclick="closeAnswerModal()">İptal</button>
+                    <button type="submit" class="btn btn-primary">Gönder</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 20px;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 12px;
+    max-height: 90vh;
+    overflow-y: auto;
+    width: 100%;
+}
+
+.modal-header {
+    padding: 20px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 28px;
+    cursor: pointer;
+    color: #999;
+}
+
+.close-btn:hover {
+    color: #333;
+}
+
+.question-card {
+    background: #f9f9f9;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+}
+
+.question-text {
+    font-weight: bold;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.survey-card {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    transition: all 0.2s;
+}
+
+.survey-card:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.survey-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 10px;
+}
+
+.survey-title {
+    font-size: 18px;
+    font-weight: bold;
+    color: #333;
+}
+
+.survey-status {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.survey-status.pending {
+    background: #ff9800;
+    color: white;
+}
+
+.survey-status.completed {
+    background: #4caf50;
+    color: white;
+}
+</style>
+
+<script>
+let currentSurvey = null;
+
+async function loadSurveys() {
+    try {
+        const response = await fetch('/api/surveys/list');
+        const data = await response.json();
+        
+        const surveysList = document.getElementById('surveysList');
+        
+        if (!data.surveys || data.surveys.length === 0) {
+            surveysList.innerHTML = `
+                <div style="padding: 40px; text-align: center; color: #999;">
+                    <div style="font-size: 3em; margin-bottom: 10px;">📋</div>
+                    <p>Henüz size gönderilmiş anket bulunmuyor</p>
+                </div>
+            `;
+            return;
+        }
+        
+        let html = '';
+        data.surveys.forEach(survey => {
+            const isCompleted = survey.my_responses > 0;
+            
+            html += `
+                <div class="survey-card">
+                    <div class="survey-header">
+                        <div>
+                            <div class="survey-title">${survey.title}</div>
+                            <div style="font-size: 13px; color: #666; margin-top: 5px;">
+                                ${survey.description || ''}
+                            </div>
+                        </div>
+                        <span class="survey-status ${isCompleted ? 'completed' : 'pending'}">
+                            ${isCompleted ? '✅ Tamamlandı' : '⏳ Bekliyor'}
+                        </span>
+                    </div>
+                    <div style="font-size: 13px; color: #666; margin-top: 10px;">
+                        📅 Bitiş: ${new Date(survey.end_date).toLocaleString('tr-TR')}
+                    </div>
+                    <div style="font-size: 13px; color: #666; margin-top: 5px;">
+                        📝 ${survey.question_count} soru
+                    </div>
+                    ${!isCompleted ? `
+                        <div style="margin-top: 10px;">
+                            <button class="btn btn-primary" onclick="openSurvey(${survey.id})">📝 Anketi Yanıtla</button>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        });
+        
+        surveysList.innerHTML = html;
+    } catch (error) {
+        console.error(error);
+        document.getElementById('surveysList').innerHTML = `
+            <div style="padding: 40px; text-align: center; color: #ff4444;">
+                Anketler yüklenirken hata oluştu
+            </div>
+        `;
+    }
+}
+
+async function openSurvey(surveyId) {
+    try {
+        const response = await fetch(`/api/surveys/${surveyId}`);
+        const data = await response.json();
+        
+        if (!data.survey) {
+            alert('Anket bulunamadı');
+            return;
+        }
+        
+        currentSurvey = data.survey;
+        const questions = data.questions || [];
+        
+        document.getElementById('surveyModalTitle').textContent = currentSurvey.title;
+        document.getElementById('surveyDescription').textContent = currentSurvey.description || '';
+        
+        let questionsHTML = '';
+        questions.forEach((q, index) => {
+            const options = q.options || [];
+            
+            questionsHTML += `
+                <div class="question-card">
+                    <div class="question-text">${index + 1}. ${q.question_text}</div>
+                    <input type="hidden" name="question_id_${q.id}" value="${q.id}">
+                    <input type="hidden" name="question_type_${q.id}" value="${q.question_type}">
+                    
+                    ${q.question_type === 'text' ? `
+                        <textarea class="form-control" name="answer_${q.id}" rows="3" ${q.is_required ? 'required' : ''}></textarea>
+                    ` : ''}
+                    
+                    ${q.question_type === 'choice' ? `
+                        <div>
+                            ${options.map((opt, i) => `
+                                <label style="display: block; padding: 10px; margin: 5px 0; background: white; border: 1px solid #ddd; border-radius: 6px; cursor: pointer;">
+                                    <input type="radio" name="answer_${q.id}" value="${opt}" ${q.is_required ? 'required' : ''}> ${opt}
+                                </label>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+                    
+                    ${q.question_type === 'rating' ? `
+                        <div style="display: flex; gap: 10px; justify-content: center; margin-top: 10px;">
+                            ${[1,2,3,4,5].map(rating => `
+                                <label style="cursor: pointer;">
+                                    <input type="radio" name="answer_${q.id}" value="${rating}" ${q.is_required ? 'required' : ''} style="display: none;">
+                                    <div class="rating-btn" onclick="selectRating(this)">${rating}</div>
+                                </label>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        });
+        
+        document.getElementById('questionsList').innerHTML = questionsHTML;
+        document.getElementById('answerSurveyModal').style.display = 'flex';
+    } catch (error) {
+        console.error(error);
+        alert('Anket yüklenirken hata oluştu');
+    }
+}
+
+function closeAnswerModal() {
+    document.getElementById('answerSurveyModal').style.display = 'none';
+    currentSurvey = null;
+}
+
+async function submitAnswers(event) {
+    event.preventDefault();
+    
+    if (!currentSurvey) return;
+    
+    const formData = new FormData(event.target);
+    const responses = [];
+    
+    const questionsList = document.getElementById('questionsList');
+    const questionInputs = questionsList.querySelectorAll('[name^="question_id_"]');
+    
+    questionInputs.forEach(input => {
+        const questionId = parseInt(input.value);
+        const questionType = formData.get(`question_type_${questionId}`);
+        const answerValue = formData.get(`answer_${questionId}`);
+        
+        if (answerValue) {
+            const response = {
+                question_id: questionId
+            };
+            
+            if (questionType === 'text' || questionType === 'rating') {
+                response.answer_text = answerValue;
+                response.answer_option = null;
+            } else if (questionType === 'choice') {
+                response.answer_text = null;
+                response.answer_option = answerValue;
+            }
+            
+            responses.push(response);
+        }
+    });
+    
+    try {
+        const response = await fetch(`/api/surveys/${currentSurvey.id}/submit`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({responses})
+        });
+        
+        if (response.ok) {
+            alert('✅ Yanıtlarınız kaydedildi. Teşekkür ederiz!');
+            closeAnswerModal();
+            loadSurveys();
+        } else {
+            alert('Yanıtlar kaydedilirken hata oluştu');
+        }
+    } catch (error) {
+        console.error(error);
+        alert('Yanıtlar kaydedilirken hata oluştu');
+    }
+}
+
+function selectRating(element) {
+    const parent = element.closest('div[style*="display: flex"]');
+    parent.querySelectorAll('.rating-btn').forEach(btn => btn.classList.remove('selected'));
+    element.classList.add('selected');
+    
+    const radio = element.parentElement.querySelector('input[type="radio"]');
+    if (radio) radio.checked = true;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const style = document.createElement('style');
+    style.textContent = `
+        .rating-btn {
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #ddd;
+            border-radius: 50%;
+            font-size: 18px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        .rating-btn:hover {
+            border-color: #4caf50;
+            background: #f0f9ff;
+        }
+        .rating-btn.selected {
+            border-color: #4caf50;
+            background: #4caf50;
+            color: white;
+        }
+    `;
+    document.head.appendChild(style);
+    
+    loadSurveys();
+});
+</script>
+{% endblock %}

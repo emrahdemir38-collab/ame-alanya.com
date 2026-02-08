@@ -1,0 +1,287 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Profil Ayarları{% endblock %}
+
+{% block extra_css %}
+<style>
+    .profile-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    .profile-header {
+        text-align: center;
+        margin-bottom: 40px;
+    }
+    .profile-header h1 {
+        font-size: 2em;
+        color: #111827;
+        margin-bottom: 10px;
+    }
+    .profile-avatar-large {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        font-size: 3em;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 20px;
+        font-weight: bold;
+        box-shadow: 0 10px 30px rgba(102,126,234,0.3);
+    }
+    .profile-card {
+        background: white;
+        border-radius: 15px;
+        padding: 30px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    .profile-card h2 {
+        color: #374151;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #667eea;
+        padding-bottom: 10px;
+    }
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 15px 0;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    .info-row:last-child {
+        border-bottom: none;
+    }
+    .info-label {
+        font-weight: 600;
+        color: #6b7280;
+    }
+    .info-value {
+        color: #111827;
+    }
+    .form-group {
+        margin-bottom: 20px;
+    }
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        color: #374151;
+        font-weight: 500;
+    }
+    .form-group input {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 5px;
+        font-size: 1em;
+    }
+    .form-group input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+    }
+    .btn {
+        padding: 12px 30px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1em;
+        font-weight: 500;
+        transition: all 0.3s;
+    }
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102,126,234,0.4);
+    }
+    .alert {
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+        display: none;
+    }
+    .alert-success {
+        background: #d1fae5;
+        color: #065f46;
+        border: 1px solid #10b981;
+    }
+    .alert-error {
+        background: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #ef4444;
+    }
+    .role-badge {
+        display: inline-block;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-size: 0.9em;
+        font-weight: 500;
+    }
+    .role-admin {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    .role-teacher {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+    .role-student {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    .role-parent {
+        background: #e9d5ff;
+        color: #6b21a8;
+    }
+    @media (max-width: 768px) {
+        .profile-container {
+            padding: 10px;
+        }
+        .profile-card {
+            padding: 20px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <div class="profile-header">
+        <div class="profile-avatar-large">
+            {{ current_user.full_name[0]|upper if current_user.full_name else 'U' }}
+        </div>
+        <h1>{{ current_user.full_name or 'Kullanıcı' }}</h1>
+        <span class="role-badge role-{{ current_user.role }}">
+            {% if current_user.role == 'admin' %}👤 Admin
+            {% elif current_user.role == 'teacher' %}👨‍🏫 Öğretmen
+            {% elif current_user.role == 'student' %}👨‍🎓 Öğrenci
+            {% elif current_user.role == 'parent' %}👨‍👩‍👧 Veli
+            {% else %}Misafir{% endif %}
+        </span>
+    </div>
+
+    <div class="profile-card">
+        <h2>📋 Profil Bilgileri</h2>
+        <div class="info-row">
+            <span class="info-label">Ad Soyad:</span>
+            <span class="info-value">{{ current_user.full_name or '-' }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">E-posta:</span>
+            <span class="info-value">{{ current_user.email or '-' }}</span>
+        </div>
+        {% if current_user.role == 'student' and current_user.class_name %}
+        <div class="info-row">
+            <span class="info-label">Sınıf:</span>
+            <span class="info-value">{{ current_user.class_name }}</span>
+        </div>
+        {% endif %}
+        <div class="info-row">
+            <span class="info-label">Rol:</span>
+            <span class="info-value">
+                {% if current_user.role == 'admin' %}Admin
+                {% elif current_user.role == 'teacher' %}Öğretmen
+                {% elif current_user.role == 'student' %}Öğrenci
+                {% elif current_user.role == 'parent' %}Veli
+                {% else %}Belirtilmemiş{% endif %}
+            </span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Kullanıcı ID:</span>
+            <span class="info-value">#{{ current_user.id }}</span>
+        </div>
+    </div>
+
+    {% if current_user.role in ['admin', 'teacher'] %}
+    <div class="profile-card">
+        <h2>🔐 Şifre Değiştir</h2>
+        <div id="passwordAlert" class="alert"></div>
+        <form id="changePasswordForm">
+            <div class="form-group">
+                <label for="currentPassword">Mevcut Şifre</label>
+                <input type="password" id="currentPassword" placeholder="Mevcut şifrenizi girin" required>
+            </div>
+            <div class="form-group">
+                <label for="newPassword">Yeni Şifre</label>
+                <input type="password" id="newPassword" placeholder="Yeni şifrenizi girin" required minlength="6">
+            </div>
+            <div class="form-group">
+                <label for="confirmPassword">Yeni Şifre (Tekrar)</label>
+                <input type="password" id="confirmPassword" placeholder="Yeni şifrenizi tekrar girin" required minlength="6">
+            </div>
+            <button type="submit" class="btn btn-primary">Şifreyi Güncelle</button>
+        </form>
+    </div>
+    {% else %}
+    <div class="profile-card">
+        <h2>ℹ️ Şifre Bilgisi</h2>
+        <p style="color: #6b7280; line-height: 1.6;">
+            Şifreniz yönetici tarafından belirlenmiştir. Güvenlik nedeniyle şifrenizi değiştiremezsiniz. 
+            Şifrenizi unuttuysanız lütfen okul yönetimine başvurun.
+        </p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.getElementById('changePasswordForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const currentPassword = document.getElementById('currentPassword').value;
+        const newPassword = document.getElementById('newPassword').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+        const alertDiv = document.getElementById('passwordAlert');
+        
+        // Validation
+        if (newPassword !== confirmPassword) {
+            alertDiv.className = 'alert alert-error';
+            alertDiv.textContent = '❌ Yeni şifreler eşleşmiyor!';
+            alertDiv.style.display = 'block';
+            return;
+        }
+        
+        if (newPassword.length < 6) {
+            alertDiv.className = 'alert alert-error';
+            alertDiv.textContent = '❌ Yeni şifre en az 6 karakter olmalıdır!';
+            alertDiv.style.display = 'block';
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/profile/change-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    current_password: currentPassword,
+                    new_password: newPassword
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                alertDiv.className = 'alert alert-success';
+                alertDiv.textContent = '✅ ' + (data.message || 'Şifreniz başarıyla güncellendi!');
+                alertDiv.style.display = 'block';
+                document.getElementById('changePasswordForm').reset();
+            } else {
+                alertDiv.className = 'alert alert-error';
+                alertDiv.textContent = '❌ ' + (data.error || 'Şifre güncellenemedi!');
+                alertDiv.style.display = 'block';
+            }
+        } catch (error) {
+            console.error('Şifre değiştirme hatası:', error);
+            alertDiv.className = 'alert alert-error';
+            alertDiv.textContent = '❌ Bağlantı hatası oluştu!';
+            alertDiv.style.display = 'block';
+        }
+    });
+</script>
+{% endblock %}

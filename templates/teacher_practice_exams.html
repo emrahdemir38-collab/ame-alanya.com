@@ -1,0 +1,1930 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LGS Deneme Takip - Öğretmen</title>
+    <link rel="stylesheet" href="/static/css/admin-modern.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: var(--font-family), 'Segoe UI', sans-serif;
+            background: var(--gray-50);
+        }
+        .header {
+            background: var(--gradient-ocean);
+            color: white;
+            padding: 20px 24px;
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 { font-size: 1.6em; font-weight: 700; }
+        .btn-back {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.4);
+            padding: 10px 22px;
+            border-radius: var(--radius-lg);
+            cursor: pointer;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all var(--transition-fast);
+        }
+        .btn-back:hover { background: rgba(255,255,255,0.3); transform: translateY(-1px); }
+        .container {
+            max-width: 1400px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .card h2 {
+            color: #374151;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #3b82f6;
+            padding-bottom: 10px;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #374151;
+            font-weight: 500;
+        }
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .form-group select:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102,126,234,0.4); }
+        .btn-warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+        }
+        .btn-warning:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(245,158,11,0.4); }
+        .chart-container {
+            position: relative;
+            height: 350px;
+            margin-bottom: 20px;
+        }
+        .student-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .student-card {
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.3s;
+        }
+        .student-card:hover {
+            background: #e5e7eb;
+            border-color: #667eea;
+        }
+        .student-card.selected {
+            background: #dbeafe;
+            border-color: #3b82f6;
+        }
+        .student-card .name {
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 5px;
+        }
+        .student-card .info {
+            font-size: 0.85em;
+            color: #6b7280;
+        }
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+        .alert-info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
+        .hidden { display: none; }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #6b7280;
+        }
+        .excel-upload-area {
+            border: 2px dashed #d1d5db;
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            background: #f9fafb;
+        }
+        .excel-upload-area.dragover {
+            background: #dbeafe;
+            border-color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📈 LGS Deneme Takip - Öğretmen Paneli</h1>
+        <button class="btn-back" onclick="window.location.href='/teacher/dashboard'">← Ana Sayfa</button>
+        <div style="clear: both;"></div>
+    </div>
+
+    <div class="container">
+        <div id="alertBox"></div>
+
+        <!-- YENİ SİSTEM 1: Sınıf Seviyesi Karşılaştırma -->
+        <div class="card">
+            <h2>📊 Sınıf Seviyesi Karşılaştırma</h2>
+            <p style="color: #6b7280; margin-bottom: 15px; font-size: 0.9em;">
+                ℹ️ Aynı seviyedeki sınıfları karşılaştırın (örn: 7A, 7B, 7C, 7D karşılaştırması)
+            </p>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Sınıf Seviyesi</label>
+                    <select id="gradeLevelSelect">
+                        <option value="">Seviye seçin...</option>
+                        <option value="5">5. Sınıflar (A,B,C,D,E)</option>
+                        <option value="6">6. Sınıflar (A,B,C,D,E)</option>
+                        <option value="7">7. Sınıflar (A,B,C,D,E)</option>
+                        <option value="8">8. Sınıflar (A,B,C,D,E)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Deneme No</label>
+                    <select id="gradeExamSelect">
+                        <option value="">Deneme seçin...</option>
+                        <option value="1">Deneme 1</option>
+                        <option value="2">Deneme 2</option>
+                        <option value="3">Deneme 3</option>
+                        <option value="4">Deneme 4</option>
+                        <option value="5">Deneme 5</option>
+                        <option value="6">Deneme 6</option>
+                        <option value="7">Deneme 7</option>
+                        <option value="8">Deneme 8</option>
+                        <option value="9">Deneme 9</option>
+                        <option value="10">Deneme 10</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Ders</label>
+                    <select id="gradeSubjectSelect">
+                        <option value="">Ders seçin...</option>
+                        <option value="turkce">Türkçe</option>
+                        <option value="matematik">Matematik</option>
+                        <option value="fen">Fen Bilimleri</option>
+                        <option value="sosyal">Sosyal Bilgiler</option>
+                        <option value="ingilizce">İngilizce</option>
+                        <option value="din">Din Kültürü</option>
+                        <option value="lgs_score">LGS Puanı</option>
+                    </select>
+                </div>
+            </div>
+            <div style="text-align: center;">
+                <button class="btn btn-primary" onclick="showGradeLevelComparison()" style="padding: 12px 40px;">
+                    📊 Sınıfları Karşılaştır
+                </button>
+            </div>
+
+            <div id="gradeLevelChartBox" style="display:none; margin-top: 30px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 style="color: #1f2937; margin: 0;">
+                        <span id="gradeLevelTitle"></span>
+                    </h3>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-warning" onclick="downloadGradeLevelPDF()" style="display: flex; align-items: center; gap: 8px;">
+                            📄 PDF İndir
+                        </button>
+                        <button class="btn btn-primary" onclick="printGradeLevel()" style="display: flex; align-items: center; gap: 8px;">
+                            🖨️ Yazdır
+                        </button>
+                    </div>
+                </div>
+                <div class="chart-container" style="height: 450px;">
+                    <canvas id="gradeLevelChart"></canvas>
+                </div>
+                <div style="margin-top: 20px; padding: 15px; background: #f3f4f6; border-radius: 8px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;" id="gradeLevelStats">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- YENİ SİSTEM 2: Öğrenci Detay Görünümü -->
+        <div class="card">
+            <h2>👤 Öğrenci Detay Görünümü</h2>
+            <p style="color: #6b7280; margin-bottom: 15px; font-size: 0.9em;">
+                ℹ️ Belirli bir öğrencinin tüm deneme grafiklerini görüntüleyin
+            </p>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Sınıf Seçin</label>
+                    <select id="studentDetailClassSelect" onchange="loadStudentsForDetail()">
+                        <option value="">Sınıf seçin...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Öğrenci Seçin</label>
+                    <select id="studentDetailSelect" disabled>
+                        <option value="">Önce sınıf seçin...</option>
+                    </select>
+                </div>
+            </div>
+            <div style="text-align: center;">
+                <button class="btn btn-primary" onclick="showStudentDetail()" style="padding: 12px 40px;">
+                    📈 Öğrenci Grafiklerini Göster
+                </button>
+            </div>
+
+            <div id="studentDetailBox" style="display:none; margin-top: 30px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 style="color: #1f2937; margin: 0;">
+                        📊 <span id="studentDetailName"></span> - Deneme Gelişim Grafikleri
+                    </h3>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-warning" onclick="downloadStudentDetailPDF()" style="display: flex; align-items: center; gap: 8px;">
+                            📄 PDF İndir
+                        </button>
+                        <button class="btn btn-primary" onclick="printStudentDetail()" style="display: flex; align-items: center; gap: 8px;">
+                            🖨️ Yazdır
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="card" style="background: #f3f4f6; margin-bottom: 15px;">
+                    <h3 style="margin-bottom: 15px;">📊 LGS Puan Gelişimi</h3>
+                    <div class="chart-container">
+                        <canvas id="studentDetailLgsChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="card" style="background: #f3f4f6; margin-bottom: 15px;">
+                    <h3 style="margin-bottom: 15px;">📚 Türkçe Net Gelişimi</h3>
+                    <div class="chart-container">
+                        <canvas id="studentDetailTurkceChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="card" style="background: #f3f4f6; margin-bottom: 15px;">
+                    <h3 style="margin-bottom: 15px;">🔢 Matematik Net Gelişimi</h3>
+                    <div class="chart-container">
+                        <canvas id="studentDetailMatematikChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="card" style="background: #f3f4f6; margin-bottom: 15px;">
+                    <h3 style="margin-bottom: 15px;">🧪 Fen Bilimleri Net Gelişimi</h3>
+                    <div class="chart-container">
+                        <canvas id="studentDetailFenChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="card" style="background: #f3f4f6; margin-bottom: 15px;">
+                    <h3 style="margin-bottom: 15px;">🌍 Sosyal Bilgiler Net Gelişimi</h3>
+                    <div class="chart-container">
+                        <canvas id="studentDetailSosyalChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="card" style="background: #f3f4f6; margin-bottom: 15px;">
+                    <h3 style="margin-bottom: 15px;">🇬🇧 İngilizce Net Gelişimi</h3>
+                    <div class="chart-container">
+                        <canvas id="studentDetailIngilizceChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="card" style="background: #f3f4f6; margin-bottom: 15px;">
+                    <h3 style="margin-bottom: 15px;">📖 Din Kültürü Net Gelişimi</h3>
+                    <div class="chart-container">
+                        <canvas id="studentDetailDinChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🏫 Sınıf Bazında Analiz</h2>
+            <div class="form-group">
+                <label>Sınıf Seçin</label>
+                <select id="classSelect" onchange="loadClassData()">
+                    <option value="">Sınıf seçin...</option>
+                </select>
+            </div>
+
+            <div id="classChartsBox" style="display:none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin: 20px 0;">
+                    <h3 style="color: #1f2937; margin: 0;">📊 <span id="classNameDisplay"></span> Sınıf Ortalamaları</h3>
+                    <button class="btn btn-warning" onclick="downloadClassPDF()" style="display: flex; align-items: center; gap: 8px;">
+                        📄 PDF Rapor İndir
+                    </button>
+                </div>
+                
+                <div class="chart-container">
+                    <canvas id="classSubjectChart"></canvas>
+                </div>
+                
+                <div class="chart-container">
+                    <canvas id="classLgsChart"></canvas>
+                </div>
+
+                <h3 style="margin: 20px 0; color: #1f2937;">👥 Öğrenci Seç</h3>
+                <div class="form-group">
+                    <label>Bireysel Öğrenci Grafiği İçin Seçim Yapın</label>
+                    <select id="studentSelect" onchange="loadStudentDataFromDropdown()">
+                        <option value="">Öğrenci seçin...</option>
+                    </select>
+                </div>
+
+                <details style="margin-top: 20px;">
+                    <summary style="cursor: pointer; padding: 10px; background: #f3f4f6; border-radius: 5px; font-weight: 500;">
+                        📋 Sınıftaki Tüm Öğrenciler (Kart Görünümü)
+                    </summary>
+                    <div id="studentsList" class="student-grid" style="margin-top: 15px;"></div>
+                </details>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📚 Ders Bazlı Deneme Analizi</h2>
+            <p style="color: #6b7280; margin-bottom: 20px;">Bir sınıf ve ders seçerek, o dersin her denemedeki sınıf ortalamasını görüntüleyin.</p>
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Sınıf Seçin</label>
+                    <select id="subjectAnalysisClassSelect" onchange="loadSubjectAnalysis()">
+                        <option value="">Sınıf seçin...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Ders Seçin</label>
+                    <select id="subjectAnalysisSubjectSelect" onchange="loadSubjectAnalysis()">
+                        <option value="">Ders seçin...</option>
+                        <option value="turkce">Türkçe</option>
+                        <option value="matematik">Matematik</option>
+                        <option value="fen">Fen Bilimleri</option>
+                        <option value="sosyal">Sosyal Bilgiler</option>
+                        <option value="ingilizce">İngilizce</option>
+                        <option value="din">Din Kültürü</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="subjectAnalysisBox" style="display:none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin: 20px 0;">
+                    <h3 style="color: #1f2937; margin: 0;">📊 <span id="subjectAnalysisTitle"></span></h3>
+                    <button class="btn btn-warning" onclick="downloadSubjectAnalysisPDF()" style="display: flex; align-items: center; gap: 8px;">
+                        📄 PDF Rapor İndir
+                    </button>
+                </div>
+                
+                <div class="chart-container" style="height: 400px;">
+                    <canvas id="subjectAnalysisChart"></canvas>
+                </div>
+                
+                <div style="margin-top: 20px; overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                                <th style="padding: 12px; text-align: center;">Deneme No</th>
+                                <th style="padding: 12px; text-align: center;">Ortalama Net</th>
+                                <th style="padding: 12px; text-align: center;">En Düşük</th>
+                                <th style="padding: 12px; text-align: center;">En Yüksek</th>
+                                <th style="padding: 12px; text-align: center;">Öğrenci Sayısı</th>
+                            </tr>
+                        </thead>
+                        <tbody id="subjectAnalysisTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" id="studentChartsBox" style="display:none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="margin: 0;">📊 <span id="studentNameDisplay"></span> - Deneme Sonuçları</h2>
+                <button class="btn btn-warning" onclick="downloadStudentPDF()" style="display: flex; align-items: center; gap: 8px;">
+                    📄 PDF Rapor İndir
+                </button>
+            </div>
+            
+            <div class="chart-container">
+                <canvas id="studentSubjectChart"></canvas>
+            </div>
+            
+            <div class="chart-container">
+                <canvas id="studentLgsChart"></canvas>
+            </div>
+
+            <h3 style="margin: 20px 0;">📋 Tüm Denemeler</h3>
+            <div style="overflow-x: auto;">
+                <table id="studentExamsTable">
+                    <thead>
+                        <tr>
+                            <th>Deneme</th>
+                            <th>Türkçe</th>
+                            <th>Mat</th>
+                            <th>Fen</th>
+                            <th>Sosyal</th>
+                            <th>İng</th>
+                            <th>Din</th>
+                            <th>LGS</th>
+                            <th>İşlemler</th>
+                        </tr>
+                    </thead>
+                    <tbody id="studentExamsBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let classSubjectChart = null;
+        let classLgsChart = null;
+        let studentSubjectChart = null;
+        let studentLgsChart = null;
+        let selectedStudentId = null;
+        let currentClassName = '';
+        let currentStudentId = null;
+        let gradeLevelChart = null;
+        let studentDetailChart = null;
+        
+        // PDF için mevcut seçimleri tutacak değişkenler
+        let currentGradeLevel = '';
+        let currentExamNo = '';
+        let currentSubject = '';
+        let currentDetailStudentId = null;
+        let currentDetailStudentName = '';
+        
+        // Ders Bazlı Analiz için değişkenler
+        let subjectAnalysisChart = null;
+        let currentSubjectAnalysisClass = '';
+        let currentSubjectAnalysisSubject = '';
+
+        const classes = ['5A', '5B', '5C', '5D', '5E', '6A', '6B', '6C', '6D', '6E', '7A', '7B', '7C', '7D', '7E', '8A', '8B', '8C', '8D', '8E'];
+
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/current-user');
+                const data = await response.json();
+                if (!data.authenticated || data.user.role !== 'teacher') {
+                    window.location.href = '/';
+                    return false;
+                }
+                return true;
+            } catch (error) {
+                window.location.href = '/';
+                return false;
+            }
+        }
+
+        function populateClasses() {
+            console.log('🔧 populateClasses çağrıldı');
+            const select = document.getElementById('classSelect');
+            const studentDetailSelect = document.getElementById('studentDetailClassSelect');
+            const subjectAnalysisClassSelect = document.getElementById('subjectAnalysisClassSelect');
+            
+            if (!select) {
+                console.error('❌ classSelect elementi bulunamadı!');
+                return;
+            }
+            if (!studentDetailSelect) {
+                console.error('❌ studentDetailClassSelect elementi bulunamadı!');
+                return;
+            }
+            
+            console.log(`✅ ${classes.length} sınıf doldurulacak`);
+            classes.forEach(className => {
+                const option = document.createElement('option');
+                option.value = className;
+                option.textContent = className;
+                select.appendChild(option);
+                
+                // Öğrenci detay dropdown için de ekle
+                const detailOption = document.createElement('option');
+                detailOption.value = className;
+                detailOption.textContent = className;
+                studentDetailSelect.appendChild(detailOption);
+                
+                // Ders bazlı analiz dropdown için de ekle
+                if (subjectAnalysisClassSelect) {
+                    const subjectOption = document.createElement('option');
+                    subjectOption.value = className;
+                    subjectOption.textContent = className;
+                    subjectAnalysisClassSelect.appendChild(subjectOption);
+                }
+            });
+            console.log('✅ Sınıf dropdown\'ları dolduruldu');
+        }
+
+        async function loadClassData() {
+            console.log('🔧 loadClassData çağrıldı');
+            const className = document.getElementById('classSelect').value;
+            console.log('Seçilen sınıf:', className);
+            
+            if (!className) {
+                document.getElementById('classChartsBox').style.display = 'none';
+                document.getElementById('studentChartsBox').style.display = 'none';
+                currentClassName = '';
+                return;
+            }
+            
+            currentClassName = className;
+            
+            try {
+                // Sınıf ortalaması
+                console.log(`📊 API çağrısı: /teacher/api/practice-exams/class-average/${className}`);
+                const avgResponse = await fetch(`/teacher/api/practice-exams/class-average/${className}`);
+                const avgData = await avgResponse.json();
+                console.log('Ortalama verisi:', avgData);
+                
+                // Sınıftaki öğrenciler
+                console.log(`👥 API çağrısı: /teacher/api/practice-exams/class-students/${className}`);
+                const studentsResponse = await fetch(`/teacher/api/practice-exams/class-students/${className}`);
+                const studentsData = await studentsResponse.json();
+                console.log('Öğrenci verisi:', studentsData);
+                
+                if (avgData.exams && avgData.exams.length > 0) {
+                    document.getElementById('classChartsBox').style.display = 'block';
+                    document.getElementById('classNameDisplay').textContent = className;
+                    createClassCharts(avgData.exams);
+                } else {
+                    document.getElementById('classChartsBox').style.display = 'none';
+                    showAlert(`${className} sınıfı için henüz deneme verisi girilmemiş`, 'info');
+                }
+                
+                if (studentsData.students && studentsData.students.length > 0) {
+                    console.log(`✅ ${studentsData.students.length} öğrenci bulundu`);
+                    displayStudentsList(studentsData.students);
+                } else {
+                    console.log('❌ Öğrenci bulunamadı');
+                    document.getElementById('studentsList').innerHTML = '<p style="color: #6b7280;">Bu sınıfta öğrenci bulunmuyor</p>';
+                    // Dropdown'u da temizle
+                    const dropdown = document.getElementById('studentSelect');
+                    dropdown.innerHTML = '<option value="">Öğrenci bulunamadı</option>';
+                }
+                
+            } catch (error) {
+                console.error('❌ loadClassData hatası:', error);
+                showAlert('Veri yüklenemedi: ' + error.message, 'error');
+            }
+        }
+
+        function displayStudentsList(students) {
+            // Dropdown'u doldur
+            const dropdown = document.getElementById('studentSelect');
+            dropdown.innerHTML = '<option value="">Öğrenci seçin...</option>';
+            
+            students.forEach(student => {
+                const option = document.createElement('option');
+                option.value = student.id;
+                option.textContent = student.full_name;
+                option.dataset.name = student.full_name;
+                dropdown.appendChild(option);
+            });
+            
+            // Kartları doldur
+            const container = document.getElementById('studentsList');
+            container.innerHTML = '';
+            
+            students.forEach(student => {
+                const card = document.createElement('div');
+                card.className = 'student-card';
+                card.onclick = (evt) => loadStudentData(student.id, student.full_name, evt);
+                card.innerHTML = `
+                    <div class="name">${student.full_name}</div>
+                    <div class="info">ID: ${student.id}</div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function loadStudentDataFromDropdown() {
+            const dropdown = document.getElementById('studentSelect');
+            const studentId = dropdown.value;
+            const studentName = dropdown.options[dropdown.selectedIndex].dataset.name;
+            
+            if (!studentId) {
+                document.getElementById('studentChartsBox').style.display = 'none';
+                return;
+            }
+            
+            loadStudentData(studentId, studentName);
+        }
+
+        async function loadStudentData(studentId, studentName, evt = null) {
+            console.log('🔧 loadStudentData çağrıldı - Öğrenci ID:', studentId, 'İsim:', studentName);
+            selectedStudentId = studentId;
+            currentStudentId = studentId;
+            
+            // Seçimi göster (sadece kart tıklamasında)
+            document.querySelectorAll('.student-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            if (evt && evt.target) {
+                const card = evt.target.closest('.student-card');
+                if (card) card.classList.add('selected');
+            }
+            
+            try {
+                console.log(`📊 API çağrısı: /teacher/api/practice-exams/student/${studentId}`);
+                const response = await fetch(`/teacher/api/practice-exams/student/${studentId}`);
+                console.log('Response status:', response.status, response.statusText);
+                
+                if (!response.ok) {
+                    console.error(`❌ HTTP Hatası: ${response.status} - ${response.statusText}`);
+                    if (response.status === 403) {
+                        showAlert('⛔ Yetkilendirme hatası: Bu öğrencinin verilerine erişim yetkiniz yok.', 'error');
+                        return;
+                    }
+                }
+                
+                const data = await response.json();
+                console.log('Öğrenci deneme verisi:', data);
+                
+                if (data.exams && data.exams.length > 0) {
+                    console.log(`✅ ${data.exams.length} deneme bulundu`);
+                    document.getElementById('studentChartsBox').style.display = 'block';
+                    document.getElementById('studentNameDisplay').textContent = studentName;
+                    createStudentCharts(data.exams);
+                    populateExamsTable(data.exams);
+                } else {
+                    console.log('❌ Deneme verisi bulunamadı');
+                    document.getElementById('studentChartsBox').style.display = 'none';
+                    showAlert('Bu öğrenci için henüz deneme verisi yok', 'info');
+                }
+            } catch (error) {
+                console.error('❌ loadStudentData hatası:', error);
+                showAlert('Öğrenci verileri yüklenemedi: ' + error.message, 'error');
+            }
+        }
+
+        function createClassCharts(exams) {
+            const examNumbers = exams.map(e => 'Deneme ' + e.exam_number);
+            
+            const turkceNets = exams.map(e => parseFloat(e.turkce_net));
+            const matematikNets = exams.map(e => parseFloat(e.matematik_net));
+            const fenNets = exams.map(e => parseFloat(e.fen_net));
+            const sosyalNets = exams.map(e => parseFloat(e.sosyal_net));
+            const ingilizceNets = exams.map(e => parseFloat(e.ingilizce_net));
+            const dinNets = exams.map(e => parseFloat(e.din_net));
+            const lgsScores = exams.map(e => parseFloat(e.lgs_score));
+            
+            if (classSubjectChart) classSubjectChart.destroy();
+            if (classLgsChart) classLgsChart.destroy();
+            
+            const firstScore = lgsScores[0];
+            const lastScore = lgsScores[lgsScores.length - 1];
+            const progress = lastScore - firstScore;
+            const progressPercent = ((progress / firstScore) * 100).toFixed(1);
+            const progressText = progress >= 0 ? `+${progress.toFixed(1)} puan (↗ %${progressPercent})` : `${progress.toFixed(1)} puan (↘ %${progressPercent})`;
+            
+            const lgsCtx = document.getElementById('classLgsChart').getContext('2d');
+            classLgsChart = new Chart(lgsCtx, {
+                type: 'bar',
+                data: {
+                    labels: examNumbers,
+                    datasets: [{
+                        label: 'Sınıf Ortalama LGS Puanı',
+                        data: lgsScores,
+                        backgroundColor: '#667eea',
+                        borderColor: '#4c51bf',
+                        borderWidth: 2,
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 1500, easing: 'easeInOutQuart' },
+                    plugins: {
+                        title: { 
+                            display: true, 
+                            text: `Sınıf Ortalama LGS Puan Gelişimi: ${progressText}`,
+                            font: { size: 18, weight: 'bold' },
+                            color: progress >= 0 ? '#667eea' : '#ef4444'
+                        },
+                        legend: { display: false },
+                        datalabels: {
+                            align: 'top',
+                            anchor: 'end',
+                            color: '#667eea',
+                            font: { size: 11, weight: 'bold' },
+                            formatter: (value) => value.toFixed(0)
+                        }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true, 
+                            max: 500,
+                            grid: { color: 'rgba(0, 0, 0, 0.1)' },
+                            ticks: { font: { size: 12 } }
+                        },
+                        x: { grid: { color: 'rgba(0, 0, 0, 0.05)' } }
+                    }
+                }
+            });
+            
+            const subjectCtx = document.getElementById('classSubjectChart').getContext('2d');
+            classSubjectChart = new Chart(subjectCtx, {
+                type: 'bar',
+                data: {
+                    labels: examNumbers,
+                    datasets: [
+                        { label: 'Türkçe', data: turkceNets, backgroundColor: '#ef4444', borderColor: '#dc2626', borderWidth: 2, borderRadius: 6 },
+                        { label: 'Matematik', data: matematikNets, backgroundColor: '#3b82f6', borderColor: '#2563eb', borderWidth: 2, borderRadius: 6 },
+                        { label: 'Fen', data: fenNets, backgroundColor: '#10b981', borderColor: '#059669', borderWidth: 2, borderRadius: 6 },
+                        { label: 'Sosyal', data: sosyalNets, backgroundColor: '#f59e0b', borderColor: '#d97706', borderWidth: 2, borderRadius: 6 },
+                        { label: 'İngilizce', data: ingilizceNets, backgroundColor: '#8b5cf6', borderColor: '#7c3aed', borderWidth: 2, borderRadius: 6 },
+                        { label: 'Din', data: dinNets, backgroundColor: '#ec4899', borderColor: '#db2777', borderWidth: 2, borderRadius: 6 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 1500, easing: 'easeInOutQuart' },
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        title: { display: true, text: 'Sınıf Ortalama Net Gelişimi (Ders Bazında)', font: { size: 18, weight: 'bold' } },
+                        legend: { position: 'bottom', labels: { padding: 15, usePointStyle: true } },
+                        datalabels: { display: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, max: 20, grid: { color: 'rgba(0, 0, 0, 0.1)' }, ticks: { stepSize: 5 } },
+                        x: { grid: { color: 'rgba(0, 0, 0, 0.05)' } }
+                    }
+                }
+            });
+        }
+
+        function createStudentCharts(exams) {
+            const examNumbers = exams.map(e => 'D' + e.exam_number);
+            
+            const turkceNets = exams.map(e => parseFloat(e.turkce_net));
+            const matematikNets = exams.map(e => parseFloat(e.matematik_net));
+            const fenNets = exams.map(e => parseFloat(e.fen_net));
+            const sosyalNets = exams.map(e => parseFloat(e.sosyal_net));
+            const ingilizceNets = exams.map(e => parseFloat(e.ingilizce_net));
+            const dinNets = exams.map(e => parseFloat(e.din_net));
+            const lgsScores = exams.map(e => parseFloat(e.lgs_score));
+            
+            if (studentSubjectChart) studentSubjectChart.destroy();
+            if (studentLgsChart) studentLgsChart.destroy();
+            
+            const firstScore = lgsScores[0];
+            const lastScore = lgsScores[lgsScores.length - 1];
+            const progress = lastScore - firstScore;
+            const progressPercent = ((progress / firstScore) * 100).toFixed(1);
+            const progressText = progress >= 0 ? `+${progress.toFixed(1)} puan (↗ %${progressPercent})` : `${progress.toFixed(1)} puan (↘ %${progressPercent})`;
+            
+            const lgsCtx = document.getElementById('studentLgsChart').getContext('2d');
+            studentLgsChart = new Chart(lgsCtx, {
+                type: 'bar',
+                data: {
+                    labels: examNumbers,
+                    datasets: [{
+                        label: 'LGS Puanı',
+                        data: lgsScores,
+                        backgroundColor: '#059669',
+                        borderColor: '#047857',
+                        borderWidth: 2,
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 1500, easing: 'easeInOutQuart' },
+                    plugins: {
+                        title: { 
+                            display: true, 
+                            text: `LGS Puan Gelişimi: ${progressText}`,
+                            font: { size: 18, weight: 'bold' },
+                            color: progress >= 0 ? '#059669' : '#ef4444'
+                        },
+                        legend: { display: false },
+                        datalabels: {
+                            align: 'top',
+                            anchor: 'end',
+                            color: '#059669',
+                            font: { size: 11, weight: 'bold' },
+                            formatter: (value) => value.toFixed(0)
+                        }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true,
+                            max: 500,
+                            grid: { color: 'rgba(0, 0, 0, 0.1)' },
+                            ticks: { font: { size: 12 } }
+                        },
+                        x: { grid: { color: 'rgba(0, 0, 0, 0.05)' } }
+                    }
+                }
+            });
+            
+            const subjectCtx = document.getElementById('studentSubjectChart').getContext('2d');
+            studentSubjectChart = new Chart(subjectCtx, {
+                type: 'bar',
+                data: {
+                    labels: examNumbers,
+                    datasets: [
+                        { label: 'Türkçe', data: turkceNets, backgroundColor: '#ef4444', borderColor: '#dc2626', borderWidth: 2, borderRadius: 6 },
+                        { label: 'Matematik', data: matematikNets, backgroundColor: '#3b82f6', borderColor: '#2563eb', borderWidth: 2, borderRadius: 6 },
+                        { label: 'Fen', data: fenNets, backgroundColor: '#10b981', borderColor: '#059669', borderWidth: 2, borderRadius: 6 },
+                        { label: 'Sosyal', data: sosyalNets, backgroundColor: '#f59e0b', borderColor: '#d97706', borderWidth: 2, borderRadius: 6 },
+                        { label: 'İngilizce', data: ingilizceNets, backgroundColor: '#8b5cf6', borderColor: '#7c3aed', borderWidth: 2, borderRadius: 6 },
+                        { label: 'Din', data: dinNets, backgroundColor: '#ec4899', borderColor: '#db2777', borderWidth: 2, borderRadius: 6 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 1500, easing: 'easeInOutQuart' },
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        title: { display: true, text: 'Ders Bazında Net Gelişimi', font: { size: 18, weight: 'bold' } },
+                        legend: { position: 'bottom', labels: { padding: 15, usePointStyle: true } },
+                        datalabels: { display: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, max: 20, grid: { color: 'rgba(0, 0, 0, 0.1)' }, ticks: { stepSize: 5 } },
+                        x: { grid: { color: 'rgba(0, 0, 0, 0.05)' } }
+                    }
+                }
+            });
+        }
+
+        function showAlert(message, type) {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => { alertBox.innerHTML = ''; }, 5000);
+        }
+
+        // Deneme Tablosu
+        function populateExamsTable(exams) {
+            const tbody = document.getElementById('studentExamsBody');
+            tbody.innerHTML = '';
+            
+            exams.forEach(exam => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${exam.exam_number}</td>
+                    <td>${parseFloat(exam.turkce_net).toFixed(1)}</td>
+                    <td>${parseFloat(exam.matematik_net).toFixed(1)}</td>
+                    <td>${parseFloat(exam.fen_net).toFixed(1)}</td>
+                    <td>${parseFloat(exam.sosyal_net).toFixed(1)}</td>
+                    <td>${parseFloat(exam.ingilizce_net).toFixed(1)}</td>
+                    <td>${parseFloat(exam.din_net).toFixed(1)}</td>
+                    <td><strong>${parseFloat(exam.lgs_score).toFixed(2)}</strong></td>
+                    <td>
+                        <button class="btn btn-danger" onclick="deleteExam(${exam.id}, ${exam.exam_number})" 
+                                style="padding: 5px 10px; font-size: 0.9em;">
+                            🗑️ Sil
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        async function deleteExam(examId, examNumber) {
+            if (!confirm(`${examNumber} numaralı denemeyi silmek istediğinize emin misiniz?\n\nBu işlem geri alınamaz!`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/teacher/api/practice-exams/delete/${examId}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showAlert(`Deneme ${examNumber} başarıyla silindi!`, 'success');
+                    
+                    // Grafikleri ve tabloyu yeniden yükle
+                    if (currentStudentId) {
+                        const studentName = document.getElementById('studentNameDisplay').textContent;
+                        const refreshResponse = await fetch(`/teacher/api/practice-exams/student/${currentStudentId}`);
+                        const refreshData = await refreshResponse.json();
+                        
+                        if (refreshData.exams && refreshData.exams.length > 0) {
+                            createStudentCharts(refreshData.exams);
+                            populateExamsTable(refreshData.exams);
+                        } else {
+                            document.getElementById('studentChartsBox').style.display = 'none';
+                            showAlert('Bu öğrencinin artık deneme verisi yok', 'info');
+                        }
+                    }
+                    
+                    // Sınıf ortalamasını da güncelle
+                    if (currentClassName) {
+                        loadClassData();
+                    }
+                } else {
+                    showAlert('Silme işlemi başarısız: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showAlert('Silme hatası: ' + error.message, 'error');
+            }
+        }
+
+        // Detaylı Analiz Fonksiyonları
+        let analysisChart = null;
+
+        async function loadExamsForAnalysis() {
+            const className = document.getElementById('analysisClassSelect').value;
+            const examSelect = document.getElementById('analysisExamSelect');
+            const subjectSelect = document.getElementById('analysisSubjectSelect');
+            
+            if (!className) {
+                examSelect.disabled = true;
+                subjectSelect.disabled = true;
+                examSelect.innerHTML = '<option value="">Önce sınıf seçin...</option>';
+                document.getElementById('analysisChartBox').style.display = 'none';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/teacher/api/practice-exams/class/${className}`);
+                const data = await response.json();
+                
+                examSelect.innerHTML = '<option value="">Deneme seçin...</option>';
+                
+                if (data.exams && data.exams.length > 0) {
+                    // Deneme numaralarını benzersiz hale getir
+                    const uniqueExams = [...new Set(data.exams.map(e => e.exam_number))];
+                    uniqueExams.sort((a, b) => a - b);
+                    
+                    uniqueExams.forEach(examNum => {
+                        const option = document.createElement('option');
+                        option.value = examNum;
+                        option.textContent = `Deneme ${examNum}`;
+                        examSelect.appendChild(option);
+                    });
+                    
+                    examSelect.disabled = false;
+                    subjectSelect.disabled = false;
+                } else {
+                    examSelect.innerHTML = '<option value="">Bu sınıfta deneme yok</option>';
+                }
+            } catch (error) {
+                console.error('Deneme yükleme hatası:', error);
+                showAlert('Denemeler yüklenemedi: ' + error.message, 'error');
+            }
+        }
+
+        async function showAnalysisChart() {
+            const className = document.getElementById('analysisClassSelect').value;
+            const examNumber = document.getElementById('analysisExamSelect').value;
+            const subject = document.getElementById('analysisSubjectSelect').value;
+            
+            if (!className || !examNumber || !subject) {
+                alert('Lütfen sınıf, deneme ve ders seçin!');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/teacher/api/practice-exams/class/${className}`);
+                const data = await response.json();
+                
+                // Seçilen deneme için verileri filtrele
+                const examData = data.exams.filter(e => e.exam_number == examNumber);
+                
+                if (examData.length === 0) {
+                    alert('Bu deneme için veri bulunamadı!');
+                    return;
+                }
+                
+                // Ders adı mapping
+                const subjectNames = {
+                    'turkce': 'Türkçe',
+                    'matematik': 'Matematik',
+                    'fen': 'Fen Bilimleri',
+                    'sosyal': 'Sosyal Bilgiler',
+                    'ingilizce': 'İngilizce',
+                    'din': 'Din Kültürü'
+                };
+                
+                const subjectColors = {
+                    'turkce': '#ef4444',
+                    'matematik': '#3b82f6',
+                    'fen': '#10b981',
+                    'sosyal': '#f59e0b',
+                    'ingilizce': '#8b5cf6',
+                    'din': '#ec4899'
+                };
+                
+                const subjectNetField = subject + '_net';
+                
+                // Öğrencileri net değerine göre sırala
+                const sortedData = examData.sort((a, b) => parseFloat(b[subjectNetField]) - parseFloat(a[subjectNetField]));
+                
+                const studentNames = sortedData.map(e => e.full_name);
+                const nets = sortedData.map(e => parseFloat(e[subjectNetField]));
+                
+                // İstatistikler
+                const avg = (nets.reduce((a, b) => a + b, 0) / nets.length).toFixed(2);
+                const max = Math.max(...nets).toFixed(2);
+                const min = Math.min(...nets).toFixed(2);
+                
+                document.getElementById('analysisTitle').textContent = 
+                    `${className} - Deneme ${examNumber} - ${subjectNames[subject]}`;
+                document.getElementById('analysisAvg').textContent = avg + ' net';
+                document.getElementById('analysisMax').textContent = max + ' net';
+                document.getElementById('analysisMin').textContent = min + ' net';
+                document.getElementById('analysisCount').textContent = nets.length + ' öğrenci';
+                
+                // Grafik oluştur
+                if (analysisChart) analysisChart.destroy();
+                
+                const ctx = document.getElementById('analysisChart').getContext('2d');
+                analysisChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: studentNames,
+                        datasets: [{
+                            label: subjectNames[subject] + ' Net',
+                            data: nets,
+                            backgroundColor: subjectColors[subject] + '99',
+                            borderColor: subjectColors[subject],
+                            borderWidth: 2,
+                            borderRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: `${className} - Deneme ${examNumber} - ${subjectNames[subject]} Sonuçları`,
+                                font: { size: 18, weight: 'bold' },
+                                color: '#374151'
+                            },
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                padding: 12,
+                                titleFont: { size: 14, weight: 'bold' },
+                                bodyFont: { size: 13 },
+                                callbacks: {
+                                    label: function(context) {
+                                        return `Net: ${context.parsed.y.toFixed(2)}`;
+                                    }
+                                }
+                            },
+                            datalabels: {
+                                align: 'top',
+                                anchor: 'end',
+                                color: '#374151',
+                                font: { size: 10, weight: 'bold' },
+                                formatter: function(value) {
+                                    return value.toFixed(1);
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 20,
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.1)'
+                                },
+                                ticks: {
+                                    font: { size: 12 },
+                                    callback: function(value) {
+                                        return value + ' net';
+                                    }
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.05)'
+                                },
+                                ticks: {
+                                    font: { size: 10 },
+                                    maxRotation: 45,
+                                    minRotation: 45
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                document.getElementById('analysisChartBox').style.display = 'block';
+                
+            } catch (error) {
+                console.error('Analiz hatası:', error);
+                showAlert('Grafik oluşturulamadı: ' + error.message, 'error');
+            }
+        }
+
+        // YENİ SİSTEM 1: Sınıf Seviyesi Karşılaştırma
+        async function showGradeLevelComparison() {
+            const gradeLevel = document.getElementById('gradeLevelSelect').value;
+            const examNumber = document.getElementById('gradeExamSelect').value;
+            const subject = document.getElementById('gradeSubjectSelect').value;
+            
+            if (!gradeLevel || !examNumber || !subject) {
+                alert('Lütfen sınıf seviyesi, deneme ve ders seçin!');
+                return;
+            }
+            
+            // PDF için değişkenleri kaydet
+            currentGradeLevel = gradeLevel;
+            currentExamNo = examNumber;
+            currentSubject = subject;
+            
+            try {
+                // Seviyedeki tüm sınıfları al (örn: 7A, 7B, 7C, 7D, 7E)
+                const gradeClasses = classes.filter(c => c.startsWith(gradeLevel));
+                
+                // Her sınıf için ortalama hesapla
+                const classData = [];
+                
+                for (const className of gradeClasses) {
+                    const response = await fetch(`/teacher/api/practice-exams/class/${className}`);
+                    const data = await response.json();
+                    
+                    const examData = data.exams.filter(e => e.exam_number == examNumber);
+                    
+                    if (examData.length > 0) {
+                        let avg;
+                        if (subject === 'lgs_score') {
+                            const scores = examData.map(e => parseFloat(e.lgs_score));
+                            avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+                        } else {
+                            const nets = examData.map(e => parseFloat(e[subject + '_net']));
+                            avg = nets.reduce((a, b) => a + b, 0) / nets.length;
+                        }
+                        classData.push({ className, avg, count: examData.length });
+                    }
+                }
+                
+                if (classData.length === 0) {
+                    alert('Bu deneme için veri bulunamadı!');
+                    return;
+                }
+                
+                const subjectNames = {
+                    'turkce': 'Türkçe',
+                    'matematik': 'Matematik',
+                    'fen': 'Fen Bilimleri',
+                    'sosyal': 'Sosyal Bilgiler',
+                    'ingilizce': 'İngilizce',
+                    'din': 'Din Kültürü',
+                    'lgs_score': 'LGS Puanı'
+                };
+                
+                const subjectColors = {
+                    'turkce': '#ef4444',
+                    'matematik': '#3b82f6',
+                    'fen': '#10b981',
+                    'sosyal': '#f59e0b',
+                    'ingilizce': '#8b5cf6',
+                    'din': '#ec4899',
+                    'lgs_score': '#10b981'
+                };
+                
+                const labels = classData.map(d => d.className);
+                const values = classData.map(d => d.avg);
+                
+                document.getElementById('gradeLevelTitle').textContent = 
+                    `${gradeLevel}. Sınıflar - Deneme ${examNumber} - ${subjectNames[subject]} Karşılaştırması`;
+                
+                // İstatistikleri göster
+                const statsHTML = classData.map(d => `
+                    <div>
+                        <strong>${d.className}:</strong>
+                        <div style="font-size: 1.5em; color: ${subjectColors[subject]}; font-weight: bold;">
+                            ${d.avg.toFixed(2)} ${subject === 'lgs_score' ? 'puan' : 'net'}
+                        </div>
+                        <div style="font-size: 0.9em; color: #6b7280;">${d.count} öğrenci</div>
+                    </div>
+                `).join('');
+                document.getElementById('gradeLevelStats').innerHTML = statsHTML;
+                
+                // Grafik oluştur
+                if (gradeLevelChart) gradeLevelChart.destroy();
+                
+                const ctx = document.getElementById('gradeLevelChart').getContext('2d');
+                gradeLevelChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: subjectNames[subject],
+                            data: values,
+                            backgroundColor: subjectColors[subject] + 'CC',
+                            borderColor: subjectColors[subject],
+                            borderWidth: 2,
+                            borderRadius: 8,
+                            barThickness: 80
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: {
+                            duration: 1500,
+                            easing: 'easeInOutQuart'
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: `${gradeLevel}. Sınıflar - ${subjectNames[subject]} Karşılaştırma`,
+                                font: { size: 20, weight: 'bold' },
+                                color: '#374151'
+                            },
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                padding: 12,
+                                titleFont: { size: 14, weight: 'bold' },
+                                bodyFont: { size: 13 },
+                                callbacks: {
+                                    label: function(context) {
+                                        const suffix = subject === 'lgs_score' ? ' puan' : ' net';
+                                        return `Ortalama: ${context.parsed.y.toFixed(2)}${suffix}`;
+                                    }
+                                }
+                            },
+                            datalabels: {
+                                display: true,
+                                align: 'end',
+                                anchor: 'end',
+                                offset: 4,
+                                color: '#ffffff',
+                                backgroundColor: subjectColors[subject],
+                                borderRadius: 4,
+                                padding: {
+                                    top: 6,
+                                    bottom: 6,
+                                    left: 10,
+                                    right: 10
+                                },
+                                font: { 
+                                    size: 16, 
+                                    weight: 'bold',
+                                    family: 'Arial'
+                                },
+                                formatter: function(value) {
+                                    return value.toFixed(1);
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: subject === 'lgs_score' ? 500 : 20,
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.1)'
+                                },
+                                ticks: {
+                                    font: { size: 13 },
+                                    callback: function(value) {
+                                        const suffix = subject === 'lgs_score' ? ' puan' : ' net';
+                                        return value + suffix;
+                                    }
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.05)'
+                                },
+                                ticks: {
+                                    font: { size: 14, weight: 'bold' },
+                                    color: '#374151'
+                                }
+                            }
+                        }
+                    },
+                    plugins: [ChartDataLabels]
+                });
+                
+                document.getElementById('gradeLevelChartBox').style.display = 'block';
+                
+            } catch (error) {
+                console.error('Karşılaştırma hatası:', error);
+                showAlert('Grafik oluşturulamadı: ' + error.message, 'error');
+            }
+        }
+
+        // YENİ SİSTEM 2: Öğrenci Detay Görünümü
+        let studentDetailCharts = {};
+        
+        async function loadStudentsForDetail() {
+            console.log('🔧 loadStudentsForDetail çağrıldı');
+            const className = document.getElementById('studentDetailClassSelect').value;
+            console.log('Seçilen sınıf (detay):', className);
+            const select = document.getElementById('studentDetailSelect');
+            
+            select.disabled = true;
+            select.innerHTML = '<option value="">Yükleniyor...</option>';
+            
+            if (!className) {
+                select.innerHTML = '<option value="">Önce sınıf seçin...</option>';
+                return;
+            }
+            
+            try {
+                console.log(`📊 API çağrısı: /teacher/api/practice-exams/class/${className}`);
+                const response = await fetch(`/teacher/api/practice-exams/class/${className}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('Deneme verisi (detay):', data);
+                
+                if (!data.exams || data.exams.length === 0) {
+                    console.log('❌ Deneme bulunamadı');
+                    select.innerHTML = '<option value="">Bu sınıfta deneme yok</option>';
+                    select.disabled = true;
+                    showAlert(`${className} sınıfında henüz deneme sınavı bulunmuyor.`, 'info');
+                    return;
+                }
+                
+                // Benzersiz öğrencileri al
+                const uniqueStudents = [];
+                const seenIds = new Set();
+                
+                data.exams.forEach(exam => {
+                    if (!seenIds.has(exam.student_id)) {
+                        seenIds.add(exam.student_id);
+                        uniqueStudents.push({
+                            id: exam.student_id,
+                            name: exam.full_name
+                        });
+                    }
+                });
+                
+                console.log(`✅ ${uniqueStudents.length} benzersiz öğrenci bulundu`);
+                
+                if (uniqueStudents.length === 0) {
+                    select.innerHTML = '<option value="">Bu sınıfta öğrenci yok</option>';
+                    select.disabled = true;
+                    showAlert(`${className} sınıfında öğrenci bulunmuyor.`, 'info');
+                    return;
+                }
+                
+                select.innerHTML = '<option value="">Öğrenci seçin...</option>';
+                uniqueStudents.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+                
+                uniqueStudents.forEach(student => {
+                    const option = document.createElement('option');
+                    option.value = student.id;
+                    option.textContent = student.name;
+                    select.appendChild(option);
+                });
+                
+                select.disabled = false;
+                console.log('✅ Öğrenci dropdown\'u dolduruldu');
+                
+            } catch (error) {
+                console.error('❌ Öğrenci yükleme hatası:', error);
+                select.innerHTML = '<option value="">Hata oluştu</option>';
+                select.disabled = true;
+                showAlert('Öğrenci listesi yüklenemedi: ' + error.message, 'error');
+            }
+        }
+
+        async function showStudentDetail() {
+            console.log('🔧 showStudentDetail çağrıldı');
+            const studentId = document.getElementById('studentDetailSelect').value;
+            console.log('Seçilen öğrenci ID:', studentId);
+            
+            if (!studentId) {
+                alert('Lütfen bir öğrenci seçin!');
+                return;
+            }
+            
+            try {
+                console.log(`📊 API çağrısı: /teacher/api/practice-exams/student/${studentId}`);
+                const response = await fetch(`/teacher/api/practice-exams/student/${studentId}`);
+                console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('Öğrenci detay verisi:', data);
+                
+                if (!data.exams || data.exams.length === 0) {
+                    alert('Bu öğrenci için deneme verisi bulunamadı!');
+                    return;
+                }
+                
+                const exams = data.exams;
+                const studentName = data.student.full_name;
+                
+                // PDF için değişkenleri kaydet
+                currentDetailStudentId = studentId;
+                currentDetailStudentName = studentName;
+                
+                document.getElementById('studentDetailName').textContent = studentName;
+                
+                // Tüm grafikleri temizle
+                Object.values(studentDetailCharts).forEach(chart => {
+                    if (chart) chart.destroy();
+                });
+                studentDetailCharts = {};
+                
+                // Grafikleri oluştur
+                createStudentDetailCharts(exams);
+                
+                document.getElementById('studentDetailBox').style.display = 'block';
+                
+            } catch (error) {
+                console.error('Öğrenci detay hatası:', error);
+                showAlert('Grafik oluşturulamadı: ' + error.message, 'error');
+            }
+        }
+
+        function createStudentDetailCharts(exams) {
+            const examNumbers = exams.map(e => 'Deneme ' + e.exam_number);
+            
+            const turkceNets = exams.map(e => parseFloat(e.turkce_net));
+            const matematikNets = exams.map(e => parseFloat(e.matematik_net));
+            const fenNets = exams.map(e => parseFloat(e.fen_net));
+            const sosyalNets = exams.map(e => parseFloat(e.sosyal_net));
+            const ingilizceNets = exams.map(e => parseFloat(e.ingilizce_net));
+            const dinNets = exams.map(e => parseFloat(e.din_net));
+            const lgsScores = exams.map(e => parseFloat(e.lgs_score));
+            
+            // LGS Grafik
+            studentDetailCharts.lgs = createBarChart('studentDetailLgsChart', examNumbers, lgsScores, 'LGS Puanı', '#10b981', 500);
+            
+            // Ders grafikleri
+            studentDetailCharts.turkce = createBarChart('studentDetailTurkceChart', examNumbers, turkceNets, 'Türkçe', '#ef4444', 20);
+            studentDetailCharts.matematik = createBarChart('studentDetailMatematikChart', examNumbers, matematikNets, 'Matematik', '#3b82f6', 20);
+            studentDetailCharts.fen = createBarChart('studentDetailFenChart', examNumbers, fenNets, 'Fen', '#10b981', 20);
+            studentDetailCharts.sosyal = createBarChart('studentDetailSosyalChart', examNumbers, sosyalNets, 'Sosyal', '#f59e0b', 10);
+            studentDetailCharts.ingilizce = createBarChart('studentDetailIngilizceChart', examNumbers, ingilizceNets, 'İngilizce', '#8b5cf6', 10);
+            studentDetailCharts.din = createBarChart('studentDetailDinChart', examNumbers, dinNets, 'Din', '#ec4899', 10);
+        }
+
+        function createBarChart(canvasId, labels, data, title, color, maxValue) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            
+            return new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: title,
+                        data: data,
+                        backgroundColor: data.map((val, i) => {
+                            if (i === 0) return color + 'AA';
+                            return val >= data[i-1] ? color : color + '55';
+                        }),
+                        borderColor: color,
+                        borderWidth: 2,
+                        borderRadius: 8,
+                        barThickness: 50
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 1200,
+                        easing: 'easeInOutQuart'
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: title + (maxValue === 500 ? ' Gelişimi' : ' Net Gelişimi'),
+                            font: { size: 16, weight: 'bold' },
+                            color: '#374151'
+                        },
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            titleFont: { size: 14, weight: 'bold' },
+                            bodyFont: { size: 13 }
+                        },
+                        datalabels: {
+                            display: true,
+                            align: 'end',
+                            anchor: 'end',
+                            offset: 4,
+                            color: '#ffffff',
+                            backgroundColor: color,
+                            borderRadius: 4,
+                            padding: {
+                                top: 4,
+                                bottom: 4,
+                                left: 8,
+                                right: 8
+                            },
+                            font: { 
+                                size: 14, 
+                                weight: 'bold',
+                                family: 'Arial'
+                            },
+                            formatter: function(value) {
+                                return value.toFixed(1);
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: maxValue,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            },
+                            ticks: {
+                                font: { size: 12 },
+                                stepSize: maxValue === 500 ? 100 : 5
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            },
+                            ticks: {
+                                font: { size: 12 }
+                            }
+                        }
+                    }
+                },
+                plugins: [ChartDataLabels]
+            });
+        }
+
+        // PDF Download Fonksiyonları
+        function downloadClassPDF() {
+            if (!currentClassName) {
+                alert('Lütfen önce bir sınıf seçin!');
+                return;
+            }
+            window.open(`/teacher/api/practice-exams/report/class/${currentClassName}`, '_blank');
+        }
+
+        function downloadStudentPDF() {
+            if (!currentStudentId) {
+                alert('Lütfen önce bir öğrenci seçin!');
+                return;
+            }
+            window.open(`/teacher/api/practice-exams/report/student/${currentStudentId}`, '_blank');
+        }
+        
+        // Sınıf Seviyesi Karşılaştırma PDF İndir
+        function downloadGradeLevelPDF() {
+            if (!currentGradeLevel || !currentExamNo || !currentSubject) {
+                alert('Lütfen önce sınıf seviyesi, deneme ve ders seçin!');
+                return;
+            }
+            window.open(`/teacher/api/practice-exams/report/grade-level/${currentGradeLevel}/${currentExamNo}/${currentSubject}`, '_blank');
+        }
+        
+        // Sınıf Seviyesi Karşılaştırma Yazdır
+        function printGradeLevel() {
+            if (!currentGradeLevel || !currentExamNo || !currentSubject) {
+                alert('Lütfen önce verileri yükleyin!');
+                return;
+            }
+            
+            const printWindow = window.open('', '_blank');
+            const chartCanvas = document.getElementById('gradeLevelChart');
+            const chartImage = chartCanvas.toDataURL('image/png');
+            const title = document.getElementById('gradeLevelTitle').textContent;
+            const stats = document.getElementById('gradeLevelStats').innerHTML;
+            
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>${title}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; }
+                        .header { text-align: center; margin-bottom: 20px; }
+                        .header img { height: 60px; }
+                        .header h1 { color: #1e40af; margin: 10px 0; font-size: 16px; }
+                        .title { font-size: 18px; font-weight: bold; margin: 20px 0; text-align: center; }
+                        .chart { text-align: center; margin: 20px 0; }
+                        .chart img { max-width: 100%; height: auto; }
+                        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 20px; }
+                        .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #666; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <img src="/static/images/school_logo.png" alt="Logo">
+                        <h1>Ayse Melahat Erkin Ortaokulu - Ogrenci Takip Sistemi</h1>
+                    </div>
+                    <div class="title">${title}</div>
+                    <div class="chart"><img src="${chartImage}"></div>
+                    <div class="stats">${stats}</div>
+                    <div class="footer">Rapor Tarihi: ${new Date().toLocaleDateString('tr-TR')} ${new Date().toLocaleTimeString('tr-TR')}</div>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+            setTimeout(() => { printWindow.print(); }, 500);
+        }
+        
+        // Öğrenci Detay PDF İndir
+        function downloadStudentDetailPDF() {
+            if (!currentDetailStudentId) {
+                alert('Lütfen önce bir öğrenci seçin!');
+                return;
+            }
+            window.open(`/teacher/api/practice-exams/report/student/${currentDetailStudentId}`, '_blank');
+        }
+        
+        // =====================================================
+        // DERS BAZLI DENEME ANALİZİ FONKSİYONLARI
+        // =====================================================
+        
+        const subjectNames = {
+            'turkce': 'Türkçe',
+            'matematik': 'Matematik',
+            'fen': 'Fen Bilimleri',
+            'sosyal': 'Sosyal Bilgiler',
+            'ingilizce': 'İngilizce',
+            'din': 'Din Kültürü'
+        };
+        
+        const subjectColors = {
+            'turkce': '#ef4444',
+            'matematik': '#3b82f6',
+            'fen': '#10b981',
+            'sosyal': '#f59e0b',
+            'ingilizce': '#8b5cf6',
+            'din': '#ec4899'
+        };
+        
+        async function loadSubjectAnalysis() {
+            const className = document.getElementById('subjectAnalysisClassSelect').value;
+            const subject = document.getElementById('subjectAnalysisSubjectSelect').value;
+            
+            if (!className || !subject) {
+                document.getElementById('subjectAnalysisBox').style.display = 'none';
+                return;
+            }
+            
+            currentSubjectAnalysisClass = className;
+            currentSubjectAnalysisSubject = subject;
+            
+            try {
+                const response = await fetch(`/teacher/api/practice-exams/class-subject/${className}/${subject}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    showAlert(data.error, 'error');
+                    return;
+                }
+                
+                if (!data.exams || data.exams.length === 0) {
+                    showAlert(`${className} sınıfı için ${subjectNames[subject]} deneme verisi bulunamadı`, 'info');
+                    document.getElementById('subjectAnalysisBox').style.display = 'none';
+                    return;
+                }
+                
+                document.getElementById('subjectAnalysisBox').style.display = 'block';
+                document.getElementById('subjectAnalysisTitle').textContent = `${className} - ${subjectNames[subject]} Deneme Performansı`;
+                
+                createSubjectAnalysisChart(data.exams, subject);
+                createSubjectAnalysisTable(data.exams);
+                
+            } catch (error) {
+                console.error('Ders analizi yüklenirken hata:', error);
+                showAlert('Veri yüklenirken hata oluştu', 'error');
+            }
+        }
+        
+        function createSubjectAnalysisChart(exams, subject) {
+            const ctx = document.getElementById('subjectAnalysisChart').getContext('2d');
+            
+            if (subjectAnalysisChart) {
+                subjectAnalysisChart.destroy();
+            }
+            
+            const labels = exams.map(e => `Deneme ${e.exam_number}`);
+            const averages = exams.map(e => e.net_avg);
+            const maxNets = exams.map(e => e.net_max);
+            const minNets = exams.map(e => e.net_min);
+            
+            // Her bar için farklı renk
+            const barColors = ['#667eea', '#764ba2', '#f59e0b', '#10b981', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+            const colors = labels.map((_, i) => barColors[i % barColors.length]);
+            
+            subjectAnalysisChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Sınıf Ortalaması',
+                        data: averages,
+                        backgroundColor: colors,
+                        borderColor: colors.map(c => c),
+                        borderWidth: 2,
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        datalabels: {
+                            anchor: 'end',
+                            align: 'top',
+                            color: '#1f2937',
+                            font: { weight: 'bold', size: 12 },
+                            formatter: (value) => value.toFixed(2)
+                        },
+                        tooltip: {
+                            callbacks: {
+                                afterLabel: function(context) {
+                                    const index = context.dataIndex;
+                                    return [
+                                        `En Yüksek: ${maxNets[index]}`,
+                                        `En Düşük: ${minNets[index]}`,
+                                        `Öğrenci: ${exams[index].student_count}`
+                                    ];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: subject === 'turkce' || subject === 'matematik' || subject === 'fen' ? 22 : 12,
+                            title: {
+                                display: true,
+                                text: 'Net Ortalaması',
+                                font: { weight: 'bold' }
+                            },
+                            grid: {
+                                color: 'rgba(0,0,0,0.1)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Denemeler',
+                                font: { weight: 'bold' }
+                            }
+                        }
+                    }
+                },
+                plugins: [ChartDataLabels]
+            });
+        }
+        
+        function createSubjectAnalysisTable(exams) {
+            const tbody = document.getElementById('subjectAnalysisTableBody');
+            tbody.innerHTML = '';
+            
+            exams.forEach((exam, index) => {
+                const tr = document.createElement('tr');
+                tr.style.backgroundColor = index % 2 === 0 ? '#ffffff' : '#f8fafc';
+                tr.innerHTML = `
+                    <td style="padding: 12px; text-align: center; font-weight: 600;">Deneme ${exam.exam_number}</td>
+                    <td style="padding: 12px; text-align: center; font-weight: bold; color: #667eea;">${exam.net_avg}</td>
+                    <td style="padding: 12px; text-align: center; color: #ef4444;">${exam.net_min}</td>
+                    <td style="padding: 12px; text-align: center; color: #10b981;">${exam.net_max}</td>
+                    <td style="padding: 12px; text-align: center;">${exam.student_count}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+        
+        function downloadSubjectAnalysisPDF() {
+            if (!currentSubjectAnalysisClass || !currentSubjectAnalysisSubject) {
+                alert('Lütfen önce sınıf ve ders seçin!');
+                return;
+            }
+            window.open(`/teacher/api/practice-exams/report/class-subject/${currentSubjectAnalysisClass}/${currentSubjectAnalysisSubject}`, '_blank');
+        }
+        
+        // =====================================================
+        // DERS BAZLI ANALİZ FONKSİYONLARI SONU
+        // =====================================================
+        
+        // Öğrenci Detay Yazdır
+        function printStudentDetail() {
+            if (!currentDetailStudentId) {
+                alert('Lütfen önce verileri yükleyin!');
+                return;
+            }
+            
+            const printWindow = window.open('', '_blank');
+            const studentName = document.getElementById('studentDetailName').textContent;
+            
+            // Tüm grafikleri al
+            const charts = ['studentDetailLgsChart', 'studentDetailTurkceChart', 'studentDetailMatematikChart', 
+                           'studentDetailFenChart', 'studentDetailSosyalChart', 'studentDetailIngilizceChart', 'studentDetailDinChart'];
+            const chartNames = ['LGS Puan Gelisimi', 'Turkce Net Gelisimi', 'Matematik Net Gelisimi', 
+                              'Fen Bilimleri Net Gelisimi', 'Sosyal Bilgiler Net Gelisimi', 'Ingilizce Net Gelisimi', 'Din Kulturu Net Gelisimi'];
+            
+            let chartsHtml = '';
+            charts.forEach((chartId, index) => {
+                const canvas = document.getElementById(chartId);
+                if (canvas) {
+                    const image = canvas.toDataURL('image/png');
+                    chartsHtml += `<div class="chart-item"><h3>${chartNames[index]}</h3><img src="${image}"></div>`;
+                }
+            });
+            
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>${studentName} - Deneme Gelisim Raporu</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; }
+                        .header { text-align: center; margin-bottom: 20px; }
+                        .header img { height: 60px; }
+                        .header h1 { color: #1e40af; margin: 10px 0; font-size: 16px; }
+                        .title { font-size: 18px; font-weight: bold; margin: 20px 0; text-align: center; color: #1f2937; }
+                        .chart-item { margin: 20px 0; page-break-inside: avoid; }
+                        .chart-item h3 { color: #374151; font-size: 14px; margin-bottom: 10px; }
+                        .chart-item img { max-width: 100%; height: auto; }
+                        .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #666; }
+                        @media print { .chart-item { page-break-inside: avoid; } }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <img src="/static/images/school_logo.png" alt="Logo">
+                        <h1>Ayse Melahat Erkin Ortaokulu - Ogrenci Takip Sistemi</h1>
+                    </div>
+                    <div class="title">${studentName} - Deneme Gelisim Raporu</div>
+                    ${chartsHtml}
+                    <div class="footer">Rapor Tarihi: ${new Date().toLocaleDateString('tr-TR')} ${new Date().toLocaleTimeString('tr-TR')}</div>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+            setTimeout(() => { printWindow.print(); }, 500);
+        }
+
+        window.onload = async function() {
+            if (await checkAuth()) {
+                populateClasses();
+            }
+        };
+    </script>
+</body>
+</html>

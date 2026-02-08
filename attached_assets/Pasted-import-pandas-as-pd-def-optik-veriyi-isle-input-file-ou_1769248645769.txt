@@ -1,0 +1,69 @@
+import pandas as pd
+
+def optik_veriyi_isle(input_file, output_file):
+    processed_data = []
+    
+    with open(input_file, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+        
+    for line in lines:
+        # 1. Sabit Genişlikli Sütunları Karakter İndeksine Göre Kesme
+        # Bu indeksler ham dosyadaki (FMT/TXT) sütun yerleşimidir
+        kurum_kodu = line[0:8].strip()
+        ogrenci_no = line[8:13].strip()
+        oturum = line[13:14].strip()
+        kitapcik = line[14:15].strip()
+        ad_soyad = line[15:45].strip()
+        
+        # SINIF AYARI: 5 B yazımındaki boşluğu temizler (5B yapar)
+        # 65-71 arası sınıf alanı olarak belirlendi
+        sinif_ham = line[65:71].strip()
+        sinif = "".join(sinif_ham.split()) 
+        
+        # CEVAP ANAHTARI / ÖĞRENCİ CEVAPLARI
+        # Türkçe 71. karakterden başlıyor (B harfi kaymasını engellemek için)
+        cevaplar = line[71:] 
+
+        # Dersleri Belirttiğiniz Soru Sayılarına Göre Dilimleme
+        turkce = cevaplar[0:15]
+        sosyal = cevaplar[15:25]
+        din = cevaplar[25:35]
+        ing = cevaplar[35:45]
+        
+        # Sayısal oturum (Mat ve Fen) genellikle 1. oturumda olur
+        # Dosyadaki yapıya göre bu alanları da 15'er karakter alıyoruz
+        mat = cevaplar[45:60] if oturum == "1" else ""
+        fen = cevaplar[60:75] if oturum == "1" else ""
+        
+        # Veriyi Sözlük Yapısına Dönüştürme
+        row = {
+            "Kurum Kodu": kurum_kodu,
+            "Ogrenci No": ogrenci_no,
+            "Oturum": oturum,
+            "Kitapcik": kitapcik,
+            "Ad Soyad": ad_soyad,
+            "Sinif": sinif,
+            "S2_Turkce": turkce if oturum == "2" else "",
+            "S2_Sosyal": sosyal if oturum == "2" else "",
+            "S2_Din": din if oturum == "2" else "",
+            "S2_Ing": ing if oturum == "2" else "",
+            "Bos1": "", # İstediğiniz 4 boş sütun
+            "Bos2": "",
+            "Bos3": "",
+            "Bos4": "",
+            "S1_Mat": mat if oturum == "1" else "",
+            "S1_Fen": fen if oturum == "1" else ""
+        }
+        processed_data.append(row)
+
+    # DataFrame Oluşturma ve CSV olarak kaydetme
+    df = pd.DataFrame(processed_data)
+    
+    # Önce Sözel (2), sonra Sayısal (1) gelecek şekilde sıralama
+    df = df.sort_values(by=['Oturum'], ascending=False)
+    
+    df.to_csv(output_file, index=False, sep=';', encoding='utf-8-sig')
+    print(f"İşlem tamamlandı! {output_file} dosyası oluşturuldu.")
+
+# Çalıştırma
+optik_veriyi_isle('girdi_dosyaniz.txt', '5_Sinif_Sonuc.csv')

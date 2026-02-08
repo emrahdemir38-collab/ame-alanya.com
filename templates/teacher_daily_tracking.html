@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Öğrenci Günlük Takip - AMEO</title>
+    <link rel="stylesheet" href="/static/css/admin-modern.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: var(--font-family), 'Segoe UI', sans-serif;
+            background: var(--gray-50);
+        }
+        .header {
+            background: var(--gradient-ocean);
+            color: white;
+            padding: 20px 24px;
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 { font-size: 1.6em; font-weight: 700; }
+        .btn-back {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.4);
+            padding: 10px 22px;
+            border-radius: var(--radius-lg);
+            cursor: pointer;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all var(--transition-fast);
+        }
+        .btn-back:hover { background: rgba(255,255,255,0.3); transform: translateY(-1px); }
+        .container {
+            max-width: 1400px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+        
+        .controls {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .controls h3 { margin-bottom: 15px; color: #333; }
+        .control-row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .control-input {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        .btn {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        .btn:hover { background: #1e40af; }
+        .btn-secondary {
+            background: #6b7280;
+        }
+        .btn-secondary:hover { background: #4b5563; }
+        .btn-success {
+            background: #10b981;
+        }
+        .btn-success:hover { background: #059669; }
+        .view-info {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        
+        .students-list {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .students-list h3 { margin-bottom: 20px; color: #333; }
+        
+        .student-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+        .student-header {
+            background: #f9fafb;
+            padding: 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.3s;
+        }
+        .student-header:hover { background: #f3f4f6; }
+        .student-name {
+            font-weight: 600;
+            color: #2563eb;
+        }
+        .student-class {
+            color: #666;
+            font-size: 0.9em;
+            margin-left: 10px;
+        }
+        .entry-count {
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        .entry-count.zero {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .expand-icon {
+            transition: transform 0.3s;
+        }
+        .expand-icon.expanded { transform: rotate(180deg); }
+        
+        .student-content {
+            display: none;
+            padding: 20px;
+            border-top: 1px solid #e5e7eb;
+        }
+        .student-content.expanded { display: block; }
+        
+        .entries-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+        }
+        .entry-card {
+            background: #f0fdf4;
+            border: 1px solid #10b981;
+            border-radius: 5px;
+            padding: 15px;
+        }
+        .entry-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .entry-day {
+            font-weight: 600;
+            color: #059669;
+        }
+        .entry-date {
+            color: #666;
+            font-size: 0.85em;
+        }
+        .entry-subject {
+            background: #d1fae5;
+            color: #065f46;
+            padding: 4px 10px;
+            border-radius: 5px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: inline-block;
+        }
+        .entry-note {
+            color: #333;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+        .no-entries {
+            text-align: center;
+            color: #999;
+            padding: 40px;
+        }
+        
+        .alert {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #ef4444;
+        }
+        
+        @media (max-width: 768px) {
+            .container { padding: 0 10px; }
+            .header h1 { font-size: 1.4em; }
+            .control-row { flex-direction: column; width: 100%; }
+            .control-input, .btn { width: 100%; }
+            .entries-grid { grid-template-columns: 1fr; }
+            .student-header { flex-wrap: wrap; }
+            .student-name { flex: 1 1 100%; margin-bottom: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="/teacher/dashboard" class="btn-back">← Geri Dön</a>
+        <h1>📊 Öğrenci Günlük Çalışma Takibi</h1>
+    </div>
+
+    <div class="container">
+        <div id="alertBox"></div>
+        
+        <div class="controls">
+            <h3>📅 Görüntüleme Ayarları</h3>
+            <div class="control-row">
+                <select id="classFilter" class="control-input" onchange="loadData()">
+                    <option value="">Tüm Sınıflar</option>
+                </select>
+                <select id="viewType" class="control-input">
+                    <option value="week">Haftalık Görünüm</option>
+                    <option value="month">Aylık Görünüm</option>
+                </select>
+                <input type="date" id="selectedDate" class="control-input">
+                <button onclick="loadData()" class="btn">Verileri Yükle</button>
+                <button onclick="loadCurrentPeriod()" class="btn btn-secondary">Bu Hafta/Ay</button>
+                <button onclick="downloadReport()" class="btn btn-success">📄 Rapor Al</button>
+            </div>
+            <div class="view-info" id="viewInfo"></div>
+        </div>
+        
+        <div class="students-list">
+            <h3>Öğrenci Kayıtları</h3>
+            <div id="studentsList"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentData = null;
+        let selectedStudents = new Set();
+
+        async function loadClasses() {
+            try {
+                const res = await fetch('/api/daily-tracking/teacher/classes');
+                const data = await res.json();
+                const select = document.getElementById('classFilter');
+                data.classes.forEach(cls => {
+                    const option = document.createElement('option');
+                    option.value = cls.name;
+                    option.textContent = `${cls.name} (${cls.count} öğrenci)`;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Sınıflar yüklenemedi:', error);
+            }
+        }
+
+        function showAlert(message, type = 'error') {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => { alertBox.innerHTML = ''; }, 3000);
+        }
+
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}.${month}.${year}`;
+        }
+
+        function loadCurrentPeriod() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('selectedDate').value = today;
+            loadData();
+        }
+
+        async function loadData() {
+            const viewType = document.getElementById('viewType').value;
+            const selectedDate = document.getElementById('selectedDate').value;
+            const classFilter = document.getElementById('classFilter').value;
+            
+            if (!selectedDate) {
+                showAlert('Lütfen bir tarih seçin');
+                return;
+            }
+            
+            let url = `/api/daily-tracking/teacher/students?view=${viewType}&date=${selectedDate}`;
+            if (classFilter) {
+                url += `&class_name=${encodeURIComponent(classFilter)}`;
+            }
+            
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                
+                if (data.success) {
+                    currentData = data;
+                    document.getElementById('viewInfo').textContent = 
+                        `${viewType === 'week' ? 'Hafta' : 'Ay'}: ${formatDate(data.start_date)} - ${formatDate(data.end_date)}`;
+                    
+                    renderStudents(data.students);
+                } else {
+                    showAlert(data.error || 'Veriler yüklenemedi');
+                }
+            } catch (error) {
+                console.error('Veri yükleme hatası:', error);
+                showAlert('Bir hata oluştu');
+            }
+        }
+
+        function renderStudents(students) {
+            const container = document.getElementById('studentsList');
+            
+            if (!students || students.length === 0) {
+                container.innerHTML = '<div class="no-entries">Öğrenci bulunamadı</div>';
+                return;
+            }
+            
+            let html = '';
+            students.forEach((student, index) => {
+                const entryCount = student.records.length;
+                const countClass = entryCount === 0 ? 'zero' : '';
+                
+                html += `
+                    <div class="student-card">
+                        <div class="student-header">
+                            <div style="display: flex; align-items: center; gap: 10px;" onclick="toggleStudent(${index})">
+                                <span class="student-name">${student.student_name}</span>
+                                <span class="student-class">${student.student_class || ''}</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <input type="checkbox" onchange="toggleStudentSelection(${student.student_id})" onclick="event.stopPropagation()">
+                                <span class="entry-count ${countClass}">${entryCount} kayıt</span>
+                                <span class="expand-icon" id="icon-${index}" onclick="toggleStudent(${index})">▼</span>
+                            </div>
+                        </div>
+                        <div class="student-content" id="content-${index}">
+                            ${renderEntries(student.records)}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function renderEntries(records) {
+            if (!records || records.length === 0) {
+                return '<div class="no-entries">Bu dönemde kayıt yok</div>';
+            }
+            
+            const groupedByDate = {};
+            records.forEach(record => {
+                if (!groupedByDate[record.date]) {
+                    groupedByDate[record.date] = [];
+                }
+                groupedByDate[record.date].push(record);
+            });
+            
+            let html = '<div class="entries-grid">';
+            Object.keys(groupedByDate).sort().forEach(date => {
+                const dayRecords = groupedByDate[date];
+                
+                dayRecords.forEach(record => {
+                    html += `
+                        <div class="entry-card">
+                            <div class="entry-header">
+                                <span class="entry-day">${record.day_of_week}</span>
+                                <span class="entry-date">${formatDate(record.date)}</span>
+                            </div>
+                            <div class="entry-subject">${record.subject}</div>
+                            <div class="entry-note">${record.note}</div>
+                        </div>
+                    `;
+                });
+            });
+            html += '</div>';
+            
+            return html;
+        }
+
+        function toggleStudent(index) {
+            const content = document.getElementById(`content-${index}`);
+            const icon = document.getElementById(`icon-${index}`);
+            
+            content.classList.toggle('expanded');
+            icon.classList.toggle('expanded');
+        }
+
+        function toggleStudentSelection(studentId) {
+            if (selectedStudents.has(studentId)) {
+                selectedStudents.delete(studentId);
+            } else {
+                selectedStudents.add(studentId);
+            }
+        }
+
+        async function downloadReport() {
+            if (!currentData) {
+                showAlert('Önce verileri yükleyin');
+                return;
+            }
+            
+            if (selectedStudents.size === 0) {
+                showAlert('Lütfen en az bir öğrenci seçin');
+                return;
+            }
+            
+            const studentIds = Array.from(selectedStudents).join(',');
+            const url = `/api/daily-tracking/report?student_ids=${studentIds}&start_date=${currentData.start_date}&end_date=${currentData.end_date}`;
+            window.open(url, '_blank');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadClasses();
+            loadCurrentPeriod();
+        });
+    </script>
+</body>
+</html>

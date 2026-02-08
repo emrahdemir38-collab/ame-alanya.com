@@ -1,0 +1,446 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Soru Analizi{% endblock %}
+
+{% block content %}
+<nav class="breadcrumb-nav">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/student/dashboard">Ana Sayfa</a></li>
+        <li class="breadcrumb-item active">Soru Analizi</li>
+    </ol>
+</nav>
+
+<div style="max-width: 1200px; margin: 0 auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h1 style="font-size: 2em; color: #111827; margin: 0;">🔍 Soru Analizi</h1>
+        <button onclick="openExamQuestionsModal()" 
+            style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3); transition: transform 0.2s;"
+            onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+            📄 Deneme Sorularını Gör
+        </button>
+    </div>
+
+    <div style="background: white; border-radius: 10px; padding: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px;">
+        <h2 style="margin-bottom: 20px; color: #374151;">📝 Deneme Sınavlarım</h2>
+        <p style="color: #6b7280; margin-bottom: 20px;">Denemelerinizden birine tıklayarak öğretmeninize soru sorabilirsiniz.</p>
+        <div id="examList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px;">
+            <p style="text-align: center; color: #9ca3af; padding: 40px;">Yükleniyor...</p>
+        </div>
+    </div>
+    
+    <div style="background: white; border-radius: 10px; padding: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+        <h2 style="margin-bottom: 20px; color: #374151;">💬 Sorduğum Sorular</h2>
+        <div id="questionsList"></div>
+        <div id="noQuestions" style="display:none; text-align: center; padding: 60px 20px; color: #999;">
+            <div style="font-size: 4em; margin-bottom: 20px;">💬</div>
+            <h3>Henüz soru sormadınız</h3>
+            <p>Deneme sınavlarınızdaki sorularla ilgili öğretmenlerinize soru sorabilirsiniz.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Soru Ekleme Modal -->
+<div id="questionModal" style="display:none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto;">
+    <div style="max-width: 600px; margin: 50px auto; background: white; border-radius: 10px; padding: 30px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="color: #111827;">📩 Yeni Soru Sor</h2>
+            <button onclick="closeModal()" style="background: none; border: none; font-size: 1.5em; cursor: pointer;">×</button>
+        </div>
+        
+        <div id="modalContent">
+            <p style="margin-bottom: 20px; color: #6b7280;">
+                <strong>Deneme:</strong> <span id="modalExamNumber"></span>
+            </p>
+            
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 500;">Öğretmen Seç</label>
+                <select id="teacherSelect" required style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 5px;">
+                    <option value="">Yükleniyor...</option>
+                </select>
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 500;">Ders</label>
+                <select id="subjectSelect" required style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 5px;">
+                    <option value="">Ders seçin</option>
+                    <option value="Türkçe">Türkçe</option>
+                    <option value="Matematik">Matematik</option>
+                    <option value="Fen Bilimleri">Fen Bilimleri</option>
+                    <option value="Sosyal Bilgiler">Sosyal Bilgiler</option>
+                    <option value="İngilizce">İngilizce</option>
+                    <option value="Din Kültürü">Din Kültürü</option>
+                </select>
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 500;">Soru Numarası</label>
+                <input type="number" id="questionNumber" min="1" max="100" required placeholder="Örn: 15" 
+                    style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 5px;">
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 500;">Neden Yapamadınız?</label>
+                <select id="reasonSelect" required style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 5px;">
+                    <option value="">Seçin</option>
+                    <option value="Bilgi Eksikliği">Bilgi Eksikliği</option>
+                    <option value="Soruyu Yanlış Anlama">Soruyu Yanlış Anlama</option>
+                    <option value="Diğer">Diğer</option>
+                </select>
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 500;">Ek Not (İsteğe Bağlı)</label>
+                <textarea id="studentNote" placeholder="Soruyla ilgili ek açıklama..." 
+                    style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 5px; min-height: 100px; resize: vertical;"></textarea>
+            </div>
+            
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button onclick="closeModal()" 
+                    style="padding: 10px 20px; background: #e5e7eb; border: none; border-radius: 5px; cursor: pointer;">
+                    İptal
+                </button>
+                <button onclick="submitQuestion()" 
+                    style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                    📤 Gönder
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Deneme Sorularını Görüntüleme Modal -->
+<div id="examQuestionsModal" style="display:none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto;">
+    <div style="max-width: 900px; margin: 50px auto; background: white; border-radius: 10px; padding: 30px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="color: #111827;">📄 Deneme Sınavı Soruları</h2>
+            <button onclick="closeExamQuestionsModal()" style="background: none; border: none; font-size: 1.5em; cursor: pointer;">×</button>
+        </div>
+        
+        <div id="examQuestionsContent">
+            <p style="text-align: center; color: #9ca3af; padding: 40px;">Yükleniyor...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+let selectedExam = null;
+
+async function loadExams() {
+    try {
+        const response = await fetch('/api/question-asks/practice-exams/my-exams');
+        const data = await response.json();
+        const exams = data.exams || [];
+        
+        const container = document.getElementById('examList');
+        if (exams.length === 0) {
+            container.innerHTML = `
+                <div style="grid-column: 1/-1; text-align: center; padding: 60px 20px; color: #999;">
+                    <div style="font-size: 4em; margin-bottom: 20px;">📝</div>
+                    <h3>Henüz deneme sınavınız yok</h3>
+                    <p>Öğretmeniniz sizin için deneme sınavı girdiğinde burada görünecektir.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        container.innerHTML = exams.map(exam => {
+            const totalNet = exam.total_net != null ? parseFloat(exam.total_net) : 0;
+            const lgsScore = exam.lgs_score != null ? parseFloat(exam.lgs_score) : 0;
+            
+            return `
+                <div onclick="openModal(${exam.id}, ${exam.exam_number})" 
+                    style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; padding: 20px; cursor: pointer; transition: transform 0.2s; color: white;"
+                    onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                    <h3 style="color: white; margin-bottom: 10px;">📋 Deneme ${exam.exam_number}</h3>
+                    <p style="font-size: 0.9em; margin-bottom: 5px; opacity: 0.9;">
+                        <strong>Toplam Net:</strong> ${totalNet.toFixed(2)}
+                    </p>
+                    <p style="font-size: 0.9em; margin-bottom: 5px; opacity: 0.9;">
+                        <strong>LGS Puanı:</strong> ${lgsScore.toFixed(2)}
+                    </p>
+                    <p style="font-size: 0.85em; margin-top: 10px; opacity: 0.8;">
+                        ${new Date(exam.created_at).toLocaleDateString('tr-TR')}
+                    </p>
+                    <p style="margin-top: 15px; background: rgba(255,255,255,0.2); padding: 8px; border-radius: 5px; text-align: center; font-size: 0.9em;">
+                        ✋ Soru Sor
+                    </p>
+                </div>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Denemeler yüklenemedi:', error);
+        document.getElementById('examList').innerHTML = `
+            <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #ef4444;">
+                ❌ Denemeler yüklenirken hata oluştu
+            </div>
+        `;
+    }
+}
+
+async function loadMyQuestions() {
+    try {
+        const response = await fetch('/api/question-asks/student/me');
+        const data = await response.json();
+        
+        const container = document.getElementById('questionsList');
+        const emptyState = document.getElementById('noQuestions');
+        
+        if (!data.questions || data.questions.length === 0) {
+            container.innerHTML = '';
+            emptyState.style.display = 'block';
+            return;
+        }
+        
+        emptyState.style.display = 'none';
+        container.innerHTML = data.questions.map(q => `
+            <div style="background: #f9fafb; border-radius: 8px; padding: 20px; margin-bottom: 15px; border-left: 4px solid ${q.status === 'pending' ? '#fbbf24' : '#10b981'};">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <div>
+                        <strong style="color: #111827;">Deneme ${q.exam_number} - ${q.subject} - Soru ${q.question_number}</strong>
+                        <p style="color: #666; margin-top: 5px;">Öğretmen: ${q.teacher_name}</p>
+                    </div>
+                    <span style="display: inline-block; padding: 5px 12px; border-radius: 20px; font-size: 0.85em; font-weight: 600; background: ${q.status === 'pending' ? '#fef3c7' : '#d1fae5'}; color: ${q.status === 'pending' ? '#92400e' : '#065f46'};">
+                        ${q.status === 'pending' ? '⏳ Bekliyor' : '✅ Cevaplandı'}
+                    </span>
+                </div>
+                <div style="color: #666; line-height: 1.6;">
+                    <p><strong>Neden:</strong> ${q.reason}</p>
+                    ${q.student_note ? `<p><strong>Not:</strong> ${q.student_note}</p>` : ''}
+                    <p style="font-size: 0.85em; color: #999; margin-top: 10px;">
+                        ${new Date(q.created_at).toLocaleDateString('tr-TR')}
+                    </p>
+                </div>
+                ${q.teacher_response ? `
+                    <div style="background: #f0fdf4; border-left: 4px solid #10b981; padding: 15px; margin-top: 15px; border-radius: 5px;">
+                        <strong>📌 Öğretmen Cevabı:</strong>
+                        <p style="margin-top: 10px;">${q.teacher_response}</p>
+                        <p style="font-size: 0.85em; color: #666; margin-top: 10px;">
+                            ${new Date(q.answered_at).toLocaleDateString('tr-TR')}
+                        </p>
+                    </div>
+                ` : ''}
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Sorular yüklenemedi:', error);
+        document.getElementById('questionsList').innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #ef4444;">
+                ❌ Sorular yüklenirken hata oluştu
+            </div>
+        `;
+    }
+}
+
+async function openModal(examId, examNumber) {
+    selectedExam = { id: examId, number: examNumber };
+    
+    const existing = document.getElementById('dynamicQuestionModal');
+    if (existing) existing.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'dynamicQuestionModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;justify-content:center;align-items:center;z-index:2147483647;';
+    modal.innerHTML = `
+        <div style="background:white;border-radius:16px;padding:24px;width:90%;max-width:500px;max-height:90vh;overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <h2 style="margin:0;">Sınav ${examNumber} - Soru Sor</h2>
+                <button onclick="closeModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;">×</button>
+            </div>
+            <div style="margin-bottom:16px;">
+                <label style="display:block;font-weight:500;margin-bottom:6px;">Öğretmen</label>
+                <select id="teacherSelect" style="width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;box-sizing:border-box;">
+                    <option value="">Yükleniyor...</option>
+                </select>
+            </div>
+            <div style="margin-bottom:16px;">
+                <label style="display:block;font-weight:500;margin-bottom:6px;">Ders</label>
+                <select id="subjectSelect" style="width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;box-sizing:border-box;">
+                    <option value="">Seçin</option>
+                    <option value="turkce">Türkçe</option>
+                    <option value="matematik">Matematik</option>
+                    <option value="fen">Fen</option>
+                    <option value="inkilap">İnkılap</option>
+                    <option value="din">Din</option>
+                    <option value="ingilizce">İngilizce</option>
+                </select>
+            </div>
+            <div style="margin-bottom:16px;">
+                <label style="display:block;font-weight:500;margin-bottom:6px;">Soru No</label>
+                <input type="number" id="questionNumber" min="1" style="width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;box-sizing:border-box;">
+            </div>
+            <div style="margin-bottom:16px;">
+                <label style="display:block;font-weight:500;margin-bottom:6px;">Neden</label>
+                <select id="reasonSelect" style="width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;box-sizing:border-box;">
+                    <option value="">Seçin</option>
+                    <option value="Konuyu anlamadım">Konuyu anlamadım</option>
+                    <option value="Çözümü bulamadım">Çözümü bulamadım</option>
+                    <option value="Farklı çözüm istiyorum">Farklı çözüm istiyorum</option>
+                </select>
+            </div>
+            <div style="margin-bottom:16px;">
+                <label style="display:block;font-weight:500;margin-bottom:6px;">Not (opsiyonel)</label>
+                <textarea id="studentNote" rows="3" style="width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;box-sizing:border-box;resize:vertical;"></textarea>
+            </div>
+            <button onclick="submitQuestion()" style="width:100%;padding:12px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:white;border:none;border-radius:8px;font-size:1rem;font-weight:500;cursor:pointer;">
+                Gönder
+            </button>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    
+    // Öğretmenleri yükle
+    try {
+        const response = await fetch('/api/question-asks/teachers/my-teachers');
+        const data = await response.json();
+        
+        const teacherSelect = document.getElementById('teacherSelect');
+        if (data.teachers && data.teachers.length > 0) {
+            teacherSelect.innerHTML = '<option value="">Öğretmen seçin</option>' + 
+                data.teachers.map(t => `<option value="${t.id}">${t.full_name}</option>`).join('');
+        } else {
+            teacherSelect.innerHTML = '<option value="">Öğretmen bulunamadı</option>';
+        }
+    } catch (error) {
+        console.error('Öğretmenler yüklenemedi:', error);
+    }
+}
+
+function closeModal() {
+    const modal = document.getElementById('dynamicQuestionModal');
+    if (modal) modal.remove();
+    selectedExam = null;
+}
+
+async function submitQuestion() {
+    const teacherId = document.getElementById('teacherSelect').value;
+    const subject = document.getElementById('subjectSelect').value;
+    const questionNumber = document.getElementById('questionNumber').value;
+    const reason = document.getElementById('reasonSelect').value;
+    const studentNote = document.getElementById('studentNote').value;
+    
+    if (!teacherId || !subject || !questionNumber || !reason) {
+        alert('Lütfen tüm gerekli alanları doldurun');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/question-asks/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                teacher_id: parseInt(teacherId),
+                practice_exam_id: selectedExam.id,
+                subject: subject,
+                question_number: parseInt(questionNumber),
+                reason: reason,
+                student_note: studentNote || null
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            alert(data.message || 'Sorunuz gönderildi!');
+            closeModal();
+            loadMyQuestions();
+        } else {
+            alert(data.error || 'Hata oluştu');
+        }
+    } catch (error) {
+        console.error('Gönderme hatası:', error);
+        alert('Bağlantı hatası');
+    }
+}
+
+// Modal dışına tıklayınca kapat
+document.getElementById('questionModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeModal();
+    }
+});
+
+// Deneme Sorularını Görüntüleme Fonksiyonları
+async function openExamQuestionsModal() {
+    const existing = document.getElementById('dynamicExamQuestionsModal');
+    if (existing) existing.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'dynamicExamQuestionsModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;justify-content:center;align-items:center;z-index:2147483647;';
+    modal.innerHTML = `
+        <div style="background:white;border-radius:16px;padding:24px;width:90%;max-width:600px;max-height:90vh;overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <h2 style="margin:0;">Sınav Soruları</h2>
+                <button onclick="closeExamQuestionsModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;">×</button>
+            </div>
+            <div id="examQuestionsContent"><p style="text-align:center;padding:20px;">Yükleniyor...</p></div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    await loadExamQuestions();
+}
+
+function closeExamQuestionsModal() {
+    const modal = document.getElementById('dynamicExamQuestionsModal');
+    if (modal) modal.remove();
+}
+
+async function loadExamQuestions() {
+    try {
+        const response = await fetch('/api/exam-questions');
+        const data = await response.json();
+        
+        const container = document.getElementById('examQuestionsContent');
+        
+        if (!data.questions || data.questions.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 60px 20px; color: #999;">
+                    <div style="font-size: 4em; margin-bottom: 20px;">📝</div>
+                    <h3>Henüz deneme sorusu yüklenmemiş</h3>
+                    <p>Admin tarafından deneme sınavı soruları yüklendiğinde burada görünecektir.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        container.innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px;">
+                ${data.questions.map(q => `
+                    <div style="background: #f9fafb; border-radius: 8px; padding: 20px; border: 1px solid #e5e7eb;">
+                        <h3 style="color: #111827; margin-bottom: 10px;">${q.exam_name}</h3>
+                        <p style="color: #6b7280; font-size: 0.9em; margin-bottom: 15px;">
+                            ${q.file_type === 'pdf' ? '📄 PDF Dosyası' : '🖼️ Resim Dosyası'}
+                        </p>
+                        <p style="color: #9ca3af; font-size: 0.85em; margin-bottom: 15px;">
+                            ${new Date(q.created_at).toLocaleDateString('tr-TR')}
+                        </p>
+                        <a href="/api/exam-questions/${q.id}/file" target="_blank"
+                            style="display: block; text-align: center; background: #3b82f6; color: white; padding: 10px; border-radius: 5px; text-decoration: none; transition: background 0.2s;"
+                            onmouseover="this.style.background='#2563eb'" onmouseout="this.style.background='#3b82f6'">
+                            👁️ Görüntüle
+                        </a>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    } catch (error) {
+        console.error('Sorular yüklenemedi:', error);
+        document.getElementById('examQuestionsContent').innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #ef4444;">
+                ❌ Sorular yüklenirken hata oluştu
+            </div>
+        `;
+    }
+}
+
+// Deneme soruları modal dışına tıklayınca kapat
+document.getElementById('examQuestionsModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeExamQuestionsModal();
+    }
+});
+
+loadExams();
+loadMyQuestions();
+</script>
+{% endblock %}

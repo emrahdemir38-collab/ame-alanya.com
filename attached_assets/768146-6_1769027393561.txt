@@ -1,0 +1,254 @@
+0076814622702248726001472BKADÝR ÇINAR ÞENEL    6 BDDCBDA BCBCADAA     ADBDABABCD          DCB ADA BC          AADCAAAACD                                                   
+                        2AECRÝN ADA BOLAT      6 BCBCADCACADDDBAB     DBCACDBDAC          CCCDABDBDA          ACCDBAACDA                                                   
+00768146           001532BBEREN ÇÝÇEK          6 BBACBDCABCAC DCA     DCBDACBDCD          DCBDBDBBDA          BCAC AAC D                                                   
+0076814624865179350001632BAYÇÝN ÇOLAK          6 BCDDADBABCBDADBA     ADBDACDBCB          CCBCBDADDC          BADCBAACCD                                                   
+00768146           002382ASAÝD NUR GÜNDÜZ      6 BDAAACBADCABCABC     ABBDDCDBBD          DCBD DCB B          ABBCAACBAD                                                   
+0076814619156367660001642AAYLÝN SÜVARÝ         6 BDBDADCACACADBBB     BDCAACBDAC          CBCDABBDCB          ACDDBCACAD                                                   
+0076814617674417850001692BAZRA BETÜL TÜRK      6 BDDCACBCBCBCDDAA     ACBDCCCDDA          DCBCDDADBC          BADCCAACCD                                                   
+00768146           001802ABULUT YILMAZ         6 BCBDDDAACDCCDB B     ABCAADBDAC          ADCDCBCBDC          ACCDBADCDA                                                   
+00768146           001832BDURU YAYLALI         6 BBDCBDA BCDAAAAA     ADDDABDDDD          CCBDDDACDA          BCACBBCBC                                                    
+00768146           001892AEFE TÜLÜ             6 BBBCDADDCDABADAA     ADAAABCCDB          CDACCBADCB          CAABDDBCBA                                                   
+00768146           001912BEGE TÜLÜ             6 BDC BAD CADAABDC     A DDABDABC          CCDCABBCAA          DCADDBB AC                                                   
+00768146           001782BBERRA KARADAÞ        6 BCDCCBBCBDBDADAA     ADADACBBBA          DCBDBDAABC          BADCDAACCD                                                   
+00768146           001602AARDA BERK BAHÇECÝ    6 BCBAAD ACBC BBBB     DDCDADBAAC          DBAAADBAD           A CDBCDA                                                     
+00768146           001592BALYA NUR NARMAN      6 BDABBDCADDBACABA     BCBCCAB CD          CA CBCAA B          ABDDB AACD                                                   
+00768146           001732AAHMET YUSUF ÞAHÝN    6 BCBBA CAAAC DB D     BDCAADBDBC           BCAC  BDC          C C                                                          
+00768146           001952AELÝF TATAROV         6 BDABBBADDACBAC B     CBDBCDBABC          BCDCBACDCA          CACDADCCDA                                                   
+00768146           001372ABAHAR GÜRBÜZ         6D CBCACAACDCACBBB     DBCAADBDBB          DBCACCDBDA          CABABCDCCC                                                   
+00768146           001682AAYÞE MÝNA AKÇALIOÐLU 6D DBB B BCD DCAA      D  DADDCBC             ACBD D           AAD B DB                                                     
+00768146           001982BEMÝNE AY ÞAHÝN       6D ADCDBCBAADCACBC     CBACBABCDD          BBDBBDCCBD          BABDBCCC D                                                   
+00768146           002172BÝLEYZA AKAY          6D CDDBDBCBCBDACCA     ADBDACBBCA          DCBDDDACDA          BADDBAACCD                                                   
+00768146           002222BMEMET MUMCU          6D DADADDCDBDB CB      C BACA DCB          BDAD   CAA          CCA  ADBCD                                                   
+00768146           001652BAYLÝN TAÞKARABACAK   6D BDCDDBABCBCADAA     ADBDABDBCD          DCBDBDAADC          BADCDAACCD                                                   
+00768146           001502BABDURRAHMAN YILMAZ   6D ADCADBD CBABBCA     A BDBCDDD           BAC  BABDB          BB ABA                                                       
+00768146           001612AASLI NUR UYSAL       6D BBA CAABD CDBAB      B DCDDDAC          ADCDCBBDDD          C BDCDAC D                                                   
+00768146           001702BBATUHAN KAYA         6D ADCBDBDBCBDADAA     ACADACDDCA          DABCDDAABC          BADCBCACCD                                                   
+00768146           001772BBERRA ÇAPAK          6D CDCADBDA BB C A     ADBDACDC DD         D CCBDCCD           A  CDAAA B                                                   
+00768146           002002AERVA BUÐLEM ÇEKÝÇ    6D CBCADBABAC CBCB     DDCDACBDAB          CBCDCD DDC          CADDBA A C                                                   
+00768146           002232AMÝRAY AKÇALIOÐLU     6D CB ADAACABDBBD      D CDAD D C          ABCD BCADA          ACCAAACC A                                                   
+00768146           001672AAYÞE ÝKRA KARADENÝZ  6D CBDABAADACBCBDC     DBCAADBDAC          CBCCD BDDA          ACDDBADDAC                                                   
+00768146           001812AÇINAR ALÝ KARAASLAN  6D CBCADAADDCBDABB     DDCDADADAC          ADDDC DBDA          ACCDBADCDA                                                   
+00768146           001852BELÝF DOÐAN           6D ADCBDBCBCBDADAA     ADBDACDBCD          DDB ADACDC          BADCDAACAD                                                   
+00768146           001752ABERÝN ÇAPAK          6D DCCA  ACBC BBCD     DBCAADDDAD          A                   AA B C                                                       
+0076814628171068384001522AAHU ARSLAN           6 BCBCBDCACDCCDBCB     DBCAACBDAC          CBCDCBCADA          AACDBADCAA                                                   
+00768146           001552AALÝ TURAN AYDIN      6 BBBAACBACADBBCAB     DADAADBCCC          ACDB AA BA          AABADBBCAD                                                   
+00768146           002122AGÜL NÝHAL KORKMAZ    6C CBDDAAADD BDBAB     DBCDADAD C          ADC CB D A          ACCDBA C A                                                   
+00768146           002662AAYÞE MELEK UÐUR      6C CCCCDACDDACDC B     DCCDACBABB          CDCDCABBA           ACDDB DCDA                                                   
+00768146           002312BNADÝR GULIYEV        6C DBC DBBBCBCBC A     ADDDBCD CA          DCBCDDB DA          BADCDAACCD                                                   
+00768146           002322ANÝSA SU BAYRAM       6C ABBADAACDCADB B     DDCAADBDAC          DDCDCBCBDA          AACBDC B B                                                   
+00768146           002272AMUSTAFA KUCUR        6C CBDACAACDCADBCB     DBCDDDBDCC          CDCDCBCBDA          ACCDDADCDA                                                   
+00768146           002632BZÜMRÜT ASYA DEMÝRÖREN6C CDCADBABCBCADAA     ADDDACDBCD          ACBDDDACDC          BCCCCADCDB                                                   
+00768146           002192AKEREM DERE           6C CBDCDAABDCCCBAB     DBBAADBDAC          ADCDCDBBDA          AADABAACCA                                                   
+00768146           002152BHÜMEYRA ÇELÝK        6C BACCBBCBCBCDAAA     ADBDACBBCA          DCBCBDA BA          AADCDDACDD                                                   
+00768146           002472AVÝYAN ZEYNEP BATUR   6C B AAC ACDCB A B     D CAAC DBC          ABCD   CDA            BDC                                                        
+00768146           002582AZEYNEP ÇEVÝK         6C DABACDCCBCCBD C     ACBCABABBC          DCDB  D BA          ACB BDD  D                                                   
+00768146           002462BUMUT ALÝ ÖZKAN       6C BACAAB   CB   A     A B DDAA              A                                                                              
+00768146           002572BZEHRA KULAÇ          6C DDC BBAB ACAD A     ADA ACDBCA          DC DBBBCBC          BCCC AACDB                                                   
+00768146           002332BÖMER ÜNAL YENÝALP    6C CAC DBCBCBDCDAA     ADBDAC BCA          DCBCADACCC          BADCCAACCD                                                   
+00768146           002402ASÝNAN GÖREN          6C CBCADAACDC DBAB     DDCAACBDAC          DBCDCB BDA          ACCDBADCBA                                                   
+00768146           001972BELÝF ÜN              6C C CBBCCBCBBADAA     ADBDAB DCA           CBDADAABC          BADCDAACCD                                                   
+00768146           001822ADEFNE ÝPEK MALKOÇ    6C CAD  AACDC DBCB     BBC ACADAC           CCD B BDD          ACCDBADD A                                                   
+00768146           002102BFEYZA BEGÜM KAYA     6C CDCADD BCBABDAA     ADBDABDDCA          D BADDAACC          AC  BADDDC                                                   
+00768146           001722ABAYRAM BERAT YÝÐÝTER 6C  ABDDA CDC CB       DBC A  D C           B DCA BD           A C BCADCB                                                   
+00768146           002072AFATMA BARCIN         6C CBDADA DDC DBDC     BDCABCBDAC           DCCCB DDA          A DBB A BA                                                   
+00768146           001202AÜLKÜ NÝSA ÇELÝK      6C CBBDDBACBCDDBCB     DBCAACADBC          ADBCCBDDCB          ACCDABBCCB                                                   
+00768146           001942AELÝF SU SOYDAM       6C CCADDAACACADDDB     DBCDADBCBB           DCCCB AABCA        AACDACACAA                                                   
+00768146           001762BBERRA AYKUL          6C AAAADAABBCBDC       BDBDDDD             ADCABC A            BBAA A   D                                                   
+00768146           001862BECEM SÜMER           6C CDCABBDBAACADBA     ADBCBBDBCA          DCD DDBABC          BAACBAAACB                                                   
+00768146           002032BEYMEN DERE           6C BBCDAACBCBAAD A     ADBDACD DA          DDBDBDACDC          BCDDBADBAC                                                   
+00768146           002052AFATIMA TÜZZEHRA YILDI6C DABA AACBCADB       D CDADBCBC          ADC  B BDC          AB  AA  CC                                                   
+00768146           001992AEMÝR KAZIM AVCI      6C  BAADDAAAABDC B     BDCDACBCBC          ADBACB BDB          A CDBCBDBA                                                   
+00768146           001452ATALHA KANMAZ         6C BBABCAACACDDCAD     BDCAADBD C          DDCDA ADDC          CA AACCBAA                                                   
+00768146           001442BAYÞE ELA ÇAKAR       6C CAC DBCBCBD D A     AD DACDBCA          DCBDBDACBC          BADCBAACDD                                                   
+00768146           002062BKEREM TAHA YENÝ      6C DABCDBDBC CD  A     DCBDA BDCD          DB  BCA BC          BA B BCCCB                                                   
+00768146           001412BBEYZA NUR YÝÐÝT      6A DBCCAABCCBBCCAD     CDBACBBBDA          DCACDDACAD          BADDDAACDB                                                   
+00768146           001842BEBRAR SENA ALDEMÝR   6A CDCCDBCBCBDADAA     ADAD CDBCA           DBCBDA DC          BA CAACCCA                                                   
+00768146           001792ABUÐLEM BEREN EKE     6A CBDADAACDCBDBDB     DDCAADBDDC          ABCDCBABAB          CADBBCACCC                                                   
+00768146           001742BBEREN AKÇOCUK        6A CDC DBCDCACADBA     ADBDACDDCD          CCBCDDBCBC          BBDCDBAABD                                                   
+00768146           001712ABAVER ÞÝNÝK          6A CBDADAACDCBBCBA     DDCAADBBAC          CDCDBACBCA          DACDBADCAC                                                   
+00768146           001662BELA DOÐAN            6A C C DBCBCBCADDA     ADBDACDDCA          DCBCDCBCDC          BADCCAACCD                                                   
+00768146           001462AMATTÝAS CAN IÞIK     6A CBCADAACDCADBCB     DBCAADBDAC          ABCDCBCADA          ACCDBADCDA                                                   
+00768146           001422AMEHMET EMÝR AKILLI   6A CBDDDAACDCADBCB     DBDDADBDAC          CBCDCB BDA          ACCDBADCDA                                                   
+0076814640276560280001222ABENGÝSU AYANOÐLU     6A CBDADAACDCADBAB     DBCDADBDAC          ACCDCBCBDA          ACCDBADCAA                                                   
+00768146           001432BHÜSEYÝN SEYDÝ DERELÝO6A DACDDBABBABAD A     ADBDDCBDBA          DBBDBDDBDB          BACDADCACA                                                   
+00768146           001482BGÜLSENA GÜLLER       6A DDBDDBDBADCD  A     ADBDBCDBCC          DCB B CADD          BCABDADCAB                                                   
+00768146           001542BALÝ TOKTAY           6A DABDBBCBDBCBBAA     ADBCACDBBA          DCCDBDBADC          BCDBCBDACD                                                   
+00768146           001562ANAZ SU IRMAK KILINÇ  6A CBCADBACDCDDBDB     DBCAADBDAC          CBCDCBADDB          CACABAADCA                                                   
+00768146           001582BTALHA TUNCER         6A CDCBDBABCADDDAA     ADBDACBBCA          DCBDD  CBC          BADCDAAACD                                                   
+00768146           001622AASRIN ÜNAL           6A CBDADAACDC CBCB     DBCADDBDAC          CBCDCBDDD           ACCDBADCBA                                                   
+00768146           001492AZEHRA GÜL DOÐRUL     6A CADADCACDCBDBCB     DBCCACADAC          CDCDCACBDA          ACCDAADCCA                                                   
+00768146           002532BZEHRANUR SÜTÜVEN     6 BADCDDBABCBCADAA     ADBCACDBCA          DCBCDDACDC          BAABBCCACD                                                   
+00768146           002562AZEYNEP CEYDA ÇETÝN   6 BDCADD AADCDDBAB     DDCDADBDAC          DBADCACBDA          AACBACCBBC                                                   
+00768146           003692BMUSTAFA KINACI       6 BADDCABAADCDBACA     CDBAABBDAB          CADDBDABDA          BDCDCBBCAD                                                   
+00768146           002512AYUSUF KAYA           6 BDBBADAADAADDCAB     DBCAACBDDC          DBADABDCBA          CC DBCDCBC                                                   
+00768146           002482AYAÐMUR YÖNTEM        6 BDCBCB ACBDBDCAA     BBCDACAAB           ADCDCBDBCA          BA C ACBBD                                                   
+00768146           002242BMOHAMMAD ALI ALAUSUD 6 BCACDBBCBCBCDCCA     ADADACDDCB          CCBABDBADC          BADCCCCCCD                                                   
+00768146           002112AÞEYHMUS TURAN        6 BADADDCDCBCABABC     ABDBCACBDA          ABADDADBDC          DDABBCBCCA                                                   
+00768146           002012AESÝLA BUÐLEM ARSLAN  6 BCBC CAACACCDBCA     DBCAADBCAD          ABCDCB BAA          BCCDBADCDC                                                   
+00768146           002202AMARZÝYE TUÐÇE SELVÝDA6 BDBBADAACAC CBAB     BDCAADADAB          CCCDCBDADA          AACDACABCA                                                   
+0076814605010275840002852ARABÝA CEVRÝYE EKER   6 BDCCABCACACBDBAB     DBCDACBDBC          ABCDCBABDA          CDCBADA A                                                    
+00768146           002442BTALHA ÇAPAK          6 BDAABDAAACDBDAAA     A BDAC  A           ACDABAAD            D BB B  D                                                    
+00768146           002492BYAKUP TALHA TOSUN    6 BD CADB BCBCAD A     AD BAC D A          DC  DDA CD          ABC   ACDD                                                   
+00768146           002672BMUSTAFA TÝMUR YETGÝN 6 BCAC BB BCBC D       ADADAC              DC                  B    D  DA                                                   
+00768146           002282AMUSTAFA SAÝT BATUR   6 BCBADDAADACADBBB     DBDAADBDAC          CBCDACADDA          ACDDDBADCD                                                   
+00768146           002082BGÝZEM BÖBREK         6 BDACADBABCABCCAD     ACBCBBDBDA          DCACDDBCDC          BCCCCADDCA                                                   
+00768146           002132BHASAN ERDEM          6 BBDCADBDDDACBDCB     ADBCBDDCCB          DCBADCADCA          BDDCDBABCD                                                   
+00768146           002412ASÜLEYMAN SOYLU       6D BDBCCDACDCDCABC     DBBADDBAAC          ADCBCDBDCA            CAD   BC                                                   
+00768146           002422BÞAH AYAZ ORHUN       6D CDCADBCBCBDADAA     ADBDACDBDA          DCBDADACDC          BADBDAABCD                                                   
+00768146           002612AZÝLDAN ÖZTÜRK        6D CBCBDAADCCBDBDB     DDCAADBDAC          ABCBCDDBDA          AC DAACBCC                                                   
+00768146           002682AFEHMÝ EFE AVARA      6D AC BC ACBCDABC      DBCDADDB C          C ACBC  CD          A DDBC CBA                                                   
+00768146           002302BRABÝA TEPE           6D DDCBDABBAACDDCA     ADBDACBCCD          ADCDACBACD          A CCBDADCA                                                   
+00768146           002342AÖMÜR YAREN KUÞ       6D CBC  AACACBDBCB     DBCACDBDAC           BCDAD BDA          AADDBCDC D                                                   
+00768146           002362BREMZÝYE ARSLAN       6D ADCBCACBADCABDD     CDABCDBACD          BADCBCADBC          DACBDACBDA                                                   
+00768146           002372ARUKÝYE ERGÝN         6D DACADAACDCCCBCB     DCCAADADBC          ACADCDCBDA          ACBABADCDA                                                   
+00768146           002262AMUSTAFA GÜRGEN       6D ABA ACDDADACBCA     BBADAABBDC          BBDDCAADBA          BBAC DACAC                                                   
+00768146           002642BFATÝH HAN YABAR      6D CDCBDB              ADBDCCDBCB          ACB DD ADC          BCDCBACABB                                                   
+00768146           002802BSEMÝH YALÇIN         6D DDCBDBDBCBCADAA     ADBDACDDCA          DCBDADAABC          BADCDAAACD                                                   
+00768146           002872AHASAN ARSLAN         6D CBDADCADBDCACDB     DDBCACBCAC          CBCDCC              AADDBCCCBA                                                   
+00768146           003952BALÝ ÝSMAÝL ELÇÝ      6D CACDDBCBCBCCDAA     ADBDACDDCA          DC D DAA C           AACDAACAD                                                   
+00768146           002522AYUSUF ÜNALAN         6D CBDADAACDC DBCB     DDCDADBDAC          ADCDCBC DA          ACCDB DCBA                                                   
+00768146           002552BZEYNEP AÞLAMA        6D DDCADB BBBABD A     ADADACBDCA          AACCBCDCA           AACBAAACCC                                                   
+00768146           002622BZÜLFÝKAR DENÝZ CAN   6D CACBBACBCBBAD A     ACCB BBACD          CC DBDCADC          ACAC AA DD                                                   
+00768146           004622ACANAN DOÐAN          6A ADCCCDADDACAACB     CABDDCDDBA          CAACCDBDAC          ACDBCDBCAC                                                   
+00768146           002692BHALÝME ZÜMRA ERDOÐAN 6A CACADBCBCBD D A     CDBDACDBCA          CCCCBDAA C          BADCCAACCD                                                   
+00768146           002652AAYÞEGÜL GÜNGÖR       6A CACDDCACACDDDCB     DDACACDDBC          ABCDCBBDCA          ACCDAABCDA                                                   
+00768146           002592BZEYNEP KAYA          6A BDDCABCBCBDBDAA     ADBDDCDBCA          DCBBBA DDC          BADCDAAACD                                                   
+00768146           002502ABELKIS SILA DALÖMER  6A CBBADAACDACDBCB     BDCAADBDAC          CDCDCB BDA          CCDDBCDCDA                                                   
+00768146           002452BTÝMUR ÝBLÝKER        6A DAABDBBCCBADAAA     ADADACDBCD          DCBBDCACBA          BADCDACACD                                                   
+00768146           002182AKEREM ÇAÐAN DOÐRUYOL 6A AAABCDAABBBDACC     CCCADDCADC          CDCBDDDBBD          DBDADCBCDB                                                   
+00768146           002292BMUSTAFA TOKTAY       6A ACACDBCACDBACBA     ABBDBCCDAA          DCDACBCCCB          BDCABACDCD                                                   
+00768146           002352APOYRAZ EFE YURTCU    6A DCAAD ADDCADB B     BA ACDBDAC          CCCDC CA A          AACDBBDC A                                                   
+00768146           002392BSÝMAY MÝRAY AKTÜRK   6A BDDDDBCBCBBADCA     ACBCACDBCB          ABCAADD             BBACCACCDD                                                   
+00768146           001882BEFE ÇALIÞKAN         6A AADADBDBCCBBCDD     ADAAACDDDD          CCBDDDAADA          BABBDBDAAC                                                   
+00768146           001922AELÝF ÇAÐLAR          6A D DBDDCCDBACBDC     DDCBDCBB B          AB DB DB C          ABCCCBAABA                                                   
+00768146           001932BELÝF SU ÇETÝN        6A DCABDBDBDABACAC     CABAACABDD          ACDCBACCAB          ACBCBDCADD                                                   
+00768146           002432AÞEREF SALÝH ALTUNDAL 6A ADCCBDBDDBCABAC     CACBDADDAB          CDADCBBADA          CBDDBDCABC                                                   
+00768146           001981BEMÝNE AY ÞAHÝN       6D                                                                                 DBAD CABDBCCACC     CACBDDCDACCDCAD      
+00768146           002171BÝLEYZA AKAY          6D                                                                                 BDDCDDBB  ADC B     DDABADBDCABCCAC      
+00768146           002221BMEMET MUMCU          6D                                                                                 BDBD ABBC  BCBA     DDCCDCABCABDBCA      
+00768146           002231AMÝRAY AKÇALIOÐLU     6D                                                                                 DCDACDBBADACC A     DCABCACDDBBAA B      
+00768146           001851BELÝF DOÐAN           6D                                                                                 BCACCDBCCBADCAB     DDABCDBDCABBBAC      
+00768146           001811AÇINAR ALÝ KARAASLAN  6D                                                                                 CABADCABBCAAACB     DBDBCBACDBABCDB      
+00768146           001771BBERRA ÇAPAK          6D                                                                                   ADDCA B AA AB     DDDBADCDCBB AAC      
+00768146           001701BBATUHAN KAYA         6D                                                                                 BCDCADBCDBADCAB     DDDBCDBDCABCBAC      
+00768146           001681AAYÞE MÝNA AKÇALIOÐLU 6D                                                                                 BCABADBBCBCCC       BB   DDCDADC BB      
+00768146           001371ABAHAR GÜRBÜZ         6D                                                                                 DDAACA BBDBCAAB     DBDBDBABDDCBCCB      
+00768146           002022AEYLÜL NUR AYDIN      6A CBDADAACDC DBCB     CDDAACADDB          CDCACBCBDA          ACCDAADCAA                                                   
+00768146           002042BEYMEN KARCI          6A DBABCBDBCBBAD       A  DBCDBCD          CCACBCDD            BCDCCABACD                                                   
+00768146           001501BABDURRAHMAN YILMAZ   6D                                                                                 BDADD C CBAAC B     DCCBABBDD            
+00768146           001611AASLI NUR UYSAL       6D                                                                                 BBACCB  B DBABC     DCA CDACDC BC D      
+00768146           001671AAYÞE ÝKRA KARADENÝZ  6D                                                                                 CABCDA C  DB BD     DBAB D CDDB BDC      
+00768146           001651BAYLÝN TAÞKARABACAK   6D                                                                                 BCAAADBCDBADCAB     DDABCDBDCACCDAC      
+00768146           002001AERVA BUÐLEM ÇEKÝÇ    6D                                                                                 BC    A AC    B     DCAB DACDDABDCD      
+00768146           001751ABERÝN ÇAPAK          6D                                                                                 ACAABCCBABBDCCD     DCABB  CDBDB BC      
+00768146           001711ABAVER ÞÝNÝK          6A                                                                                 ADBACBDBADDDABC     DCABADDCDCCBACD      
+00768146           001481BGÜLSENA GÜLLER       6A                                                                                 DCABDABCADABCBA     DCCCB BDCABABAC      
+00768146           001431BHÜSEYÝN SEYDÝ DERELÝO6A                                                                                 BDDDCACBB ACABB     DBDBDCBDCABC  C      
+00768146           001421AMEHMET EMÝR AKILLI   6A                                                                                 CDBAD ABBCACAB      DCABAB CDDBAADB      
+00768146           001411BBEYZA NUR YÝÐÝT      6A                                                                                 DBDDCDABDAADCAD     DACBCADDCBCBACC      
+0076814640276560280001221ABENGÝSU AYANOÐLU     6A                                                                                 CBBADBCBBCACDDC     DCABCCACDDABCDA      
+00768146           001491AZEHRA GÜL DOÐRUL     6A                                                                                 C BA CABBDACADA     DCACCBACDDDBCCD      
+00768146           001541BALÝ TOKTAY           6A                                                                                 ABDCBACBCABCDAD     DACBACBDCDBAACC      
+00768146           001561ANAZ SU IRMAK KILINÇ  6A                                                                                 AAB D A BAAB        DCABCAACDDDBCDB      
+00768146           001581BTALHA TUNCER         6A                                                                                 BDDCAABCCBAACAB     DDABCDBDCABCBAC      
+00768146           001621AASRIN ÜNAL           6A                                                                                 CDBADCABBCAC BB     DCABCDACDDABCDB      
+00768146           001661BELA DOÐAN            6A                                                                                 BCACADBCDBADCAB     DAABCDBDCABCBAC      
+00768146           001741BBEREN AKÇOCUK        6A                                                                                 BBDDDBDBDD BCBD     DCDBCDBCBDBDDAC      
+00768146           001791ABUÐLEM BEREN EKE     6A                                                                                 ADB BADABCADDBB     DBDBCAADDB AC C      
+00768146           001841BEBRAR SENA ALDEMÝR   6A                                                                                 CDBACDCACBADCAB     DDABCDCDCABCDCC      
+00768146           001461AMATTÝAS CAN IÞIK     6A                                                                                 CDBADCABBBACADB     DCABCBACDDABCDB      
+                   000831BECRÝN ADA BOLAT      6 B                                                                                BBACDDBDCBADCAB     DBABDDBDCABCDAC      
+00768146           001471AKADÝR ÇINAR ÞENEL    6 B                                                                                CABADCABBCDAADB     DCAB BACDDBBCDB      
+00768146           001531ABEREN ÇÝÇEK          6 B                                                                                 CAADACBBDDBDBB     BDDABCDBABBBACC      
+00768146           001551BALÝ TURAN AYDIN      6 B                                                                                 DDCCC ADBACABA     D BAACCCCABBAAC      
+00768146           001591AALYA NUR NARMAN      6 B                                                                                AAB CC BC AACCD     CBC BDCCDCAACAA      
+00768146           001601BARDA BERK BAHÇECÝ    6 B                                                                                BCACDADCDAAA CB     DCC CACDCAB A D      
+00768146           001631AAYÇÝN ÇOLAK          6 B                                                                                CABADCABBDACBDB     DCABDBACDBBBCDB      
+00768146           001641BAYLÝN SÜVARÝ         6 B                                                                                BCACDDBADCADBAB     DDCBCCBDCABADAC      
+0076814617674417850001691AAZRA BETÜL TÜRK      6 B                                                                                CDBADCABBD CADB     DCAB BACDDABCDB      
+00768146           001731BAHMET YUSUF ÞAHÝN    6 B                                                                                ABBC BCBDDAD CB     D CDBDCBBAACD C      
+00768146           001781ABERRA KARADAÞ        6 B                                                                                CABADCABBCACADB     DCABCBACDCABCDB      
+00768146           001801BBULUT YILMAZ         6 B                                                                                BADCBDC  BADB B     DCBBCABDDABADAC      
+00768146           001831ADURU YAYLALI         6 B                                                                                CAAADCABBDDDADB     DDDACBADAACDCBB      
+00768146           001891BEFE TÜLÜ             6 B                                                                                DBADADCDBCCBDAC     DDABCBCBADCCADD      
+00768146           001911AEGE TÜLÜ             6 B                                                                                DCABABCBCDADBAC     CDABACDDCCCABD       
+00768146           001951BELÝF TATAROV         6 B                                                                                BCA BADCCAAAACB     D C BACDCABADCB      
+0076814628171068384001521BAHU ARSLAN           6 B                                                                                BCACADBCDBADCAB     DDABCDBACABC AC      
+00768146           002451BTÝMUR ÝBLÝKER        6A                                                                                 BDDDAADDDBACCAB     DACBCBADCABAADC      
+00768146           002501ABELKIS SILA DALÖMER  6A                                                                                 CDBADCABBCACDDC     DCBBBAACDDBBCDB      
+00768146           002651AAYÞEGÜL GÜNGÖR       6A                                                                                 CCBADDABDCACDDB     DCABCDACDADBBBB      
+00768146           002691BHALÝME ZÜMRA ERDOÐAN 6A                                                                                 BCACADBCCBADCAB     DDBB D DCABAACC      
+00768146           004621ACANAN DOÐAN          6A                                                                                 ADABDADBBDBDBDC     DCBBABADBDABADA      
+00768146           002181AKEREM ÇAÐAN DOÐRUYOL 6A                                                                                 CBDBBBCBBBCCBAC     BCCDCBBADBCBCDB      
+00768146           002291BMUSTAFA TOKTAY       6A                                                                                 BDCDABCBDDABCAA     ABBDDACBCCDBCDC      
+00768146           002351APOYRAZ EFE YURTCU    6A                                                                                  DDABBABBD C B       CAB    DABBC B      
+00768146           002391BSÝMAY MÝRAY AKTÜRK   6A                                                                                 ABACADBCB  DCAB     DDBBCDADCABCDCC      
+00768146           002431AÞEREF SALÝH ALTUNDAL 6A                                                                                 CDCABCBABABDDDC     ADCBBABCBAAABCD      
+00768146           001881BEFE ÇALIÞKAN         6A                                                                                 BDDADCCADAADBCA     DDBCCDCDCABADAC      
+00768146           001921AELÝF ÇAÐLAR          6A                                                                                  DBAA D CCCBBAD     DCDBCABCDBABAD       
+00768146           001931BELÝF SU ÇETÝN        6A                                                                                 CBDCBBCDCAABABC     DDBCCBBBCDCAAAC      
+00768146           002021AEYLÜL NUR AYDIN      6A                                                                                 CBBAC ABBDACAAA     DCABCDACDBDBCDC      
+00768146           002041BEYMEN KARCI          6A                                                                                 BCDBABADCBABCAB     DDDBCCBDCABD AC      
+00768146           002591BZEYNEP KAYA          6A                                                                                 BCACDDBCCBADCAB     DABBCBDDCABC AC      
+00768146           001721BBAYRAM BERAT YÝÐÝTER 6C                                                                                 BA D ADBDBAA BB     DAD DCBDCAA BA       
+00768146           001761ABERRA AYKUL          6C                                                                                 CDCBA  B CBCDCD     DCDB DDCDC ACBB      
+00768146           002031AEYMEN DERE           6C                                                                                 CAAADBCBCCCDCCC     DCABCDDCDDDBCDB      
+00768146           001991BEMÝR KAZIM AVCI      6C                                                                                 C DC BAADA A        ADDDCAAADB ADC       
+00768146           001861AECEM SÜMER           6C                                                                                 C  ABC B  B ABD     ACABDDAC DBCCB       
+00768146           001201AÜLKÜ NÝSA ÇELÝK      6C                                                                                  DBAD ABBD DDB      DCAB DACDABADBA      
+00768146           002101AFEYZA BEGÜM KAYA     6C                                                                                   B CBABA  CCAC     DCABACCCDBBCCCB      
+00768146           002071BFATMA BARCIN         6C                                                                                 BADDD    BAB A      DDABADDDBABCDAC      
+00768146           001971AELÝF ÜN              6C                                                                                 CABA CABCCBDA A     DCABDDACDDBBCDB      
+00768146           001451ATALHA KANMAZ         6C                                                                                  ABABCBBDD DCCB     DCABCDACDCABCCD      
+00768146           002051BFATIMA TÜZZEHRA YILDI6C                                                                                 B DB DC D  A AB     DC  CDBDCAB C C      
+00768146           001821BDEFNE ÝPEK MALKOÇ    6C                                                                                 B  BC  C BAB BB     D ABC  DCAB B C      
+00768146           002061AKEREM TAHA YENÝ      6C                                                                                 ADDAD ABBCDC D      DCABCDACDDCAC A      
+00768146           001941BELÝF SU SOYDAM       6C                                                                                 D DDCCC A     B     DACDCBDDCAB DAC      
+00768146           001441BAYÞE ELA ÇAKAR       6C                                                                                 BDADADBC BAD AB     DDABCDBDCABCDAD      
+00768146           002361BREMZÝYE ARSLAN       6D                                                                                 DDCDBBACACDACDB     DCBADBACBDCDADD      
+00768146           002371ARUKÝYE ERGÝN         6D                                                                                 AACDDCABBAACDBC     CCABABAADCDDCBC      
+00768146           002621BZÜLFÝKAR DENÝZ CAN   6D                                                                                 B CBDA BCDAA BB     DBCBBDDDCCC BBC      
+00768146           002611AZÝLDAN ÖZTÜRK        6D                                                                                 DCBBD ABBCAC BA     DCABD ACDAABDDB      
+00768146           002341AÖMÜR YAREN KUÞ       6D                                                                                 CA AACABBBADDA      DCDBCCACDDABCCC      
+00768146           002551BZEYNEP AÞLAMA        6D                                                                                   AD  BCDBCAB       DDCCBDADCAB BAC      
+00768146           002521AYUSUF ÜNALAN         6D                                                                                 CDBADCABBAA  DB     DCABCDACDDBBCDB      
+00768146           002421BÞAH AYAZ ORHUN       6D                                                                                 BBACCDDBCBAD AB     DDDBCDBDCAACDAC      
+00768146           002301BRABÝA TEPE           6D                                                                                 DBCCBCBDB AADDA     DBDDCDDDCADBCCC      
+00768146           002261AMUSTAFA GÜRGEN       6D                                                                                  DCCADCBDDCBDAD     CCBAADACDACABDB      
+00768146           002411ASÜLEYMAN SOYLU       6D                                                                                 BACADABBAADABDC     DDCACDACADCDBCB      
+00768146           002641BFATÝH HAN YABAR      6D                                                                                 BCD       ADA       D ABCCBDCABC AC      
+00768146           002681AFEHMÝ EFE AVARA      6D                                                                                 BBAAA  DCDA AB      DCAA BAB CDC CD      
+00768146           002801BSEMÝH YALÇIN         6D                                                                                 BDACADBCDBADCAB     DDABCDBDCABABAC      
+00768146           002871AHASAN ARSLAN         6D                                                                                 BADBDADACBDCCAD     DCABCDCCDCBDADB      
+00768146           003951BALÝ ÝSMAÝL ELÇÝ      6D                                                                                 DCAACD BCBAD BD     DDBCCDBDCDB C C      
+00768146           002011AESÝLA BUÐLEM ARSLAN  6 B                                                                                 DB AD BA  CD B     DCAAAAACDDABCDB      
+00768146           002081BGÝZEM BÖBREK         6 B                                                                                CDDACDA DB DBAB     ADBADDADDAACDAC      
+00768146           002111AÞEYHMUS TURAN        6 B                                                                                ACAA DCBDCACBDA     CDADDCCBDBDADAB      
+00768146           002131BHASAN ERDEM          6 B                                                                                BCDABBCADCBACBB     DAADCCADADBBCAD      
+00768146           002381ASAÝD NUR GÜNDÜZ      6 B                                                                                 ADA DBCBACABDB     DBCADADABACBBAB      
+00768146           002201BMARZÝYE TUÐÇE SELVÝDA6 B                                                                                BDDCD BADBDA AD     DDBACDDDCABCAAC      
+00768146           002441ATALHA ÇAPAK          6 B                                                                                AACABACBBBDCBCB     DCAB ADCCDD CCA      
+00768146           002481BYAÐMUR YÖNTEM        6 B                                                                                 DBD DCAACAABBC     DC B ABBDB CDAC      
+00768146           002491AYAKUP TALHA TOSUN    6 B                                                                                AC AD  BBBCDA B     DCAB BACDDABCAD      
+00768146           002241AMOHAMMAD ALI ALAUSUD 6 B                                                                                 ABADBABBDDA AD     DCABCDACDCABCDB      
+00768146           002561AZEYNEP CEYDA ÇETÝN   6 B                                                                                ACBADCADBACDA B     DCDBCD CDDCDAAD      
+00768146           002671BMUSTAFA TÝMUR YETGÝN 6 B                                                                                BA B D DDBAACCA     DDDC  BDCABC AC      
+0076814605010275840002851ARABÝA CEVRÝYE EKER   6 B                                                                                BDBBCCBBCDAAD C     DCDBCCACD BADDC      
+00768146           002511BYUSUF KAYA           6 B                                                                                BDACDCBAACBBACD     BCABDCADCAACCAC      
+00768146           003691AMUSTAFA KINACI       6 B                                                                                DBCADBDADCBABDB     ABDBACDDCADACDA      
+00768146           002281BMUSTAFA SAÝT BATUR   6 B                                                                                BCBBDABABCDACAB     DCCBDACDCAA DAC      
+00768146           002271AMUSTAFA KUCUR        6C                                                                                  DAA C BB ABDAC     DCDBDDACDCABCDB      
+00768146           002631BZÜMRÜT ASYA DEMÝRÖREN6C                                                                                 B CDDCCCDAAACAB     DDDBDDDDCABCDAC      
+00768146           002311BNADÝR GULIYEV        6C                                                                                 B AC DBC BADCAB     DDBBCDBDCABCDAC      
+00768146           002121AGÜL NÝHAL KORKMAZ    6C                                                                                 C AA D BBB CDD      DCAB DACDCDD  D      
+00768146           002191AKEREM DERE           6C                                                                                 BDBABBABBCDADCC     DCABABACDDDBCDA      
+00768146           002531BZEHRANUR SÜTÜVEN     6 B                                                                                BCACDABADBADCAB     DDABCCBCCDBACAC      
+00768146           002471AVÝYAN ZEYNEP BATUR   6C                                                                                 A CB DCA  DB        DCAB   CD B  AD      
+00768146           002151BHÜMEYRA ÇELÝK        6C                                                                                 BCAC BCACAAA AB     DDABCDBDDABCDAC      
+00768146           002581AZEYNEP ÇEVÝK         6C                                                                                 BCDACC CA A B       BCD  CD CABAB D      
+00768146           002571BZEHRA KULAÇ          6C                                                                                  CDCDDB D  CAC      DDCBCDBDDABCB C      
+00768146           002461BUMUT ALÝ ÖZKAN       6C                                                                                    B  C  BB  BD      D  AA AB     B      
+00768146           002661BAYÞE MELEK UÐUR      6C                                                                                 BAACDDBA A D A      DDBA BBDCAA BDC      
+00768146           002331BÖMER ÜNAL YENÝALP    6C                                                                                 BCACAD CABADBAB     DDABCDBDCABCAAC      
+00768146           002401ASÝNAN GÖREN          6C                                                                                 CDBADCABBDAADDB     DCABABACDCABCDB      
+00768146           002321ANÝSA SU BAYRAM       6C                                                                                 CABADBABBCABAC      DCABCDACDC CCBB      

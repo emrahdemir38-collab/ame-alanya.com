@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Öğretmen Atama - AMEO</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header h1 { font-size: 1.8em; }
+        .btn-back {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid white;
+            padding: 8px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 25px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #374151;
+        }
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        .class-checkbox {
+            display: block;
+            padding: 10px;
+            margin-bottom: 8px;
+            border: 1px solid #e5e7eb;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .class-checkbox:hover {
+            background: #f9fafb;
+        }
+        .class-checkbox input {
+            margin-right: 10px;
+        }
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        .btn:hover { opacity: 0.9; }
+        .alert {
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .alert-success { background: #d1fae5; color: #065f46; }
+        .alert-error { background: #fee2e2; color: #991b1b; }
+        .assigned-list {
+            margin-top: 20px;
+        }
+        .assigned-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: #f3f4f6;
+            border-radius: 5px;
+            margin-bottom: 8px;
+        }
+        .btn-remove {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>👨‍🏫 Öğretmen Atama Sistemi</h1>
+        <a href="/admin/dashboard" class="btn-back">← Ana Sayfa</a>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <h2 style="margin-bottom: 20px; color: #374151;">Öğretmen Seç</h2>
+            <div class="form-group">
+                <label>Öğretmen:</label>
+                <select id="teacherSelect" onchange="loadTeacherAssignments()">
+                    <option value="">-- Öğretmen Seçin --</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="assignmentSection" style="display: none;">
+            <div class="card">
+                <h2 style="margin-bottom: 20px; color: #374151;">Sınıf Atama</h2>
+                <div id="alertBox"></div>
+                <div class="form-group">
+                    <label>Atanacak Sınıflar (Birden fazla seçilebilir):</label>
+                    <div id="classCheckboxes"></div>
+                </div>
+                <button class="btn" onclick="assignClasses()">Sınıfları Ata</button>
+                
+                <div class="assigned-list">
+                    <h3 style="margin-bottom: 15px; color: #374151;">Atanmış Sınıflar:</h3>
+                    <div id="assignedClasses">Yükleniyor...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTeacherId = null;
+
+        async function loadTeachers() {
+            try {
+                const response = await fetch('/admin/api/teachers');
+                const data = await response.json();
+                const select = document.getElementById('teacherSelect');
+                
+                data.teachers.forEach(teacher => {
+                    const option = document.createElement('option');
+                    option.value = teacher.id;
+                    option.textContent = `${teacher.full_name} (${teacher.username})`;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading teachers:', error);
+            }
+        }
+
+        async function loadClasses() {
+            try {
+                const response = await fetch('/admin/api/classes');
+                const data = await response.json();
+                const container = document.getElementById('classCheckboxes');
+                container.innerHTML = '';
+                
+                data.classes.forEach(cls => {
+                    const label = document.createElement('label');
+                    label.className = 'class-checkbox';
+                    label.innerHTML = `
+                        <input type="checkbox" value="${cls.class_name}">
+                        ${cls.class_name}
+                    `;
+                    container.appendChild(label);
+                });
+            } catch (error) {
+                console.error('Error loading classes:', error);
+            }
+        }
+
+        async function loadTeacherAssignments() {
+            const teacherId = document.getElementById('teacherSelect').value;
+            if (!teacherId) {
+                document.getElementById('assignmentSection').style.display = 'none';
+                return;
+            }
+            
+            currentTeacherId = teacherId;
+            document.getElementById('assignmentSection').style.display = 'block';
+            
+            try {
+                const response = await fetch(`/api/admin/teacher-classes/${teacherId}`);
+                const data = await response.json();
+                
+                const container = document.getElementById('assignedClasses');
+                if (data.classes.length === 0) {
+                    container.innerHTML = '<p style="color: #9ca3af; font-style: italic;">Henüz sınıf atanmamış</p>';
+                    return;
+                }
+                
+                container.innerHTML = '';
+                data.classes.forEach(cls => {
+                    const div = document.createElement('div');
+                    div.className = 'assigned-item';
+                    div.innerHTML = `
+                        <span>${cls.class_name}</span>
+                        <button class="btn-remove" onclick="removeClass('${cls.class_name}')">Kaldır</button>
+                    `;
+                    container.appendChild(div);
+                });
+            } catch (error) {
+                console.error('Error loading assignments:', error);
+            }
+        }
+
+        async function assignClasses() {
+            if (!currentTeacherId) return;
+            
+            const checkboxes = document.querySelectorAll('#classCheckboxes input[type="checkbox"]:checked');
+            const classNames = Array.from(checkboxes).map(cb => cb.value);
+            
+            if (classNames.length === 0) {
+                showAlert('Lütfen en az bir sınıf seçin', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/admin/teacher-classes/assign', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        teacher_id: currentTeacherId,
+                        class_names: classNames
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showAlert(data.message, 'success');
+                    checkboxes.forEach(cb => cb.checked = false);
+                    loadTeacherAssignments();
+                } else {
+                    showAlert(data.error || 'Atama başarısız', 'error');
+                }
+            } catch (error) {
+                showAlert('Hata oluştu', 'error');
+            }
+        }
+
+        async function removeClass(className) {
+            if (!confirm(`${className} sınıfını kaldırmak istediğinizden emin misiniz?`)) return;
+            
+            try {
+                const response = await fetch('/api/admin/teacher-classes/remove', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        teacher_id: currentTeacherId,
+                        class_name: className
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showAlert(data.message, 'success');
+                    loadTeacherAssignments();
+                } else {
+                    showAlert(data.error || 'Kaldırma başarısız', 'error');
+                }
+            } catch (error) {
+                showAlert('Hata oluştu', 'error');
+            }
+        }
+
+        function showAlert(message, type) {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => { alertBox.innerHTML = ''; }, 3000);
+        }
+
+        loadTeachers();
+        loadClasses();
+    </script>
+</body>
+</html>

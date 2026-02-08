@@ -1,0 +1,462 @@
+{% set breadcrumbs = [{'text': 'Ödevlerim', 'url': ''}] %}
+{% extends "base_dashboard.html" %}
+
+{% block title %}Ödevlerim{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/admin-modern.css">
+<style>
+    .dashboard-content {
+        padding: 24px 28px;
+    }
+    
+    .assignment-card {
+        background: white;
+        border-radius: var(--radius-xl);
+        padding: 24px;
+        margin-bottom: 20px;
+        box-shadow: var(--shadow-lg);
+        border: 1px solid var(--gray-100);
+        transition: all var(--transition-fast);
+    }
+    
+    .assignment-card:hover {
+        box-shadow: var(--shadow-xl);
+        transform: translateY(-2px);
+    }
+    
+    .assignment-card h3 {
+        color: var(--gray-800);
+        font-size: 1.2rem;
+        margin-bottom: 8px;
+    }
+    
+    .assignment-card p {
+        color: var(--gray-600);
+        margin-bottom: 6px;
+    }
+    
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.6);
+        z-index: 1000;
+        overflow-y: auto;
+    }
+    
+    .modal-content {
+        background: white;
+        max-width: 600px;
+        margin: 40px auto;
+        padding: 32px;
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow-2xl);
+    }
+    
+    .modal-content h2 {
+        color: var(--gray-800);
+        margin-bottom: 24px;
+        font-size: 1.4rem;
+    }
+    
+    .form-group {
+        margin-bottom: 20px;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: var(--gray-700);
+    }
+    
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid var(--gray-200);
+        border-radius: var(--radius-lg);
+        font-size: 1rem;
+        transition: all var(--transition-fast);
+    }
+    
+    .form-group input:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: var(--primary-500);
+        box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+    }
+    
+    .class-checkboxes {
+        max-height: 300px;
+        overflow-y: auto;
+        border: 2px solid var(--gray-200);
+        padding: 12px;
+        border-radius: var(--radius-lg);
+        background: var(--gray-50);
+    }
+    
+    .class-checkboxes label {
+        display: flex;
+        align-items: center;
+        padding: 14px;
+        margin: 8px 0;
+        cursor: pointer;
+        border: 2px solid var(--gray-200);
+        border-radius: var(--radius-md);
+        background: white;
+        transition: all var(--transition-fast);
+    }
+    
+    .class-checkboxes label:hover {
+        border-color: var(--primary-500);
+        background: var(--primary-50);
+    }
+    
+    .class-checkboxes input[type="checkbox"] {
+        margin-right: 12px;
+        width: 20px;
+        height: 20px;
+    }
+    
+    .bulk-actions {
+        margin-bottom: 20px;
+        display: flex;
+        gap: 16px;
+        align-items: center;
+        padding: 16px;
+        background: white;
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow-md);
+    }
+    
+    .select-all-label {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 600;
+        color: var(--gray-700);
+        cursor: pointer;
+    }
+    
+    .item-checkbox {
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+    }
+    
+    .assignment-card-checkbox {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+    }
+    
+    .btn-action {
+        padding: 8px 16px;
+        border: none;
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.9rem;
+        transition: all var(--transition-fast);
+    }
+    
+    .btn-action:hover {
+        transform: translateY(-2px);
+    }
+    
+    .btn-action.success {
+        background: var(--gradient-success);
+        color: white;
+        box-shadow: var(--shadow-success);
+    }
+    
+    .btn-action.danger {
+        background: var(--gradient-error);
+        color: white;
+        box-shadow: var(--shadow-error);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-content">
+    <div class="page-header-modern">
+        <h1>📚 Ödevlerim</h1>
+        <p>Ödev oluşturun ve öğrenci teslimlerini takip edin</p>
+        <div class="page-header-actions">
+            <button class="btn btn-success" onclick="showCreateModal()">+ Yeni Ödev</button>
+        </div>
+    </div>
+
+    <div class="bulk-actions" id="bulkActionsPanel" style="display:none;">
+        <label class="select-all-label">
+            <input type="checkbox" class="item-checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)">
+            Tümünü Seç
+        </label>
+        <button class="btn btn-danger" onclick="bulkDeleteAssignments()" disabled id="bulkDeleteBtn">
+            🗑️ Seçilenleri Sil (<span id="selectedCount">0</span>)
+        </button>
+    </div>
+    
+    <div id="assignmentsList">
+        <div style="text-align: center; padding: 60px; color: var(--gray-400);">
+            <div class="loading-spinner" style="margin: 0 auto 16px;"></div>
+            <p>Ödevler yükleniyor...</p>
+        </div>
+    </div>
+</div>
+
+<div id="createModal" class="modal">
+    <div class="modal-content">
+        <h2>📚 Yeni Ödev Oluştur</h2>
+        <form id="createForm" enctype="multipart/form-data">
+            <div class="form-group">
+                <label>Başlık *</label>
+                <input type="text" name="title" required placeholder="Ödev başlığını girin">
+            </div>
+            <div class="form-group">
+                <label>Açıklama</label>
+                <textarea name="description" rows="3" placeholder="Ödev açıklaması..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Son Teslim Tarihi *</label>
+                <input type="datetime-local" name="due_date" required>
+            </div>
+            <div class="form-group">
+                <label>Hedef Sınıflar *</label>
+                <div id="classCheckboxes" class="class-checkboxes"></div>
+            </div>
+            <div class="form-group">
+                <label>Dosya (PDF veya Fotoğraf - opsiyonel)</label>
+                <input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png,image/*" capture="environment">
+                <small style="color: var(--gray-500); display: block; margin-top: 8px;">
+                    📱 Kamera ile çek veya galeriden seç
+                </small>
+            </div>
+            <div style="display: flex; gap: 12px; margin-top: 24px;">
+                <button type="submit" class="btn btn-success" style="flex: 1;">Oluştur</button>
+                <button type="button" class="btn btn-secondary" style="flex: 1;" onclick="closeModal()">İptal</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function showToast(message, type = 'info') {
+        const container = document.querySelector('.toast-container') || createToastContainer();
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.innerHTML = `
+            <span style="font-size: 1.2rem;">${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
+            <span style="flex: 1;">${message}</span>
+        `;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 4000);
+    }
+
+    function createToastContainer() {
+        const container = document.createElement('div');
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+        return container;
+    }
+
+    async function loadAssignments() {
+        try {
+            const response = await fetch('/teacher/my-assignments');
+            const data = await response.json();
+            const container = document.getElementById('assignmentsList');
+            const bulkPanel = document.getElementById('bulkActionsPanel');
+            
+            if (!data.assignments || data.assignments.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 60px; color: var(--gray-400);">
+                        <div style="font-size: 4rem; margin-bottom: 16px; opacity: 0.5;">📚</div>
+                        <p>Henüz ödev oluşturmadınız</p>
+                    </div>
+                `;
+                bulkPanel.style.display = 'none';
+                return;
+            }
+            
+            container.innerHTML = '';
+            bulkPanel.style.display = 'flex';
+            
+            data.assignments.forEach(a => {
+                const card = document.createElement('div');
+                card.className = 'assignment-card';
+                card.id = `assignment-${a.id}`;
+                card.innerHTML = `
+                    <div class="assignment-card-checkbox">
+                        <input type="checkbox" class="item-checkbox assignment-checkbox" value="${a.id}" onchange="updateSelection()">
+                        <div style="flex: 1;">
+                            <h3>${a.title}</h3>
+                            <p>${a.description || 'Açıklama yok'}</p>
+                            <p style="font-size: 0.9rem;">
+                                <strong>Sınıf:</strong> ${a.target_class} | 
+                                <strong>Son Teslim:</strong> ${new Date(a.due_date).toLocaleString('tr-TR')}
+                            </p>
+                            <div style="display: flex; gap: 12px; margin-top: 16px;">
+                                <button class="btn-action success" onclick="viewSubmissions(${a.id})">📊 Takip Et</button>
+                                <button class="btn-action danger" onclick="deleteAssignment(${a.id})">🗑️ Sil</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        } catch (error) {
+            document.getElementById('assignmentsList').innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--error-500);">
+                    <div style="font-size: 2rem; margin-bottom: 12px;">😕</div>
+                    <p>Yükleme hatası: ${error.message}</p>
+                </div>
+            `;
+        }
+    }
+
+    async function showCreateModal() {
+        document.getElementById('createModal').style.display = 'block';
+        
+        try {
+            const response = await fetch('/admin/classes');
+            const data = await response.json();
+            const container = document.getElementById('classCheckboxes');
+            container.innerHTML = '';
+            
+            if (data.classes && data.classes.length > 0) {
+                data.classes.forEach(cls => {
+                    const label = document.createElement('label');
+                    label.innerHTML = `
+                        <input type="checkbox" name="target_classes[]" value="${cls.name}">
+                        <span style="font-weight: 500;">${cls.name}</span>
+                    `;
+                    container.appendChild(label);
+                });
+            } else {
+                container.innerHTML = '<p style="color: var(--error-500); padding: 12px;">Sınıf bulunamadı.</p>';
+            }
+        } catch (error) {
+            document.getElementById('classCheckboxes').innerHTML = '<p style="color: var(--error-500); padding: 12px;">Hata oluştu.</p>';
+        }
+    }
+
+    function closeModal() {
+        document.getElementById('createModal').style.display = 'none';
+    }
+
+    document.getElementById('createForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const response = await fetch('/teacher/assignments/create', { method: 'POST', body: formData });
+        const result = await response.json();
+        if (result.success) {
+            showToast('Ödev oluşturuldu!', 'success');
+            closeModal();
+            loadAssignments();
+        } else {
+            showToast('Hata: ' + result.error, 'error');
+        }
+    });
+
+    async function deleteAssignment(id) {
+        if (!confirm('Silmek istediğinizden emin misiniz?')) return;
+        const response = await fetch(`/api/teacher/assignments/${id}`, { method: 'DELETE' });
+        const result = await response.json();
+        if (result.success) {
+            showToast('Ödev silindi', 'success');
+            document.getElementById(`assignment-${id}`)?.remove();
+            loadAssignments();
+        } else {
+            showToast('Hata: ' + result.error, 'error');
+        }
+    }
+    
+    function toggleSelectAll(checkbox) {
+        document.querySelectorAll('.assignment-checkbox').forEach(cb => cb.checked = checkbox.checked);
+        updateSelection();
+    }
+    
+    function updateSelection() {
+        const checkboxes = document.querySelectorAll('.assignment-checkbox:checked');
+        const count = checkboxes.length;
+        document.getElementById('selectedCount').textContent = count;
+        document.getElementById('bulkDeleteBtn').disabled = count === 0;
+        const allCheckboxes = document.querySelectorAll('.assignment-checkbox');
+        document.getElementById('selectAllCheckbox').checked = allCheckboxes.length > 0 && count === allCheckboxes.length;
+    }
+    
+    async function bulkDeleteAssignments() {
+        const ids = Array.from(document.querySelectorAll('.assignment-checkbox:checked')).map(cb => cb.value);
+        if (ids.length === 0) { showToast('Lütfen en az bir ödev seçin!', 'error'); return; }
+        if (!confirm(`${ids.length} ödevi silmek istediğinizden emin misiniz?`)) return;
+        
+        let successCount = 0;
+        for (const id of ids) {
+            try {
+                const response = await fetch(`/api/teacher/assignments/${id}`, { method: 'DELETE' });
+                const data = await response.json();
+                if (data.success) {
+                    successCount++;
+                    document.getElementById(`assignment-${id}`)?.remove();
+                }
+            } catch {}
+        }
+        
+        if (successCount > 0) {
+            showToast(`${successCount} ödev silindi!`, 'success');
+            loadAssignments();
+        }
+    }
+
+    async function viewSubmissions(assignmentId) {
+        try {
+            const response = await fetch(`/api/assignments/${assignmentId}/submissions`);
+            const data = await response.json();
+            
+            if (!data.success) {
+                showToast('Hata: ' + data.error, 'error');
+                return;
+            }
+            
+            const stats = data.statistics;
+            const students = data.students;
+            
+            let message = `📊 ÖDEV TAKİP RAPORU\n`;
+            message += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+            message += `📚 ${data.assignment.title}\n`;
+            message += `🎯 Sınıf: ${data.assignment.target_class}\n`;
+            message += `📅 Son Teslim: ${new Date(data.assignment.due_date).toLocaleString('tr-TR')}\n\n`;
+            message += `✅ Teslim Eden: ${stats.submitted} öğrenci\n`;
+            message += `❌ Teslim Etmeyen: ${stats.not_submitted} öğrenci\n`;
+            message += `📊 Oran: %${stats.percentage}\n`;
+            message += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+            
+            message += `✅ TESLİM EDENLER:\n`;
+            students.filter(s => s.has_submitted).forEach(s => {
+                const submitTime = s.submitted_at ? new Date(s.submitted_at).toLocaleString('tr-TR') : 'Bilinmiyor';
+                message += `  • ${s.full_name} (${submitTime})\n`;
+            });
+            
+            message += `\n❌ TESLİM ETMEYENLER:\n`;
+            students.filter(s => !s.has_submitted).forEach(s => {
+                message += `  • ${s.full_name}\n`;
+            });
+            
+            alert(message);
+        } catch (error) {
+            showToast('Takip bilgisi alınamadı', 'error');
+        }
+    }
+
+    loadAssignments();
+</script>
+{% endblock %}

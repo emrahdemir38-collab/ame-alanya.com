@@ -1,0 +1,390 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Yazılı Örnekleri{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/admin-modern.css">
+<style>
+    .page-header {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        color: white;
+        padding: 30px;
+        border-radius: 16px;
+        margin-bottom: 24px;
+    }
+    .page-header h1 { font-size: 1.8rem; margin-bottom: 8px; }
+    .page-header p { opacity: 0.9; }
+    
+    .content-card {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        margin-bottom: 24px;
+    }
+    
+    .form-group { margin-bottom: 20px; }
+    .form-group label { display: block; font-weight: 600; margin-bottom: 8px; color: #374151; }
+    .form-control {
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid #e5e7eb;
+        border-radius: 10px;
+        font-size: 1rem;
+        transition: all 0.2s;
+    }
+    .form-control:focus {
+        outline: none;
+        border-color: #6366f1;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+    
+    .type-selector {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+    .type-option {
+        flex: 1;
+        padding: 20px;
+        border: 2px solid #e5e7eb;
+        border-radius: 12px;
+        cursor: pointer;
+        text-align: center;
+        transition: all 0.2s;
+    }
+    .type-option:hover { border-color: #6366f1; }
+    .type-option.selected {
+        border-color: #6366f1;
+        background: rgba(99, 102, 241, 0.05);
+    }
+    .type-option .icon { font-size: 2rem; margin-bottom: 8px; }
+    .type-option .title { font-weight: 600; color: #374151; }
+    
+    .class-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+        gap: 10px;
+    }
+    .class-checkbox {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .class-checkbox:hover { border-color: #6366f1; }
+    .class-checkbox input:checked + span { font-weight: 600; color: #6366f1; }
+    .class-checkbox input { width: 18px; height: 18px; }
+    
+    .btn-primary {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        color: white;
+        border: none;
+        padding: 14px 28px;
+        border-radius: 10px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4); }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    
+    .samples-list { margin-top: 24px; }
+    .sample-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        background: #f9fafb;
+        border-radius: 12px;
+        margin-bottom: 12px;
+        transition: all 0.2s;
+    }
+    .sample-item:hover { background: #f3f4f6; }
+    .sample-info { display: flex; align-items: center; gap: 16px; }
+    .sample-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+    }
+    .sample-icon.pdf { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+    .sample-icon.link { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+    .sample-details h4 { font-size: 1rem; margin-bottom: 4px; color: #1f2937; }
+    .sample-details p { font-size: 0.85rem; color: #6b7280; }
+    .sample-classes { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    .class-tag {
+        background: #e0e7ff;
+        color: #4f46e5;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    .sample-actions { display: flex; gap: 8px; }
+    .btn-icon {
+        width: 36px;
+        height: 36px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        transition: all 0.2s;
+    }
+    .btn-view { background: #dbeafe; color: #2563eb; }
+    .btn-view:hover { background: #bfdbfe; }
+    .btn-delete { background: #fee2e2; color: #dc2626; }
+    .btn-delete:hover { background: #fecaca; }
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #9ca3af;
+    }
+    .empty-state .icon { font-size: 4rem; margin-bottom: 16px; }
+    
+    .select-all-btn {
+        background: #f3f4f6;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        margin-bottom: 12px;
+    }
+    .select-all-btn:hover { background: #e5e7eb; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>📄 Yazılı Örnekleri</h1>
+    <p>Öğrencilerinizle yazılı örneklerini paylaşın</p>
+</div>
+
+<div class="content-card">
+    <h3 style="margin-bottom: 20px; color: #1f2937;">Yeni Yazılı Örneği Ekle</h3>
+    
+    <form id="sampleForm" enctype="multipart/form-data">
+        <div class="form-group">
+            <label>Başlık</label>
+            <input type="text" class="form-control" id="sampleTitle" placeholder="Örn: 8. Sınıf 1. Dönem 1. Yazılı" required>
+        </div>
+        
+        <div class="form-group">
+            <label>Açıklama (opsiyonel)</label>
+            <textarea class="form-control" id="sampleDescription" rows="2" placeholder="Yazılı hakkında kısa açıklama..."></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label>Tür Seçin</label>
+            <div class="type-selector">
+                <div class="type-option selected" data-type="pdf" onclick="selectType('pdf')">
+                    <div class="icon">📁</div>
+                    <div class="title">PDF Yükle</div>
+                </div>
+                <div class="type-option" data-type="link" onclick="selectType('link')">
+                    <div class="icon">🔗</div>
+                    <div class="title">Link Ekle</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-group" id="pdfSection">
+            <label>PDF Dosyası</label>
+            <input type="file" class="form-control" id="pdfFile" accept=".pdf">
+        </div>
+        
+        <div class="form-group" id="linkSection" style="display: none;">
+            <label>Bağlantı URL</label>
+            <input type="url" class="form-control" id="linkUrl" placeholder="https://...">
+        </div>
+        
+        <div class="form-group">
+            <label>Hedef Sınıflar</label>
+            <button type="button" class="select-all-btn" onclick="toggleAllClasses()">Tümünü Seç/Kaldır</button>
+            <div class="class-grid" id="classGrid"></div>
+        </div>
+        
+        <button type="submit" class="btn-primary" id="submitBtn">Yazılı Örneğini Ekle</button>
+    </form>
+</div>
+
+<div class="content-card">
+    <h3 style="margin-bottom: 20px; color: #1f2937;">Yüklenen Yazılı Örnekleri</h3>
+    <div class="samples-list" id="samplesList">
+        <div class="empty-state">
+            <div class="icon">📄</div>
+            <p>Henüz yazılı örneği yüklenmedi</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let selectedType = 'pdf';
+const classes = ['5A', '5B', '5C', '5D', '5E', '6A', '6B', '6C', '6D', '6E', '7A', '7B', '7C', '7D', '7E', '8A', '8B', '8C', '8D', '8E'];
+
+function selectType(type) {
+    selectedType = type;
+    document.querySelectorAll('.type-option').forEach(opt => {
+        opt.classList.toggle('selected', opt.dataset.type === type);
+    });
+    document.getElementById('pdfSection').style.display = type === 'pdf' ? 'block' : 'none';
+    document.getElementById('linkSection').style.display = type === 'link' ? 'block' : 'none';
+}
+
+function renderClassGrid() {
+    const grid = document.getElementById('classGrid');
+    grid.innerHTML = classes.map(cls => `
+        <label class="class-checkbox">
+            <input type="checkbox" name="target_classes" value="${cls}">
+            <span>${cls}</span>
+        </label>
+    `).join('');
+}
+
+function toggleAllClasses() {
+    const checkboxes = document.querySelectorAll('#classGrid input[type="checkbox"]');
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    checkboxes.forEach(cb => cb.checked = !allChecked);
+}
+
+async function loadSamples() {
+    try {
+        const res = await fetch('/api/teacher/exam-samples');
+        const samples = await res.json();
+        
+        const container = document.getElementById('samplesList');
+        
+        if (samples.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="icon">📄</div>
+                    <p>Henüz yazılı örneği yüklenmedi</p>
+                </div>
+            `;
+            return;
+        }
+        
+        container.innerHTML = samples.map(s => {
+            const targetClasses = typeof s.target_classes === 'string' ? JSON.parse(s.target_classes) : s.target_classes;
+            const date = new Date(s.created_at).toLocaleDateString('tr-TR');
+            
+            return `
+                <div class="sample-item">
+                    <div class="sample-info">
+                        <div class="sample-icon ${s.sample_type}">${s.sample_type === 'pdf' ? '📁' : '🔗'}</div>
+                        <div class="sample-details">
+                            <h4>${s.title}</h4>
+                            <p>${s.description || 'Açıklama yok'} • ${date}</p>
+                            <div class="sample-classes">
+                                ${targetClasses.map(c => `<span class="class-tag">${c}</span>`).join('')}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="sample-actions">
+                        ${s.sample_type === 'pdf' 
+                            ? `<button class="btn-icon btn-view" onclick="window.open('${s.file_path}', '_blank')" title="Görüntüle">👁️</button>`
+                            : `<button class="btn-icon btn-view" onclick="window.open('${s.link_url}', '_blank')" title="Linke Git">🔗</button>`
+                        }
+                        <button class="btn-icon btn-delete" onclick="deleteSample(${s.id})" title="Sil">🗑️</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch (err) {
+        console.error('Samples loading error:', err);
+    }
+}
+
+async function deleteSample(id) {
+    if (!confirm('Bu yazılı örneğini silmek istediğinizden emin misiniz?')) return;
+    
+    try {
+        const res = await fetch(`/api/teacher/exam-samples/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        
+        if (data.success) {
+            loadSamples();
+        } else {
+            alert(data.error || 'Silme hatası');
+        }
+    } catch (err) {
+        alert('Bağlantı hatası');
+    }
+}
+
+document.getElementById('sampleForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Yükleniyor...';
+    
+    const formData = new FormData();
+    formData.append('title', document.getElementById('sampleTitle').value);
+    formData.append('description', document.getElementById('sampleDescription').value);
+    formData.append('sample_type', selectedType);
+    
+    if (selectedType === 'pdf') {
+        const file = document.getElementById('pdfFile').files[0];
+        if (!file) {
+            alert('Lütfen bir PDF dosyası seçin');
+            btn.disabled = false;
+            btn.textContent = 'Yazılı Örneğini Ekle';
+            return;
+        }
+        formData.append('file', file);
+    } else {
+        formData.append('link_url', document.getElementById('linkUrl').value);
+    }
+    
+    const selectedClasses = Array.from(document.querySelectorAll('#classGrid input:checked')).map(cb => cb.value);
+    if (selectedClasses.length === 0) {
+        alert('Lütfen en az bir sınıf seçin');
+        btn.disabled = false;
+        btn.textContent = 'Yazılı Örneğini Ekle';
+        return;
+    }
+    selectedClasses.forEach(cls => formData.append('target_classes', cls));
+    
+    try {
+        const res = await fetch('/api/teacher/exam-samples', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+            document.getElementById('sampleForm').reset();
+            document.querySelectorAll('#classGrid input').forEach(cb => cb.checked = false);
+            selectType('pdf');
+            loadSamples();
+        } else {
+            alert(data.error || 'Ekleme hatası');
+        }
+    } catch (err) {
+        alert('Bağlantı hatası');
+    }
+    
+    btn.disabled = false;
+    btn.textContent = 'Yazılı Örneğini Ekle';
+});
+
+renderClassGrid();
+loadSamples();
+</script>
+{% endblock %}

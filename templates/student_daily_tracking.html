@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Günlük Çalışma Takibi - AMEO</title>
+    <link rel="stylesheet" href="/static/css/admin-modern.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: var(--font-family), 'Segoe UI', sans-serif;
+            background: var(--gray-50);
+        }
+        .header {
+            background: var(--gradient-forest);
+            color: white;
+            padding: 20px 24px;
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 { font-size: 1.6em; font-weight: 700; }
+        .btn-back {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.4);
+            padding: 10px 22px;
+            border-radius: var(--radius-lg);
+            cursor: pointer;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all var(--transition-fast);
+        }
+        .btn-back:hover { background: rgba(255,255,255,0.3); transform: translateY(-1px); }
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 24px;
+        }
+        
+        .date-selector {
+            background: white;
+            border-radius: var(--radius-xl);
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--gray-100);
+        }
+        .date-selector h3 { margin-bottom: 16px; color: var(--gray-800); font-weight: 700; }
+        .date-controls {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .date-input {
+            padding: 12px 16px;
+            border: 2px solid var(--gray-200);
+            border-radius: var(--radius-lg);
+            font-size: 1em;
+            transition: all var(--transition-fast);
+        }
+        .date-input:focus {
+            outline: none;
+            border-color: var(--primary-500);
+            box-shadow: 0 0 0 3px var(--primary-100);
+        }
+        .btn {
+            background: var(--gradient-success);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: var(--radius-lg);
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all var(--transition-fast);
+            box-shadow: var(--shadow-success);
+        }
+        .btn:hover { transform: translateY(-2px); }
+        .btn-secondary {
+            background: var(--gray-500);
+            box-shadow: none;
+        }
+        .btn-secondary:hover { background: var(--gray-600); }
+        .week-info {
+            color: var(--gray-500);
+            font-size: 0.9em;
+            margin-top: 12px;
+        }
+        
+        .week-table {
+            background: white;
+            border-radius: var(--radius-xl);
+            padding: 24px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--gray-100);
+            overflow-x: auto;
+        }
+        .week-table h3 { margin-bottom: 20px; color: var(--gray-800); font-weight: 700; }
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        th, td {
+            padding: 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--gray-100);
+        }
+        th {
+            background: var(--gray-50);
+            font-weight: 700;
+            color: var(--gray-700);
+            text-transform: uppercase;
+            font-size: 0.85em;
+            letter-spacing: 0.03em;
+        }
+        tr:hover td { background: var(--gray-50); }
+        .day-cell {
+            font-weight: 700;
+            color: var(--success-600);
+        }
+        .date-cell {
+            color: var(--gray-500);
+            font-size: 0.9em;
+        }
+        .entry-row {
+            background: var(--gray-50);
+            margin-bottom: 10px;
+        }
+        .entry-controls {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        .entry-input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 0.95em;
+            flex: 1;
+            min-width: 150px;
+        }
+        .entry-textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 0.95em;
+            min-height: 80px;
+            font-family: inherit;
+        }
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 0.9em;
+        }
+        .btn-delete {
+            background: #ef4444;
+        }
+        .btn-delete:hover { background: #dc2626; }
+        
+        .existing-entries {
+            margin-top: 15px;
+        }
+        .entry-card {
+            background: #d1fae5;
+            border: 1px solid #10b981;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 8px;
+        }
+        .entry-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .entry-subject {
+            font-weight: 600;
+            color: #059669;
+        }
+        .entry-note {
+            color: #333;
+            font-size: 0.9em;
+        }
+        
+        .alert {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #10b981;
+        }
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #ef4444;
+        }
+        
+        @media (max-width: 768px) {
+            .container { padding: 0 10px; }
+            .header h1 { font-size: 1.4em; }
+            .date-controls { flex-direction: column; width: 100%; }
+            .date-input, .btn { width: 100%; }
+            table { font-size: 0.9em; }
+            th, td { padding: 10px; }
+            .entry-controls { flex-direction: column; }
+            .entry-input { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="/student/dashboard" class="btn-back">← Geri Dön</a>
+        <h1>📊 Günlük Çalışma Takibi</h1>
+    </div>
+
+    <div class="container">
+        <div id="alertBox"></div>
+        
+        <div class="date-selector">
+            <h3>📅 Hafta Seç</h3>
+            <div class="date-controls">
+                <input type="date" id="selectedDate" class="date-input">
+                <button onclick="loadWeek()" class="btn">Haftayı Yükle</button>
+                <button onclick="loadCurrentWeek()" class="btn btn-secondary">Bu Hafta</button>
+            </div>
+            <div class="week-info" id="weekInfo"></div>
+        </div>
+        
+        <div class="week-table">
+            <h3>Haftalık Çalışma Programı</h3>
+            <table id="weekTable">
+                <thead>
+                    <tr>
+                        <th>Gün</th>
+                        <th>Tarih</th>
+                        <th>Çalışmalar</th>
+                    </tr>
+                </thead>
+                <tbody id="weekTableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const daysOfWeek = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+        let currentWeekStart = null;
+        let currentWeekEnd = null;
+        let weekRecords = {};
+        let subjects = [];
+
+        async function loadSubjects() {
+            try {
+                const res = await fetch('/api/daily-tracking/subjects');
+                const data = await res.json();
+                if (data.success) {
+                    subjects = data.subjects;
+                }
+            } catch (error) {
+                console.error('Dersler yüklenemedi:', error);
+            }
+        }
+
+        function showAlert(message, type = 'success') {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => { alertBox.innerHTML = ''; }, 3000);
+        }
+
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}.${month}.${year}`;
+        }
+
+        function getWeekBounds(dateStr) {
+            const date = new Date(dateStr);
+            const day = date.getDay();
+            const diff = day === 0 ? -6 : 1 - day;
+            const monday = new Date(date);
+            monday.setDate(date.getDate() + diff);
+            
+            const sunday = new Date(monday);
+            sunday.setDate(monday.getDate() + 6);
+            
+            return {
+                start: monday.toISOString().split('T')[0],
+                end: sunday.toISOString().split('T')[0]
+            };
+        }
+
+        function loadCurrentWeek() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('selectedDate').value = today;
+            loadWeek();
+        }
+
+        async function loadWeek() {
+            const selectedDate = document.getElementById('selectedDate').value;
+            if (!selectedDate) {
+                showAlert('Lütfen bir tarih seçin', 'error');
+                return;
+            }
+            
+            const bounds = getWeekBounds(selectedDate);
+            currentWeekStart = bounds.start;
+            currentWeekEnd = bounds.end;
+            
+            document.getElementById('weekInfo').textContent = 
+                `Seçili hafta: ${formatDate(currentWeekStart)} - ${formatDate(currentWeekEnd)}`;
+            
+            try {
+                const res = await fetch(`/api/daily-tracking/student/week?date=${selectedDate}`);
+                const data = await res.json();
+                
+                if (data.success) {
+                    weekRecords = {};
+                    data.records.forEach(record => {
+                        const key = `${record.date}_${record.subject}`;
+                        weekRecords[key] = record;
+                    });
+                    
+                    renderWeekTable();
+                } else {
+                    showAlert(data.error || 'Veriler yüklenemedi', 'error');
+                }
+            } catch (error) {
+                console.error('Hafta yükleme hatası:', error);
+                showAlert('Bir hata oluştu', 'error');
+            }
+        }
+
+        function renderWeekTable() {
+            const tbody = document.getElementById('weekTableBody');
+            tbody.innerHTML = '';
+            
+            for (let i = 0; i < 7; i++) {
+                const date = new Date(currentWeekStart);
+                date.setDate(date.getDate() + i);
+                const dateStr = date.toISOString().split('T')[0];
+                const dayName = daysOfWeek[i];
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="day-cell">${dayName}</td>
+                    <td class="date-cell">${formatDate(dateStr)}</td>
+                    <td id="entries-${i}"></td>
+                `;
+                tbody.appendChild(row);
+                
+                renderDayEntries(i, dateStr, dayName);
+            }
+        }
+
+        function renderDayEntries(dayIndex, dateStr, dayName) {
+            const container = document.getElementById(`entries-${dayIndex}`);
+            
+            const existingEntries = Object.values(weekRecords).filter(r => r.date === dateStr);
+            
+            let html = '<div class="existing-entries">';
+            existingEntries.forEach(entry => {
+                html += `
+                    <div class="entry-card">
+                        <div class="entry-header">
+                            <span class="entry-subject">${entry.subject}</span>
+                            <button onclick="deleteEntry(${entry.id})" class="btn btn-delete btn-small">Sil</button>
+                        </div>
+                        <div class="entry-note">${entry.note}</div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            html += `
+                <div class="entry-controls">
+                    <select id="subject-${dayIndex}" class="entry-input">
+                        <option value="">Ders seç...</option>
+                        ${subjects.map(s => `<option value="${s}">${s}</option>`).join('')}
+                    </select>
+                </div>
+                <textarea id="note-${dayIndex}" class="entry-textarea" placeholder="Çalışma notunu yaz... (örn: 30 soru çözdüm)"></textarea>
+                <button onclick="saveEntry('${dateStr}', '${dayName}', ${dayIndex})" class="btn btn-small">Kaydet</button>
+            `;
+            
+            container.innerHTML = html;
+        }
+
+        async function saveEntry(dateStr, dayName, dayIndex) {
+            const subject = document.getElementById(`subject-${dayIndex}`).value;
+            const note = document.getElementById(`note-${dayIndex}`).value.trim();
+            
+            if (!subject) {
+                showAlert('Lütfen ders seçin', 'error');
+                return;
+            }
+            
+            if (!note) {
+                showAlert('Lütfen not girin', 'error');
+                return;
+            }
+            
+            try {
+                const res = await fetch('/api/daily-tracking/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        date: dateStr,
+                        day_of_week: dayName,
+                        subject: subject,
+                        note: note
+                    })
+                });
+                
+                const data = await res.json();
+                
+                if (data.success) {
+                    showAlert(data.message);
+                    document.getElementById(`note-${dayIndex}`).value = '';
+                    document.getElementById(`subject-${dayIndex}`).value = '';
+                    loadWeek();
+                } else {
+                    showAlert(data.error || 'Kaydetme başarısız', 'error');
+                }
+            } catch (error) {
+                console.error('Kaydetme hatası:', error);
+                showAlert('Bir hata oluştu', 'error');
+            }
+        }
+
+        async function deleteEntry(entryId) {
+            if (!confirm('Bu kaydı silmek istediğinizden emin misiniz?')) {
+                return;
+            }
+            
+            try {
+                const res = await fetch(`/api/daily-tracking/${entryId}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await res.json();
+                
+                if (data.success) {
+                    showAlert('Kayıt silindi');
+                    loadWeek();
+                } else {
+                    showAlert(data.error || 'Silme başarısız', 'error');
+                }
+            } catch (error) {
+                console.error('Silme hatası:', error);
+                showAlert('Bir hata oluştu', 'error');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadSubjects();
+            loadCurrentWeek();
+        });
+    </script>
+</body>
+</html>

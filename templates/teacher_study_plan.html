@@ -1,0 +1,321 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Ders Çalışma Programı{% endblock %}
+
+{% block content %}
+<nav class="breadcrumb-nav">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/teacher/dashboard">Ana Sayfa</a></li>
+        <li class="breadcrumb-item active">Ders Çalışma Programı</li>
+    </ol>
+</nav>
+
+<style>
+    .plan-container { max-width: 1200px; margin: 0 auto; }
+    .card { background: white; border-radius: 12px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 20px; }
+    .card-title { font-size: 1.3em; font-weight: 600; color: #1f2937; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+    .form-group { margin-bottom: 20px; }
+    .form-label { display: block; margin-bottom: 8px; color: #374151; font-weight: 500; }
+    .form-input, .form-select { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 1em; transition: border-color 0.2s; }
+    .form-input:focus, .form-select:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 768px) { .form-row { grid-template-columns: 1fr; } }
+    
+    .file-upload-area { border: 2px dashed #d1d5db; border-radius: 10px; padding: 40px; text-align: center; cursor: pointer; transition: all 0.3s; background: #f9fafb; }
+    .file-upload-area:hover { border-color: #667eea; background: #f0f4ff; }
+    .file-upload-area.has-file { border-color: #10b981; background: #f0fdf4; }
+    .file-upload-icon { font-size: 3em; margin-bottom: 10px; }
+    .file-upload-text { color: #6b7280; }
+    .file-name { color: #10b981; font-weight: 600; margin-top: 10px; }
+    
+    .student-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; max-height: 300px; overflow-y: auto; padding: 10px; background: #f9fafb; border-radius: 8px; }
+    .student-card { background: white; padding: 12px; border-radius: 8px; border: 2px solid transparent; cursor: pointer; transition: all 0.2s; text-align: center; }
+    .student-card:hover { border-color: #667eea; transform: translateY(-2px); }
+    .student-card.selected { border-color: #10b981; background: #f0fdf4; }
+    .student-name { font-weight: 500; color: #1f2937; font-size: 0.95em; }
+    
+    .btn { padding: 12px 24px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
+    .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4); }
+    .btn-danger { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; }
+    .btn-danger:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4); }
+    .btn-sm { padding: 8px 16px; font-size: 0.9em; }
+    
+    .plan-list { display: flex; flex-direction: column; gap: 15px; }
+    .plan-item { background: #f9fafb; border-radius: 10px; padding: 20px; border-left: 4px solid #667eea; }
+    .plan-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+    .plan-title { font-weight: 600; color: #1f2937; font-size: 1.1em; }
+    .plan-date { color: #6b7280; font-size: 0.85em; }
+    .plan-target { display: inline-block; background: #e0e7ff; color: #4338ca; padding: 4px 12px; border-radius: 20px; font-size: 0.85em; margin-top: 8px; }
+    .plan-actions { display: flex; gap: 10px; }
+    
+    .toggle-all-btn { background: #e5e7eb; color: #374151; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; }
+    .toggle-all-btn:hover { background: #d1d5db; }
+    
+    .empty-state { text-align: center; padding: 40px; color: #9ca3af; }
+    .empty-state-icon { font-size: 3em; margin-bottom: 15px; }
+    
+    .selection-info { background: #fef3c7; border-radius: 8px; padding: 12px 16px; margin-bottom: 15px; color: #92400e; font-size: 0.9em; }
+</style>
+
+<div class="plan-container">
+    <div class="card">
+        <h2 class="card-title">📤 Yeni Çalışma Programı Yükle</h2>
+        
+        <form id="uploadForm">
+            <div class="form-group">
+                <label class="form-label">Başlık *</label>
+                <input type="text" id="planTitle" class="form-input" placeholder="Örn: Haftalık Matematik Çalışma Programı" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">📋 Hedef Sınıflar * (Birden fazla seçebilirsiniz)</label>
+                <div id="classCheckboxContainer" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 10px; padding: 15px; background: #f0fdf4; border-radius: 10px; border: 2px solid #10b981;">
+                </div>
+                <div style="margin-top: 12px; display: flex; gap: 10px;">
+                    <button type="button" class="toggle-all-btn" onclick="selectAllClasses()">✅ Tümünü Seç</button>
+                    <button type="button" class="toggle-all-btn" onclick="deselectAllClasses()">❌ Tümünü Kaldır</button>
+                    <span id="selectedClassCount" style="padding: 8px 16px; background: #dbeafe; color: #1e40af; border-radius: 6px; font-weight: 600;">0 sınıf seçili</span>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">PDF Dosyası *</label>
+                <div class="file-upload-area" id="fileUploadArea" onclick="document.getElementById('pdfFile').click()">
+                    <div class="file-upload-icon">📄</div>
+                    <div class="file-upload-text">PDF dosyasını buraya sürükleyin veya tıklayın</div>
+                    <div class="file-name" id="fileName" style="display: none;"></div>
+                </div>
+                <input type="file" id="pdfFile" accept=".pdf" style="display: none;" onchange="onFileSelect(this)">
+            </div>
+            
+            <button type="submit" class="btn btn-primary">📤 Programı Yükle</button>
+        </form>
+    </div>
+    
+    <div class="card">
+        <h2 class="card-title">📋 Yüklenen Çalışma Programları</h2>
+        
+        <div id="planList" class="plan-list">
+            <div class="empty-state">
+                <div class="empty-state-icon">📭</div>
+                <p>Henüz çalışma programı yüklenmemiş</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let selectedClasses = new Set();
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadClasses();
+    loadPlans();
+    setupDragDrop();
+});
+
+function loadClasses() {
+    const container = document.getElementById('classCheckboxContainer');
+    const allClasses = ['5A','5B','5C','5D','5E','6A','6B','6C','6D','6E','7A','7B','7C','7D','7E','8A','8B','8C','8D','8E'];
+    
+    container.innerHTML = allClasses.map(cls => `
+        <label style="display: flex; align-items: center; cursor: pointer; padding: 10px 14px; background: white; border-radius: 8px; border: 2px solid #e5e7eb; transition: all 0.2s;">
+            <input type="checkbox" value="${cls}" onchange="updateClassCount()" style="margin-right: 10px; width: 20px; height: 20px; cursor: pointer; accent-color: #10b981;">
+            <span style="font-weight: 600; font-size: 1.1em;">${cls}</span>
+        </label>
+    `).join('');
+}
+
+function selectAllClasses() {
+    document.querySelectorAll('#classCheckboxContainer input[type="checkbox"]').forEach(cb => cb.checked = true);
+    updateClassCount();
+}
+
+function deselectAllClasses() {
+    document.querySelectorAll('#classCheckboxContainer input[type="checkbox"]').forEach(cb => cb.checked = false);
+    updateClassCount();
+}
+
+function updateClassCount() {
+    const checked = document.querySelectorAll('#classCheckboxContainer input[type="checkbox"]:checked');
+    document.getElementById('selectedClassCount').textContent = `${checked.length} sınıf seçili`;
+}
+
+function getSelectedClasses() {
+    const checked = document.querySelectorAll('#classCheckboxContainer input[type="checkbox"]:checked');
+    return Array.from(checked).map(cb => cb.value);
+}
+
+function onFileSelect(input) {
+    const file = input.files[0];
+    const area = document.getElementById('fileUploadArea');
+    const nameEl = document.getElementById('fileName');
+    
+    if (file) {
+        area.classList.add('has-file');
+        nameEl.textContent = file.name;
+        nameEl.style.display = 'block';
+    } else {
+        area.classList.remove('has-file');
+        nameEl.style.display = 'none';
+    }
+}
+
+function setupDragDrop() {
+    const area = document.getElementById('fileUploadArea');
+    
+    area.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        area.style.borderColor = '#667eea';
+        area.style.background = '#f0f4ff';
+    });
+    
+    area.addEventListener('dragleave', () => {
+        if (!document.getElementById('pdfFile').files[0]) {
+            area.style.borderColor = '#d1d5db';
+            area.style.background = '#f9fafb';
+        }
+    });
+    
+    area.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const file = e.dataTransfer.files[0];
+        if (file && file.type === 'application/pdf') {
+            const input = document.getElementById('pdfFile');
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            input.files = dt.files;
+            onFileSelect(input);
+        } else {
+            alert('Sadece PDF dosyası yükleyebilirsiniz');
+        }
+    });
+}
+
+document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const title = document.getElementById('planTitle').value.trim();
+    const selectedClassList = getSelectedClasses();
+    const file = document.getElementById('pdfFile').files[0];
+    
+    if (!title) {
+        alert('Lütfen başlık girin');
+        return;
+    }
+    
+    if (selectedClassList.length === 0) {
+        alert('Lütfen en az bir sınıf seçin');
+        return;
+    }
+    
+    if (!file) {
+        alert('Lütfen PDF dosyası seçin');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('title', title);
+    formData.append('target_type', 'class');
+    formData.append('target_classes', JSON.stringify(selectedClassList));
+    formData.append('file', file);
+    
+    try {
+        const res = await fetch('/api/study-plan-pdf/upload', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await res.json();
+        
+        if (res.ok) {
+            alert(`Çalışma programı ${selectedClassList.length} sınıfa yüklendi!`);
+            document.getElementById('uploadForm').reset();
+            document.getElementById('fileUploadArea').classList.remove('has-file');
+            document.getElementById('fileName').style.display = 'none';
+            deselectAllClasses();
+            loadPlans();
+        } else {
+            alert(result.error || 'Yükleme hatası');
+        }
+    } catch (error) {
+        console.error('Yükleme hatası:', error);
+        alert('Yükleme sırasında hata oluştu');
+    }
+});
+
+async function loadPlans() {
+    try {
+        const res = await fetch('/api/study-plan-pdf/list');
+        const plans = await res.json();
+        
+        const container = document.getElementById('planList');
+        
+        if (plans.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📭</div>
+                    <p>Henüz çalışma programı yüklenmemiş</p>
+                </div>
+            `;
+            return;
+        }
+        
+        container.innerHTML = '';
+        plans.forEach(plan => {
+            const date = new Date(plan.created_at).toLocaleString('tr-TR');
+            const targetText = plan.target_type === 'class' 
+                ? `Sınıf: ${plan.target_class}` 
+                : `${plan.student_count || 0} Öğrenci`;
+            
+            container.innerHTML += `
+                <div class="plan-item" id="plan-${plan.id}">
+                    <div class="plan-header">
+                        <div>
+                            <div class="plan-title">${plan.title}</div>
+                            <div class="plan-date">${date}</div>
+                            <span class="plan-target">${targetText}</span>
+                        </div>
+                        <div class="plan-actions">
+                            <button class="btn btn-primary btn-sm" onclick="viewPlan('${plan.file_path}')">👁️ Görüntüle</button>
+                            <button class="btn btn-danger btn-sm" onclick="deletePlan(${plan.id})">🗑️ Sil</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+    } catch (error) {
+        console.error('Planlar yüklenemedi:', error);
+    }
+}
+
+function viewPlan(filePath) {
+    // /storage/ prefix'ini kaldır
+    const cleanPath = filePath.replace(/^\/storage\//, '').replace(/^\//, '');
+    window.open(`/view-file/${cleanPath}`, '_blank');
+}
+
+async function deletePlan(planId) {
+    if (!confirm('Bu çalışma programını silmek istediğinize emin misiniz?')) {
+        return;
+    }
+    
+    try {
+        const res = await fetch(`/api/study-plan-pdf/${planId}`, {
+            method: 'DELETE'
+        });
+        
+        if (res.ok) {
+            alert('Çalışma programı silindi');
+            loadPlans();
+        } else {
+            const result = await res.json();
+            alert(result.error || 'Silme hatası');
+        }
+    } catch (error) {
+        console.error('Silme hatası:', error);
+        alert('Silme sırasında hata oluştu');
+    }
+}
+</script>
+{% endblock %}

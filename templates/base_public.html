@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AMEO LMS{% endblock %}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .public-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 40px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .public-header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .public-logo {
+            font-size: 1.5em;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .public-nav {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        
+        .btn-dashboard {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid white;
+            padding: 10px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            color: white;
+            text-decoration: none;
+            display: inline-block;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .btn-dashboard:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        
+        main {
+            flex: 1;
+            width: 100%;
+        }
+        
+        .public-footer {
+            background: #1f2937;
+            color: white;
+            padding: 20px 40px;
+            text-align: center;
+            margin-top: auto;
+        }
+        
+        .public-footer p {
+            color: #9ca3af;
+            font-size: 0.9em;
+        }
+        
+        @media (max-width: 768px) {
+            .public-header {
+                padding: 15px 20px;
+            }
+            
+            .public-header-content {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .public-nav {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <header class="public-header">
+        <div class="public-header-content">
+            <div class="public-logo">
+                🎓 AMEO LMS
+            </div>
+            <nav class="public-nav">
+                <a href="/dashboard" class="btn-dashboard">← Panele Dön</a>
+            </nav>
+        </div>
+    </header>
+    
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+    
+    <footer class="public-footer">
+        <p>&copy; 2025 AMEO LMS. Tüm hakları saklıdır.</p>
+    </footer>
+</body>
+</html>

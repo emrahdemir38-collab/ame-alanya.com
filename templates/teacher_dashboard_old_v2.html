@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Öğretmen Dashboard - AMEO</title>
+    <link rel="stylesheet" href="/static/css/sidebar.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+        }
+        .page-header {
+            background: white;
+            padding: 25px 30px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            margin-bottom: 30px;
+        }
+        .page-header h1 {
+            font-size: 1.8em;
+            color: #1f2937;
+            margin-bottom: 5px;
+        }
+        .page-header p {
+            color: #6b7280;
+            font-size: 0.95em;
+        }
+        .dashboard-content {
+            padding: 20px 30px;
+        }
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        .menu-card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+            color: white;
+        }
+        .menu-card:hover { 
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+        }
+        .card--exams { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+        .card--assignments { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .card--announcements { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        .card--questions { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+        .card--practice { background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); }
+        .card--analysis { background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); }
+        .card--study-plan { background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); }
+        .card--tracking { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); }
+        .menu-card .icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+        .menu-card h3 {
+            margin-bottom: 10px;
+        }
+        .menu-card p {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        .badge {
+            display: none;
+            background: #ef4444;
+            color: white;
+            font-size: 0.75em;
+            padding: 4px 10px;
+            border-radius: 12px;
+            margin-left: 8px;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body class="sidebar-layout">
+    <div class="main-content">
+        <div class="page-header">
+            <h1>👨‍🏫 Öğretmen Dashboard</h1>
+            <p>Öğrenci yönetimi ve ders materyalleri</p>
+        </div>
+
+        <div class="dashboard-content">
+            <h2 style="margin-bottom: 20px; color: #374151;">Hızlı Erişim</h2>
+            <div class="menu-grid">
+                <div class="menu-card card--exams" onclick="window.location.href='/teacher/exams'">
+                    <div class="icon">📝</div>
+                    <h3>Sınavlarım</h3>
+                    <p>Sınav oluştur ve değerlendir</p>
+                </div>
+                
+                <div class="menu-card card--assignments" onclick="window.location.href='/teacher/assignments'">
+                    <div class="icon">📚</div>
+                    <h3>Ödevlerim</h3>
+                    <p>Ödev ver ve teslim alınları kontrol et</p>
+                </div>
+                
+                <div class="menu-card card--announcements" onclick="window.location.href='/teacher/announcements'">
+                    <div class="icon">📢</div>
+                    <h3>Duyurular</h3>
+                    <p>Öğrencilere duyuru yayınla</p>
+                </div>
+                
+                <div class="menu-card card--questions" onclick="window.location.href='/teacher/questions'">
+                    <div class="icon">💬</div>
+                    <h3>Öğrenci Soruları</h3>
+                    <p>Öğrencilerin sorularını cevapla</p>
+                </div>
+                
+                <div class="menu-card card--practice" onclick="window.location.href='/teacher/practice-exams'">
+                    <div class="icon">📈</div>
+                    <h3>Deneme Takip</h3>
+                    <p>LGS deneme sınavlarını takip et</p>
+                </div>
+                
+                <div class="menu-card card--study-plan" onclick="window.location.href='/teacher/lesson-schedule'">
+                    <div class="icon">🗓️</div>
+                    <h3>Ders Programı</h3>
+                    <p>Öğrencilerin ders programlarını yönet</p>
+                </div>
+                
+                <div class="menu-card card--analysis" onclick="window.location.href='/teacher/question-asks'">
+                    <div class="icon">🔍</div>
+                    <h3>Soru Analizi <span id="pendingBadge" class="badge"></span></h3>
+                    <p>Deneme soruları hakkında sorular</p>
+                </div>
+                
+                <div class="menu-card card--tracking" onclick="window.location.href='/teacher/daily-tracking'">
+                    <div class="icon">📊</div>
+                    <h3>Günlük Takip</h3>
+                    <p>Öğrencilerin haftalık çalışma kayıtları</p>
+                </div>
+                
+                <div class="menu-card card--exams" onclick="window.location.href='/teacher/exam-calendar'">
+                    <div class="icon">📅</div>
+                    <h3>Deneme Sınavı Takvimi</h3>
+                    <p>Deneme sınav tarihlerini gör</p>
+                </div>
+                
+                <div class="menu-card card--practice" onclick="window.location.href='/teacher/study-plan'">
+                    <div class="icon">📚</div>
+                    <h3>Ders Çalışma Planı</h3>
+                    <p>Öğrencilere günlük ders planı oluştur</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/sidebar.js"></script>
+    <script>
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/current-user');
+                const data = await response.json();
+                
+                if (!data.authenticated || data.user.role !== 'teacher') {
+                    window.location.href = '/ameo_kullanıcı_giriş';
+                    return;
+                }
+            } catch (error) {
+                window.location.href = '/ameo_kullanıcı_giriş';
+            }
+        }
+        
+        async function loadPendingCount() {
+            try {
+                const response = await fetch('/api/question-asks/teacher/me?status=pending');
+                
+                if (!response.ok) {
+                    console.warn('Badge API failed:', response.status);
+                    return;
+                }
+                
+                const data = await response.json();
+                const count = data.questions?.length || 0;
+                
+                if (count > 0) {
+                    const badge = document.getElementById('pendingBadge');
+                    badge.textContent = count;
+                    badge.style.display = 'inline-block';
+                }
+            } catch (error) {
+                console.error('Pending count yüklenemedi:', error);
+            }
+        }
+        
+        checkAuth();
+        loadPendingCount();
+    </script>
+</body>
+</html>

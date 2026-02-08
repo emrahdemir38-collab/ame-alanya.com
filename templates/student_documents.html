@@ -1,0 +1,650 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Dokümanlar{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/admin-modern.css">
+<style>
+    .page-header {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        color: white;
+        padding: 30px;
+        border-radius: 16px;
+        margin-bottom: 24px;
+    }
+    .page-header h1 { font-size: 1.8rem; margin-bottom: 8px; }
+    .page-header p { opacity: 0.9; }
+    
+    .categories-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+    
+    .category-card {
+        background: white;
+        border-radius: 16px;
+        padding: 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s;
+        border: 3px solid transparent;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    }
+    .category-card:hover { transform: translateY(-4px); box-shadow: 0 8px 25px rgba(0,0,0,0.12); }
+    .category-card.active { border-color: #6366f1; background: linear-gradient(135deg, rgba(99,102,241,0.1), rgba(139,92,246,0.1)); }
+    .category-icon { font-size: 2.5rem; margin-bottom: 10px; }
+    .category-name { font-weight: 700; color: #1f2937; margin-bottom: 4px; font-size: 0.95rem; }
+    .category-count { font-size: 0.85rem; color: #6b7280; }
+    
+    .content-card {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    }
+    
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    .section-title { font-size: 1.3rem; font-weight: 700; color: #1f2937; }
+    
+    .filters-bar {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+    .filter-select {
+        padding: 10px 16px;
+        border: 2px solid #e5e7eb;
+        border-radius: 10px;
+        font-size: 0.9rem;
+        min-width: 140px;
+    }
+    .filter-select:focus { outline: none; border-color: #6366f1; }
+    .search-input {
+        flex: 1;
+        min-width: 200px;
+        padding: 10px 16px;
+        border: 2px solid #e5e7eb;
+        border-radius: 10px;
+        font-size: 0.9rem;
+    }
+    .search-input:focus { outline: none; border-color: #6366f1; }
+    
+    .documents-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+    }
+    
+    .document-card {
+        background: #f9fafb;
+        border-radius: 16px;
+        padding: 20px;
+        transition: all 0.3s;
+        border: 2px solid transparent;
+    }
+    .document-card:hover { 
+        transform: translateY(-4px); 
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1); 
+        border-color: #6366f1;
+    }
+    
+    .doc-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        margin-bottom: 14px;
+    }
+    .doc-icon {
+        width: 52px;
+        height: 52px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: white;
+        flex-shrink: 0;
+    }
+    .doc-icon.pdf { background: linear-gradient(135deg, #ef4444, #dc2626); }
+    .doc-icon.link { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+    
+    .doc-info { flex: 1; }
+    .doc-title { font-size: 1.1rem; font-weight: 700; color: #1f2937; margin-bottom: 4px; line-height: 1.3; }
+    .doc-teacher { font-size: 0.85rem; color: #6b7280; }
+    
+    .doc-meta {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+    }
+    .meta-item {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.8rem;
+        color: #6b7280;
+    }
+    
+    .category-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    .category-badge.exam_samples { background: #fee2e2; color: #dc2626; }
+    .category-badge.worksheets { background: #fef3c7; color: #d97706; }
+    .category-badge.summaries { background: #d1fae5; color: #059669; }
+    .category-badge.practice_exams { background: #dbeafe; color: #2563eb; }
+    .category-badge.videos { background: #ede9fe; color: #7c3aed; }
+    .category-badge.other { background: #f3f4f6; color: #6b7280; }
+    
+    .doc-desc {
+        color: #4b5563;
+        font-size: 0.9rem;
+        margin-bottom: 14px;
+        line-height: 1.5;
+    }
+    
+    .doc-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 14px;
+        border-top: 1px solid #e5e7eb;
+    }
+    .doc-date { font-size: 0.8rem; color: #9ca3af; }
+    
+    .btn-action {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.9rem;
+    }
+    .btn-action:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    }
+    .btn-action.video { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); }
+    
+    .empty-state {
+        text-align: center;
+        padding: 80px 20px;
+        color: #9ca3af;
+        grid-column: 1 / -1;
+    }
+    .empty-state .icon { font-size: 5rem; margin-bottom: 20px; }
+    .empty-state h3 { color: #6b7280; margin-bottom: 8px; }
+    
+    .pdf-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.85);
+        z-index: 1000;
+        padding: 20px;
+    }
+    .pdf-modal.active { display: flex; align-items: center; justify-content: center; }
+    .pdf-container {
+        background: white;
+        border-radius: 20px;
+        width: 100%;
+        max-width: 1000px;
+        height: 90vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    .pdf-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 24px;
+        border-bottom: 1px solid #e5e7eb;
+        background: #f9fafb;
+    }
+    .pdf-header h3 { margin: 0; color: #1f2937; font-size: 1.1rem; }
+    .pdf-actions { display: flex; gap: 10px; }
+    .pdf-btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .pdf-btn.download { background: #dbeafe; color: #2563eb; }
+    .pdf-btn.download:hover { background: #bfdbfe; }
+    .pdf-btn.close { background: #fee2e2; color: #dc2626; }
+    .pdf-btn.close:hover { background: #fecaca; }
+    .pdf-frame {
+        flex: 1;
+        border: none;
+    }
+    
+    .view-toggle {
+        display: flex;
+        gap: 8px;
+    }
+    .view-btn {
+        padding: 8px 12px;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        background: white;
+        cursor: pointer;
+        font-size: 1rem;
+        transition: all 0.2s;
+    }
+    .view-btn.active { border-color: #6366f1; background: rgba(99,102,241,0.1); }
+    .view-btn:hover { border-color: #6366f1; }
+    
+    .documents-list {
+        display: none;
+    }
+    .documents-list.active { display: block; }
+    .documents-grid.active { display: grid; }
+    
+    .doc-list-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        background: #f9fafb;
+        border-radius: 12px;
+        margin-bottom: 12px;
+        transition: all 0.2s;
+    }
+    .doc-list-item:hover { background: #f3f4f6; transform: translateX(4px); }
+    
+    .list-info { display: flex; align-items: center; gap: 14px; flex: 1; }
+    .list-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.3rem;
+        color: white;
+    }
+    .list-icon.pdf { background: linear-gradient(135deg, #ef4444, #dc2626); }
+    .list-icon.link { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+    
+    .list-details { flex: 1; }
+    .list-title { font-weight: 600; color: #1f2937; margin-bottom: 4px; }
+    .list-meta { font-size: 0.8rem; color: #6b7280; display: flex; gap: 12px; flex-wrap: wrap; }
+    
+    @media (max-width: 768px) {
+        .categories-grid { grid-template-columns: repeat(3, 1fr); }
+        .documents-grid { grid-template-columns: 1fr; }
+        .filters-bar { flex-direction: column; }
+        .section-header { flex-direction: column; align-items: flex-start; }
+        .view-toggle { display: none; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>📚 Dokümanlar</h1>
+    <p>Öğretmenlerinizin paylaştığı ders materyallerini inceleyin</p>
+</div>
+
+<div class="categories-grid" id="categoriesGrid">
+    <div class="category-card active" data-category="all" onclick="filterByCategory('all')">
+        <div class="category-icon">📂</div>
+        <div class="category-name">Tümü</div>
+        <div class="category-count" id="count-all">0</div>
+    </div>
+    <div class="category-card" data-category="exam_samples" onclick="filterByCategory('exam_samples')">
+        <div class="category-icon">📝</div>
+        <div class="category-name">Yazılı Örnekleri</div>
+        <div class="category-count" id="count-exam_samples">0</div>
+    </div>
+    <div class="category-card" data-category="worksheets" onclick="filterByCategory('worksheets')">
+        <div class="category-icon">📄</div>
+        <div class="category-name">Çalışma Kağıtları</div>
+        <div class="category-count" id="count-worksheets">0</div>
+    </div>
+    <div class="category-card" data-category="summaries" onclick="filterByCategory('summaries')">
+        <div class="category-icon">📋</div>
+        <div class="category-name">Konu Özetleri</div>
+        <div class="category-count" id="count-summaries">0</div>
+    </div>
+    <div class="category-card" data-category="practice_exams" onclick="filterByCategory('practice_exams')">
+        <div class="category-icon">📊</div>
+        <div class="category-name">Deneme Sınavları</div>
+        <div class="category-count" id="count-practice_exams">0</div>
+    </div>
+    <div class="category-card" data-category="videos" onclick="filterByCategory('videos')">
+        <div class="category-icon">🎬</div>
+        <div class="category-name">Ders Videoları</div>
+        <div class="category-count" id="count-videos">0</div>
+    </div>
+</div>
+
+<div class="content-card">
+    <div class="section-header">
+        <div class="section-title" id="sectionTitle">Tüm Dokümanlar</div>
+        <div class="view-toggle">
+            <button class="view-btn active" onclick="setView('grid', this)" title="Kart Görünümü">🔲</button>
+            <button class="view-btn" onclick="setView('list', this)" title="Liste Görünümü">📋</button>
+        </div>
+    </div>
+    
+    <div class="filters-bar">
+        <select class="filter-select" id="subjectFilter" onchange="applyFilters()">
+            <option value="">Tüm Dersler</option>
+            <option value="turkce">Türkçe</option>
+            <option value="matematik">Matematik</option>
+            <option value="fen">Fen Bilimleri</option>
+            <option value="sosyal">Sosyal Bilgiler</option>
+            <option value="ingilizce">İngilizce</option>
+            <option value="din">Din Kültürü</option>
+        </select>
+        <input type="text" class="search-input" id="searchInput" placeholder="Doküman ara..." oninput="applyFilters()">
+    </div>
+    
+    <div class="documents-grid active" id="documentsGrid"></div>
+    <div class="documents-list" id="documentsList"></div>
+</div>
+
+<div class="pdf-modal" id="pdfModal">
+    <div class="pdf-container">
+        <div class="pdf-header">
+            <h3 id="pdfTitle">PDF Görüntüleyici</h3>
+            <div class="pdf-actions">
+                <button class="pdf-btn download" id="downloadBtn" onclick="downloadPdf()">
+                    <span>📥</span> İndir
+                </button>
+                <button class="pdf-btn close" onclick="closePdfModal()">
+                    <span>✕</span> Kapat
+                </button>
+            </div>
+        </div>
+        <iframe class="pdf-frame" id="pdfFrame"></iframe>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const categoryNames = {
+    'exam_samples': 'Yazılı Örneği',
+    'worksheets': 'Çalışma Kağıdı',
+    'summaries': 'Konu Özeti',
+    'practice_exams': 'Deneme Sınavı',
+    'videos': 'Ders Videosu',
+    'other': 'Diğer'
+};
+const subjectNames = {
+    'turkce': 'Türkçe',
+    'matematik': 'Matematik',
+    'fen': 'Fen Bilimleri',
+    'sosyal': 'Sosyal Bilgiler',
+    'ingilizce': 'İngilizce',
+    'din': 'Din Kültürü'
+};
+
+let currentFilter = 'all';
+let currentView = 'grid';
+let allDocuments = [];
+let currentPdfPath = '';
+
+function filterByCategory(cat) {
+    currentFilter = cat;
+    document.querySelectorAll('.category-card').forEach(card => {
+        card.classList.toggle('active', card.dataset.category === cat);
+    });
+    
+    const titles = {
+        'all': 'Tüm Dokümanlar',
+        'exam_samples': 'Yazılı Örnekleri',
+        'worksheets': 'Çalışma Kağıtları',
+        'summaries': 'Konu Özetleri',
+        'practice_exams': 'Deneme Sınavları',
+        'videos': 'Ders Videoları'
+    };
+    document.getElementById('sectionTitle').textContent = titles[cat] || 'Dokümanlar';
+    applyFilters();
+}
+
+function setView(view, btn) {
+    currentView = view;
+    document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    
+    document.getElementById('documentsGrid').classList.toggle('active', view === 'grid');
+    document.getElementById('documentsList').classList.toggle('active', view === 'list');
+    applyFilters();
+}
+
+function applyFilters() {
+    const subject = document.getElementById('subjectFilter').value;
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    
+    let filtered = allDocuments;
+    
+    if (currentFilter !== 'all') {
+        filtered = filtered.filter(d => d.category === currentFilter);
+    }
+    if (subject) {
+        filtered = filtered.filter(d => d.subject === subject);
+    }
+    if (search) {
+        filtered = filtered.filter(d => 
+            d.title.toLowerCase().includes(search) || 
+            (d.description && d.description.toLowerCase().includes(search)) ||
+            (d.teacher_name && d.teacher_name.toLowerCase().includes(search))
+        );
+    }
+    
+    if (currentView === 'grid') {
+        renderGridView(filtered);
+    } else {
+        renderListView(filtered);
+    }
+}
+
+async function loadDocuments() {
+    try {
+        const res = await fetch('/api/student/documents');
+        allDocuments = await res.json();
+        updateCounts();
+        applyFilters();
+    } catch (err) {
+        console.error('Documents loading error:', err);
+        document.getElementById('documentsGrid').innerHTML = `
+            <div class="empty-state">
+                <div class="icon">❌</div>
+                <h3>Yükleme hatası</h3>
+                <p>Lütfen sayfayı yenileyin</p>
+            </div>
+        `;
+    }
+}
+
+function updateCounts() {
+    const counts = { all: allDocuments.length };
+    Object.keys(categoryNames).forEach(cat => counts[cat] = 0);
+    
+    allDocuments.forEach(d => {
+        const cat = d.category || 'exam_samples';
+        if (counts[cat] !== undefined) counts[cat]++;
+    });
+    
+    document.getElementById('count-all').textContent = counts.all;
+    Object.keys(categoryNames).forEach(cat => {
+        const el = document.getElementById(`count-${cat}`);
+        if (el) el.textContent = counts[cat] || 0;
+    });
+}
+
+function renderGridView(docs) {
+    const container = document.getElementById('documentsGrid');
+    
+    if (docs.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="icon">📂</div>
+                <h3>Doküman bulunamadı</h3>
+                <p>Bu kategoride henüz doküman paylaşılmamış</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = docs.map(d => {
+        const date = new Date(d.created_at).toLocaleDateString('tr-TR', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+        });
+        const category = d.category || 'exam_samples';
+        const subject = d.subject ? subjectNames[d.subject] : '';
+        
+        let actionBtn;
+        if (d.sample_type === 'pdf') {
+            actionBtn = `<button class="btn-action" onclick="openPdf('${d.file_path}', '${d.title.replace(/'/g, "\\'")}', ${d.id})">👁️ Görüntüle</button>`;
+        } else if (category === 'videos') {
+            actionBtn = `<button class="btn-action video" onclick="openLink('${d.link_url}', ${d.id})">▶️ İzle</button>`;
+        } else {
+            actionBtn = `<button class="btn-action" onclick="openLink('${d.link_url}', ${d.id})">🔗 Aç</button>`;
+        }
+        
+        return `
+            <div class="document-card">
+                <div class="doc-header">
+                    <div class="doc-icon ${d.sample_type}">${d.sample_type === 'pdf' ? '📁' : (category === 'videos' ? '🎬' : '🔗')}</div>
+                    <div class="doc-info">
+                        <div class="doc-title">${d.title}</div>
+                        <div class="doc-teacher">${d.teacher_name || ''}</div>
+                    </div>
+                </div>
+                <div class="doc-meta">
+                    <span class="category-badge ${category}">${categoryNames[category] || category}</span>
+                    ${subject ? `<span class="meta-item">📚 ${subject}</span>` : ''}
+                </div>
+                ${d.description ? `<div class="doc-desc">${d.description}</div>` : ''}
+                <div class="doc-footer">
+                    <div class="doc-date">📅 ${date}</div>
+                    ${actionBtn}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderListView(docs) {
+    const container = document.getElementById('documentsList');
+    
+    if (docs.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="icon">📂</div>
+                <h3>Doküman bulunamadı</h3>
+                <p>Bu kategoride henüz doküman paylaşılmamış</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = docs.map(d => {
+        const date = new Date(d.created_at).toLocaleDateString('tr-TR');
+        const category = d.category || 'exam_samples';
+        const subject = d.subject ? subjectNames[d.subject] : '';
+        
+        let actionBtn;
+        if (d.sample_type === 'pdf') {
+            actionBtn = `<button class="btn-action" onclick="openPdf('${d.file_path}', '${d.title.replace(/'/g, "\\'")}', ${d.id})">👁️ Görüntüle</button>`;
+        } else {
+            actionBtn = `<button class="btn-action" onclick="openLink('${d.link_url}', ${d.id})">🔗 Aç</button>`;
+        }
+        
+        return `
+            <div class="doc-list-item">
+                <div class="list-info">
+                    <div class="list-icon ${d.sample_type}">${d.sample_type === 'pdf' ? '📁' : '🔗'}</div>
+                    <div class="list-details">
+                        <div class="list-title">${d.title}</div>
+                        <div class="list-meta">
+                            <span class="category-badge ${category}">${categoryNames[category]}</span>
+                            ${subject ? `<span>📚 ${subject}</span>` : ''}
+                            <span>👨‍🏫 ${d.teacher_name || ''}</span>
+                            <span>📅 ${date}</span>
+                        </div>
+                    </div>
+                </div>
+                ${actionBtn}
+            </div>
+        `;
+    }).join('');
+}
+
+function openPdf(path, title, docId) {
+    currentPdfPath = path;
+    document.getElementById('pdfTitle').textContent = title;
+    document.getElementById('pdfFrame').src = path;
+    document.getElementById('pdfModal').classList.add('active');
+    
+    fetch(`/api/student/documents/${docId}/view`, { method: 'POST' }).catch(() => {});
+}
+
+function openLink(url, docId) {
+    fetch(`/api/student/documents/${docId}/view`, { method: 'POST' }).catch(() => {});
+    window.open(url, '_blank');
+}
+
+function downloadPdf() {
+    if (currentPdfPath) {
+        const link = document.createElement('a');
+        link.href = currentPdfPath;
+        link.download = '';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+}
+
+function closePdfModal() {
+    document.getElementById('pdfModal').classList.remove('active');
+    document.getElementById('pdfFrame').src = '';
+    currentPdfPath = '';
+}
+
+document.getElementById('pdfModal').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('pdfModal')) closePdfModal();
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closePdfModal();
+});
+
+loadDocuments();
+</script>
+{% endblock %}
