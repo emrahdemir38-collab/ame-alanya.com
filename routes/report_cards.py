@@ -4,6 +4,7 @@ Karne Yönetimi Routes - Admin PDF Karne Okuma Sistemi
 import os
 import json
 import logging
+import uuid
 from flask import Blueprint, request, jsonify, render_template, current_app, send_file
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
@@ -13,6 +14,7 @@ from datetime import datetime
 import threading
 from queue import Queue
 from io import BytesIO
+from PIL import Image as PILImage
 from utils.fmt_parser import FMTReportCardParser
 from utils.image_report_parser import ImageReportParser
 from utils.csv_parser import CSVExcelParser
@@ -9257,6 +9259,487 @@ def my_progress():
     except Exception as e:
         logger.error(f"Öğrenci gelişim raporu hatası: {e}")
         return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
+# ==================== SINAV GÖRSELLERİ YÖNETİMİ (ADMIN) ====================
+
+@report_cards_bp.route('/admin/exam-images')
+@login_required
+def admin_exam_images_page():
+    if current_user.role != 'admin':
+        return "Yetkisiz", 403
+    return render_template('admin_exam_images.html')
+
+@report_cards_bp.route('/api/exam-images/exams')
+@login_required
+def get_exams_for_images():
+    if current_user.role != 'admin':
+        return jsonify({"error": "Yetkisiz"}), 403
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT e.id, e.exam_name, e.grade_level, e.exam_date,
+                   (SELECT COUNT(*) FROM report_card_exam_pages p WHERE p.exam_id = e.id) as page_count,
+                   (SELECT COUNT(*) FROM report_card_question_regions q WHERE q.exam_id = e.id) as region_count
+            FROM report_card_exams e
+            ORDER BY e.created_at DESC
+        """)
+        exams = cur.fetchall()
+        for e in exams:
+            if e.get('exam_date'):
+                e['exam_date'] = e['exam_date'].isoformat()
+        return jsonify({"exams": exams})
+    except Exception as ex:
+        logger.error(f"Sınav listesi hatası: {ex}")
+        return jsonify({"error": str(ex)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@report_cards_bp.route('/api/exam-images/<int:exam_id>/upload', methods=['POST'])
+@login_required
+def upload_exam_images(exam_id):
+    if current_user.role != 'admin':
+        return jsonify({"error": "Yetkisiz"}), 403
+    
+    from app import object_storage
+    
+    files = request.files.getlist('files')
+    if not files:
+        return jsonify({"error": "Dosya seçilmedi"}), 400
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    try:
+        cur.execute("SELECT MAX(page_number) as max_page FROM report_card_exam_pages WHERE exam_id = %s", (exam_id,))
+        row = cur.fetchone()
+        next_page = (row['max_page'] or 0) + 1
+        
+        uploaded_pages = []
+        
+        for file in files:
+            filename = file.filename.lower()
+            file_bytes = file.read()
+            
+            if filename.endswith('.pdf'):
+                try:
+                    from pdf2image import convert_from_bytes
+                    images = convert_from_bytes(file_bytes, dpi=200)
+                    for img in images:
+                        image_key = f"exam_pages/{exam_id}/{uuid.uuid4().hex}.png"
+                        buf = BytesIO()
+                        img.save(buf, format='PNG')
+                        buf.seek(0)
+                        
+                        if object_storage.is_available():
+                            object_storage.upload_from_file(buf, image_key)
+                        
+                        cur.execute("""
+                            INSERT INTO report_card_exam_pages (exam_id, page_number, image_key, width_px, height_px)
+                            VALUES (%s, %s, %s, %s, %s) RETURNING id
+                        """, (exam_id, next_page, image_key, img.width, img.height))
+                        page_id = cur.fetchone()['id']
+                        uploaded_pages.append({'id': page_id, 'page_number': next_page, 'width': img.width, 'height': img.height})
+                        next_page += 1
+                except Exception as pdf_err:
+                    logger.error(f"PDF dönüştürme hatası: {pdf_err}")
+                    return jsonify({"error": f"PDF işlenirken hata: {str(pdf_err)}"}), 500
+            
+            elif filename.endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                img = PILImage.open(BytesIO(file_bytes))
+                if img.mode == 'RGBA':
+                    img = img.convert('RGB')
+                
+                image_key = f"exam_pages/{exam_id}/{uuid.uuid4().hex}.png"
+                buf = BytesIO()
+                img.save(buf, format='PNG')
+                buf.seek(0)
+                
+                if object_storage.is_available():
+                    object_storage.upload_from_file(buf, image_key)
+                
+                cur.execute("""
+                    INSERT INTO report_card_exam_pages (exam_id, page_number, image_key, width_px, height_px)
+                    VALUES (%s, %s, %s, %s, %s) RETURNING id
+                """, (exam_id, next_page, image_key, img.width, img.height))
+                page_id = cur.fetchone()['id']
+                uploaded_pages.append({'id': page_id, 'page_number': next_page, 'width': img.width, 'height': img.height})
+                next_page += 1
+            else:
+                continue
+        
+        conn.commit()
+        return jsonify({"success": True, "pages": uploaded_pages, "message": f"{len(uploaded_pages)} sayfa yüklendi"})
+    
+    except Exception as ex:
+        conn.rollback()
+        logger.error(f"Görsel yükleme hatası: {ex}")
+        return jsonify({"error": str(ex)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@report_cards_bp.route('/api/exam-images/<int:exam_id>/pages')
+@login_required
+def get_exam_pages(exam_id):
+    if current_user.role != 'admin':
+        return jsonify({"error": "Yetkisiz"}), 403
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT id, page_number, image_key, width_px, height_px
+            FROM report_card_exam_pages
+            WHERE exam_id = %s ORDER BY page_number
+        """, (exam_id,))
+        pages = cur.fetchall()
+        
+        cur.execute("""
+            SELECT id, page_id, subject_key, question_number, y_start_norm, y_end_norm, x_start_norm, x_end_norm
+            FROM report_card_question_regions
+            WHERE exam_id = %s ORDER BY subject_key, question_number
+        """, (exam_id,))
+        regions = cur.fetchall()
+        
+        cur.execute("SELECT question_counts, answer_key_a FROM report_card_exams WHERE id = %s", (exam_id,))
+        exam = cur.fetchone()
+        
+        subject_questions = {}
+        if exam and exam.get('question_counts'):
+            qc = exam['question_counts']
+            if isinstance(qc, str):
+                qc = json.loads(qc)
+            subject_names = {
+                'turkce': 'Türkçe', 'matematik': 'Matematik', 'fen': 'Fen Bilimleri',
+                'inkilap': 'İnkılap Tarihi', 'din': 'Din Kültürü', 'ingilizce': 'İngilizce',
+                'sosyal': 'Sosyal Bilgiler'
+            }
+            for subj_key, count in qc.items():
+                if isinstance(count, (int, float)) and count > 0:
+                    subject_questions[subj_key] = {
+                        'label': subject_names.get(subj_key, subj_key),
+                        'count': int(count)
+                    }
+        
+        return jsonify({"pages": pages, "regions": regions, "subject_questions": subject_questions})
+    except Exception as ex:
+        logger.error(f"Sayfa listesi hatası: {ex}")
+        return jsonify({"error": str(ex)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@report_cards_bp.route('/api/exam-images/page-image/<int:page_id>')
+@login_required
+def get_page_image(page_id):
+    if current_user.role != 'admin':
+        return "Yetkisiz", 403
+    from app import object_storage
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT image_key FROM report_card_exam_pages WHERE id = %s", (page_id,))
+        page = cur.fetchone()
+        if not page:
+            return "Sayfa bulunamadı", 404
+        
+        if object_storage.is_available():
+            data, content_type = object_storage.download_as_bytes(page['image_key'])
+            return send_file(BytesIO(data), mimetype=content_type or 'image/png')
+        
+        return "Dosya bulunamadı", 404
+    except Exception as ex:
+        logger.error(f"Sayfa görseli hatası: {ex}")
+        return "Hata", 500
+    finally:
+        cur.close()
+        conn.close()
+
+@report_cards_bp.route('/api/exam-images/<int:exam_id>/regions', methods=['POST'])
+@login_required
+def save_question_regions(exam_id):
+    if current_user.role != 'admin':
+        return jsonify({"error": "Yetkisiz"}), 403
+    
+    data = request.get_json()
+    regions = data.get('regions', [])
+    
+    if not regions:
+        return jsonify({"error": "Bölge bilgisi gerekli"}), 400
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    try:
+        cur.execute("DELETE FROM report_card_question_regions WHERE exam_id = %s", (exam_id,))
+        
+        for r in regions:
+            cur.execute("""
+                INSERT INTO report_card_question_regions 
+                (exam_id, page_id, subject_key, question_number, y_start_norm, y_end_norm, x_start_norm, x_end_norm)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                exam_id, r['page_id'], r['subject_key'], r['question_number'],
+                r['y_start'], r['y_end'],
+                r.get('x_start', 0), r.get('x_end', 1)
+            ))
+        
+        conn.commit()
+        return jsonify({"success": True, "message": f"{len(regions)} soru bölgesi kaydedildi"})
+    except Exception as ex:
+        conn.rollback()
+        logger.error(f"Bölge kaydetme hatası: {ex}")
+        return jsonify({"error": str(ex)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@report_cards_bp.route('/api/exam-images/<int:exam_id>/delete-page/<int:page_id>', methods=['DELETE'])
+@login_required
+def delete_exam_page(exam_id, page_id):
+    if current_user.role != 'admin':
+        return jsonify({"error": "Yetkisiz"}), 403
+    
+    from app import object_storage
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT image_key FROM report_card_exam_pages WHERE id = %s AND exam_id = %s", (page_id, exam_id))
+        page = cur.fetchone()
+        if not page:
+            return jsonify({"error": "Sayfa bulunamadı"}), 404
+        
+        try:
+            if object_storage.is_available():
+                object_storage.client.delete(page['image_key'])
+        except:
+            pass
+        
+        cur.execute("DELETE FROM report_card_question_regions WHERE page_id = %s", (page_id,))
+        cur.execute("DELETE FROM report_card_exam_pages WHERE id = %s", (page_id,))
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as ex:
+        conn.rollback()
+        logger.error(f"Sayfa silme hatası: {ex}")
+        return jsonify({"error": str(ex)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
+# ==================== HATALI SORU PDF OLUŞTURMA ====================
+
+@report_cards_bp.route('/api/wrong-questions-pdf/<int:result_id>')
+@login_required
+def generate_wrong_questions_pdf(result_id):
+    from app import object_storage
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    try:
+        cur.execute("""
+            SELECT r.*, e.exam_name, e.id as exam_id
+            FROM report_card_results r
+            JOIN report_card_exams e ON r.exam_id = e.id
+            WHERE r.id = %s
+        """, (result_id,))
+        result = cur.fetchone()
+        
+        if not result:
+            return jsonify({"error": "Sonuç bulunamadı"}), 404
+        
+        if current_user.role == 'student':
+            if current_user.student_no != result.get('student_no'):
+                return jsonify({"error": "Yetkisiz erişim"}), 403
+        elif current_user.role == 'teacher':
+            cur.execute("SELECT class_name FROM teacher_classes WHERE teacher_id = %s", (current_user.id,))
+            allowed = [row['class_name'] for row in cur.fetchall()]
+            allowed_norm = [c.replace('/', '') for c in allowed]
+            result_class = result.get('class_name', '')
+            if result_class not in allowed and result_class.replace('/', '') not in allowed_norm:
+                return jsonify({"error": "Yetkisiz erişim"}), 403
+        elif current_user.role != 'admin':
+            return jsonify({"error": "Yetkisiz erişim"}), 403
+        
+        exam_id = result['exam_id']
+        
+        cur.execute("""
+            SELECT COUNT(*) as cnt FROM report_card_question_regions WHERE exam_id = %s
+        """, (exam_id,))
+        if cur.fetchone()['cnt'] == 0:
+            return jsonify({"error": "Bu sınav için soru görselleri henüz işaretlenmemiş"}), 404
+        
+        subjects = result.get('subjects') or {}
+        if isinstance(subjects, str):
+            subjects = json.loads(subjects)
+        
+        wrong_questions = []
+        for subj_key, subj_data in subjects.items():
+            for ans in subj_data.get('answers', []):
+                if ans.get('status') in ('wrong', 'blank'):
+                    wrong_questions.append({
+                        'subject_key': subj_key,
+                        'question_number': ans.get('question_number'),
+                        'subject_label': subj_data.get('subject_label', subj_key),
+                        'outcome': ans.get('outcome', ''),
+                        'status': ans.get('status'),
+                        'student_answer': ans.get('student_answer', '-'),
+                        'correct_answer': ans.get('correct_answer', '-')
+                    })
+        
+        if not wrong_questions:
+            return jsonify({"error": "Hatalı soru bulunamadı"}), 404
+        
+        cur.execute("""
+            SELECT qr.*, ep.image_key, ep.width_px, ep.height_px
+            FROM report_card_question_regions qr
+            JOIN report_card_exam_pages ep ON qr.page_id = ep.id
+            WHERE qr.exam_id = %s
+        """, (exam_id,))
+        regions = cur.fetchall()
+        
+        region_map = {}
+        for r in regions:
+            key = f"{r['subject_key']}_{r['question_number']}"
+            region_map[key] = r
+        
+        page_images_cache = {}
+        
+        cropped_items = []
+        for wq in wrong_questions:
+            key = f"{wq['subject_key']}_{wq['question_number']}"
+            region = region_map.get(key)
+            if not region:
+                continue
+            
+            image_key = region['image_key']
+            if image_key not in page_images_cache:
+                if object_storage.is_available():
+                    data, _ = object_storage.download_as_bytes(image_key)
+                    page_images_cache[image_key] = PILImage.open(BytesIO(data))
+                else:
+                    continue
+            
+            page_img = page_images_cache[image_key]
+            w, h = page_img.size
+            
+            x1 = int(region['x_start_norm'] * w)
+            y1 = int(region['y_start_norm'] * h)
+            x2 = int(region['x_end_norm'] * w)
+            y2 = int(region['y_end_norm'] * h)
+            
+            cropped = page_img.crop((x1, y1, x2, y2))
+            
+            crop_buf = BytesIO()
+            cropped.save(crop_buf, format='PNG')
+            crop_buf.seek(0)
+            
+            cropped_items.append({
+                'image_buf': crop_buf,
+                'width': cropped.width,
+                'height': cropped.height,
+                'subject_label': wq['subject_label'],
+                'question_number': wq['question_number'],
+                'outcome': wq['outcome'],
+                'status': wq['status'],
+                'student_answer': wq['student_answer'],
+                'correct_answer': wq['correct_answer']
+            })
+        
+        if not cropped_items:
+            return jsonify({"error": "Eşleşen soru görseli bulunamadı"}), 404
+        
+        pdf_buffer = BytesIO()
+        doc = SimpleDocTemplate(pdf_buffer, pagesize=A4, topMargin=30, bottomMargin=30, leftMargin=40, rightMargin=40)
+        elements = []
+        styles = getSampleStyleSheet()
+        
+        try:
+            title_style = ParagraphStyle('WrongTitle', parent=styles['Title'], fontName='DejaVuSans', fontSize=14, spaceAfter=6)
+            subtitle_style = ParagraphStyle('WrongSubtitle', parent=styles['Normal'], fontName='DejaVuSans', fontSize=10, spaceAfter=12, textColor=colors.grey)
+            subject_style = ParagraphStyle('WrongSubject', parent=styles['Heading2'], fontName='DejaVuSans-Bold', fontSize=12, spaceBefore=16, spaceAfter=6, textColor=colors.HexColor('#7c3aed'))
+            info_style = ParagraphStyle('WrongInfo', parent=styles['Normal'], fontName='DejaVuSans', fontSize=8, textColor=colors.grey, spaceAfter=4)
+        except:
+            title_style = ParagraphStyle('WrongTitle', parent=styles['Title'], fontSize=14, spaceAfter=6)
+            subtitle_style = ParagraphStyle('WrongSubtitle', parent=styles['Normal'], fontSize=10, spaceAfter=12, textColor=colors.grey)
+            subject_style = ParagraphStyle('WrongSubject', parent=styles['Heading2'], fontSize=12, spaceBefore=16, spaceAfter=6, textColor=colors.HexColor('#7c3aed'))
+            info_style = ParagraphStyle('WrongInfo', parent=styles['Normal'], fontSize=8, textColor=colors.grey, spaceAfter=4)
+        
+        student_name = result.get('student_name', '')
+        exam_name = result.get('exam_name', '')
+        elements.append(Paragraph(f"Tekrar Coz - {student_name}", title_style))
+        elements.append(Paragraph(f"{exam_name} | Hatali/Bos: {len(cropped_items)} soru", subtitle_style))
+        elements.append(Spacer(1, 10))
+        
+        current_subject = None
+        page_width = A4[0] - 80
+        
+        for item in cropped_items:
+            if item['subject_label'] != current_subject:
+                current_subject = item['subject_label']
+                elements.append(Paragraph(f"{current_subject}", subject_style))
+            
+            status_text = "Yanlis" if item['status'] == 'wrong' else "Bos"
+            elements.append(Paragraph(
+                f"Soru {item['question_number']} | {status_text} | Cevabiniz: {item['student_answer']} | Dogru: {item['correct_answer']}",
+                info_style
+            ))
+            
+            img_width = item['width']
+            img_height = item['height']
+            
+            scale = min(page_width / img_width, 1.0)
+            display_width = img_width * scale
+            display_height = img_height * scale
+            
+            max_height = A4[1] * 0.6
+            if display_height > max_height:
+                scale2 = max_height / display_height
+                display_width *= scale2
+                display_height *= scale2
+            
+            item['image_buf'].seek(0)
+            elements.append(RLImage(item['image_buf'], width=display_width, height=display_height))
+            elements.append(Spacer(1, 12))
+        
+        doc.build(elements)
+        pdf_buffer.seek(0)
+        
+        safe_name = student_name.replace(' ', '_')
+        filename = f"Tekrar_Coz_{safe_name}_{exam_name.replace(' ', '_')}.pdf"
+        
+        return send_file(pdf_buffer, mimetype='application/pdf', as_attachment=True, download_name=filename)
+    
+    except Exception as ex:
+        logger.error(f"Hatalı soru PDF hatası: {ex}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(ex)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@report_cards_bp.route('/api/exam-images/<int:exam_id>/has-images')
+@login_required
+def check_exam_has_images(exam_id):
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT COUNT(*) as cnt FROM report_card_question_regions WHERE exam_id = %s", (exam_id,))
+        count = cur.fetchone()['cnt']
+        return jsonify({"has_images": count > 0})
+    except:
+        return jsonify({"has_images": False})
     finally:
         cur.close()
         conn.close()

@@ -3695,6 +3695,35 @@ def init_database():
             )
         """)
         
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS report_card_exam_pages (
+                id SERIAL PRIMARY KEY,
+                exam_id INTEGER REFERENCES report_card_exams(id) ON DELETE CASCADE,
+                page_number INTEGER NOT NULL,
+                image_key VARCHAR(500) NOT NULL,
+                width_px INTEGER,
+                height_px INTEGER,
+                created_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul'),
+                UNIQUE(exam_id, page_number)
+            )
+        """)
+        
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS report_card_question_regions (
+                id SERIAL PRIMARY KEY,
+                exam_id INTEGER REFERENCES report_card_exams(id) ON DELETE CASCADE,
+                page_id INTEGER REFERENCES report_card_exam_pages(id) ON DELETE CASCADE,
+                subject_key VARCHAR(50) NOT NULL,
+                question_number INTEGER NOT NULL,
+                y_start_norm FLOAT NOT NULL,
+                y_end_norm FLOAT NOT NULL,
+                x_start_norm FLOAT DEFAULT 0,
+                x_end_norm FLOAT DEFAULT 1,
+                created_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul'),
+                UNIQUE(exam_id, subject_key, question_number)
+            )
+        """)
+        
         # Parent Portal: Parent-Student Relationships (Task #8)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS parent_children (
