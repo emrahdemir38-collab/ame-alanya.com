@@ -217,18 +217,44 @@
     <div id="outcomeResult" class="result-section">
         <button class="close-btn" onclick="closeResult('outcomeResult')">&times;</button>
         <h2 class="section-title">🎯 Kazanım Analizi</h2>
+        <div style="margin-bottom: 12px;">
+            <label style="font-weight: 600; margin-right: 8px;">Ders:</label>
+            <select id="stuOutcomeSubjectFilter" class="filter-select" style="width: auto; min-width: 200px; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px;" onchange="filterStudentSubjectBlocks('outcomeContent', 'stuOutcomeSubjectFilter')">
+                <option value="">Tüm Dersler</option>
+            </select>
+        </div>
         <div id="outcomeContent"></div>
     </div>
     
     <div id="errorResult" class="result-section">
         <button class="close-btn" onclick="closeResult('errorResult')">&times;</button>
         <h2 class="section-title">❌ Hata Karnesi</h2>
+        <div style="margin-bottom: 12px;">
+            <label style="font-weight: 600; margin-right: 8px;">Ders:</label>
+            <select id="stuErrorSubjectFilter" class="filter-select" style="width: auto; min-width: 200px; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px;" onchange="filterStudentSubjectBlocks('errorContent', 'stuErrorSubjectFilter')">
+                <option value="">Tüm Dersler</option>
+            </select>
+        </div>
         <div id="errorContent"></div>
     </div>
 </div>
 
 <script>
 let myExams = [];
+const ALL_SUBJECTS = ['Türkçe', 'Matematik', 'Fen Bilimleri', 'Sosyal Bilgiler', 'İngilizce', 'Din Kültürü ve Ahlak Bilgisi', 'T.C. İnkılap Tarihi ve Atatürkçülük'];
+
+function filterStudentSubjectBlocks(containerId, selectId) {
+    const selectedSubject = document.getElementById(selectId).value.toLowerCase();
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    const blocks = container.querySelectorAll('.subject-block');
+    blocks.forEach(block => {
+        const title = block.querySelector('.subject-title');
+        if (!title) return;
+        const text = title.textContent.replace(/📚|📕/g, '').trim().toLowerCase();
+        block.style.display = (!selectedSubject || text.includes(selectedSubject)) ? '' : 'none';
+    });
+}
 
 document.addEventListener('DOMContentLoaded', loadMyExams);
 
@@ -336,6 +362,9 @@ async function showOutcome(resultId) {
         
         html += '</div>';
         content.innerHTML = html;
+        const filterSel = document.getElementById('stuOutcomeSubjectFilter');
+        filterSel.innerHTML = '<option value="">Tüm Dersler</option>' + ALL_SUBJECTS.map(s => '<option value="' + s + '">' + s + '</option>').join('');
+        filterStudentSubjectBlocks('outcomeContent', 'stuOutcomeSubjectFilter');
         
     } catch (error) {
         content.innerHTML = '<p style="color: #dc2626;">Yüklenirken hata oluştu</p>';
@@ -389,6 +418,9 @@ async function showErrors(resultId) {
         
         html += '</div>';
         content.innerHTML = html;
+        const filterSel = document.getElementById('stuErrorSubjectFilter');
+        filterSel.innerHTML = '<option value="">Tüm Dersler</option>' + ALL_SUBJECTS.map(s => '<option value="' + s + '">' + s + '</option>').join('');
+        filterStudentSubjectBlocks('errorContent', 'stuErrorSubjectFilter');
         
     } catch (error) {
         content.innerHTML = '<p style="color: #dc2626;">Yüklenirken hata oluştu</p>';
@@ -431,6 +463,13 @@ function openMultiExamModal() {
                         </label>
                     `).join('')}
                 </div>
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="font-weight:600;margin-right:8px;">Ders:</label>
+                <select id="multiSubjectFilter" class="filter-select" style="width:auto;min-width:200px;padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;" onchange="filterStudentSubjectBlocks('multiResults','multiSubjectFilter')">
+                    <option value="">Tüm Dersler</option>
+                    ${ALL_SUBJECTS.map(s => '<option value="' + s + '">' + s + '</option>').join('')}
+                </select>
             </div>
             <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;">
                 <button class="action-btn btn-outcome" onclick="loadMultiOutcome()">🎯 Kazanım Analizi</button>
@@ -487,6 +526,7 @@ async function loadMultiOutcome() {
         }
         html += '</div>';
         resultsDiv.innerHTML = html;
+        filterStudentSubjectBlocks('multiResults', 'multiSubjectFilter');
         document.getElementById('multiOutcomePdfBtn').style.display = 'inline-flex';
     } catch (error) {
         resultsDiv.innerHTML = '<p style="color:#dc2626;">Yüklenirken hata oluştu</p>';
@@ -538,6 +578,7 @@ async function loadMultiError() {
         }
         html += '</div>';
         resultsDiv.innerHTML = html;
+        filterStudentSubjectBlocks('multiResults', 'multiSubjectFilter');
         document.getElementById('multiErrorPdfBtn').style.display = 'inline-flex';
     } catch (error) {
         resultsDiv.innerHTML = '<p style="color:#dc2626;">Yüklenirken hata oluştu</p>';
