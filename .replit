@@ -1,0 +1,43 @@
+modules = ["python-3.11", "nodejs-20", "postgresql-16"]
+[agent]
+expertMode = true
+integrations = ["javascript_object_storage:1.0.0", "python_gemini_ai_integrations:1.0.0"]
+
+[nix]
+channel = "stable-25_05"
+packages = ["cairo", "ffmpeg-full", "freetype", "ghostscript", "glibcLocales", "gobject-introspection", "gtk3", "jbig2dec", "jre", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "mupdf", "openjpeg", "pkg-config", "poppler_utils", "qhull", "qpdf", "tcl", "tk", "unzip", "zlib", "poppler", "zip"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Flask Server"
+
+[[workflows.workflow]]
+name = "Flask Server"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python app.py"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[deployment]
+deploymentTarget = "autoscale"
+run = ["gunicorn", "--bind=0.0.0.0:5000", "--workers=2", "--timeout=120", "--reuse-port", "app:app"]
+
+[objectStorage]
+defaultBucketID = "replit-objstore-db03518a-4525-4cc5-bf51-cb9cf3d73269"
