@@ -8037,33 +8037,43 @@ def student_multi_error():
 @report_cards_bp.route('/api/student-multi-outcome')
 @login_required
 def student_multi_outcome_by_no():
-    """Öğrenci çoklu sınav kazanım analizi (student_no ve exam_ids ile)"""
+    """Öğrenci çoklu sınav kazanım analizi (result_ids veya student_no+exam_ids ile)"""
     if current_user.role not in ['admin', 'teacher']:
         return jsonify({"error": "Yetkisiz erişim"}), 403
     
+    result_ids_str = request.args.get('result_ids', '')
     student_no = request.args.get('student_no', '')
     exam_ids_str = request.args.get('exam_ids', '')
-    
-    if not student_no:
-        return jsonify({"error": "Öğrenci numarası gerekli"}), 400
-    if not exam_ids_str:
-        return jsonify({"error": "Sınav ID'leri gerekli"}), 400
-    
-    exam_ids = [int(x) for x in exam_ids_str.split(',') if x.strip().isdigit()]
-    if not exam_ids:
-        return jsonify({"error": "Geçerli sınav ID'si yok"}), 400
     
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        placeholders = ','.join(['%s'] * len(exam_ids))
-        cur.execute(f"""
-            SELECT r.subjects, r.student_name, e.exam_name
-            FROM report_card_results r
-            JOIN report_card_exams e ON r.exam_id = e.id
-            WHERE r.student_no = %s AND r.exam_id IN ({placeholders})
-        """, [student_no] + exam_ids)
+        if result_ids_str:
+            result_ids = [int(x) for x in result_ids_str.split(',') if x.strip().isdigit()]
+            if not result_ids:
+                return jsonify({"error": "Geçerli sonuç ID'si yok"}), 400
+            placeholders = ','.join(['%s'] * len(result_ids))
+            cur.execute(f"""
+                SELECT r.subjects, r.student_name, e.exam_name
+                FROM report_card_results r
+                JOIN report_card_exams e ON r.exam_id = e.id
+                WHERE r.id IN ({placeholders})
+            """, result_ids)
+        elif student_no and exam_ids_str:
+            exam_ids = [int(x) for x in exam_ids_str.split(',') if x.strip().isdigit()]
+            if not exam_ids:
+                return jsonify({"error": "Geçerli sınav ID'si yok"}), 400
+            placeholders = ','.join(['%s'] * len(exam_ids))
+            cur.execute(f"""
+                SELECT r.subjects, r.student_name, e.exam_name
+                FROM report_card_results r
+                JOIN report_card_exams e ON r.exam_id = e.id
+                WHERE r.student_no = %s AND r.exam_id IN ({placeholders})
+            """, [student_no] + exam_ids)
+        else:
+            return jsonify({"error": "result_ids veya student_no+exam_ids gerekli"}), 400
+        
         results = cur.fetchall()
         
         if not results:
@@ -8099,7 +8109,7 @@ def student_multi_outcome_by_no():
         for subj, outcomes in outcome_data.items():
             sorted_outcome_data[subj] = dict(sorted(outcomes.items(), key=lambda x: parse_outcome_code(x[0])))
         
-        return jsonify({"student_name": student_name, "outcomes": sorted_outcome_data})
+        return jsonify({"student_name": student_name, "outcome_data": sorted_outcome_data})
         
     except Exception as e:
         logger.error(f"Öğrenci kazanım analizi hatası: {e}")
@@ -8112,33 +8122,43 @@ def student_multi_outcome_by_no():
 @report_cards_bp.route('/api/student-multi-error')
 @login_required
 def student_multi_error_by_no():
-    """Öğrenci çoklu sınav hata karnesi (student_no ve exam_ids ile)"""
+    """Öğrenci çoklu sınav hata karnesi (result_ids veya student_no+exam_ids ile)"""
     if current_user.role not in ['admin', 'teacher']:
         return jsonify({"error": "Yetkisiz erişim"}), 403
     
+    result_ids_str = request.args.get('result_ids', '')
     student_no = request.args.get('student_no', '')
     exam_ids_str = request.args.get('exam_ids', '')
-    
-    if not student_no:
-        return jsonify({"error": "Öğrenci numarası gerekli"}), 400
-    if not exam_ids_str:
-        return jsonify({"error": "Sınav ID'leri gerekli"}), 400
-    
-    exam_ids = [int(x) for x in exam_ids_str.split(',') if x.strip().isdigit()]
-    if not exam_ids:
-        return jsonify({"error": "Geçerli sınav ID'si yok"}), 400
     
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        placeholders = ','.join(['%s'] * len(exam_ids))
-        cur.execute(f"""
-            SELECT r.subjects, r.student_name, e.exam_name
-            FROM report_card_results r
-            JOIN report_card_exams e ON r.exam_id = e.id
-            WHERE r.student_no = %s AND r.exam_id IN ({placeholders})
-        """, [student_no] + exam_ids)
+        if result_ids_str:
+            result_ids = [int(x) for x in result_ids_str.split(',') if x.strip().isdigit()]
+            if not result_ids:
+                return jsonify({"error": "Geçerli sonuç ID'si yok"}), 400
+            placeholders = ','.join(['%s'] * len(result_ids))
+            cur.execute(f"""
+                SELECT r.subjects, r.student_name, e.exam_name
+                FROM report_card_results r
+                JOIN report_card_exams e ON r.exam_id = e.id
+                WHERE r.id IN ({placeholders})
+            """, result_ids)
+        elif student_no and exam_ids_str:
+            exam_ids = [int(x) for x in exam_ids_str.split(',') if x.strip().isdigit()]
+            if not exam_ids:
+                return jsonify({"error": "Geçerli sınav ID'si yok"}), 400
+            placeholders = ','.join(['%s'] * len(exam_ids))
+            cur.execute(f"""
+                SELECT r.subjects, r.student_name, e.exam_name
+                FROM report_card_results r
+                JOIN report_card_exams e ON r.exam_id = e.id
+                WHERE r.student_no = %s AND r.exam_id IN ({placeholders})
+            """, [student_no] + exam_ids)
+        else:
+            return jsonify({"error": "result_ids veya student_no+exam_ids gerekli"}), 400
+        
         results = cur.fetchall()
         
         if not results:
@@ -8194,10 +8214,25 @@ def student_multi_error_by_no():
         for subj in error_list.values():
             subj.sort(key=lambda x: parse_outcome_code(x.get('outcome', '')))
         
+        errors_by_subject = {}
+        for subj_label, errors in error_list.items():
+            errors_by_subject[subj_label] = {
+                'subject_label': subj_label,
+                'errors': errors
+            }
+        
+        total_questions = total_correct + total_wrong + total_blank
+        net = total_correct - (total_wrong / 3) if total_wrong > 0 else total_correct
+        
         return jsonify({
             "student_name": student_name,
-            "errors": error_list,
-            "summary": {"correct": total_correct, "wrong": total_wrong, "blank": total_blank}
+            "errors_by_subject": errors_by_subject,
+            "totals": {
+                "correct": total_correct,
+                "wrong": total_wrong,
+                "blank": total_blank,
+                "net": round(net, 2)
+            }
         })
         
     except Exception as e:
