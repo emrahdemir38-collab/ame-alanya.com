@@ -9328,13 +9328,16 @@ def upload_exam_images(exam_id):
             
             if filename.endswith('.pdf'):
                 try:
-                    from pdf2image import convert_from_bytes
-                    images = convert_from_bytes(file_bytes, dpi=200)
-                    for img in images:
+                    import fitz
+                    pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
+                    for page_idx in range(len(pdf_doc)):
+                        page = pdf_doc[page_idx]
+                        mat = fitz.Matrix(200/72, 200/72)
+                        pix = page.get_pixmap(matrix=mat)
+                        img_bytes = pix.tobytes("png")
+                        
                         image_key = f"exam_pages/{exam_id}/{uuid.uuid4().hex}.png"
-                        buf = BytesIO()
-                        img.save(buf, format='PNG')
-                        buf.seek(0)
+                        buf = BytesIO(img_bytes)
                         
                         if object_storage.is_available():
                             object_storage.upload_from_file(buf, image_key)
@@ -9342,10 +9345,11 @@ def upload_exam_images(exam_id):
                         cur.execute("""
                             INSERT INTO report_card_exam_pages (exam_id, page_number, image_key, width_px, height_px)
                             VALUES (%s, %s, %s, %s, %s) RETURNING id
-                        """, (exam_id, next_page, image_key, img.width, img.height))
+                        """, (exam_id, next_page, image_key, pix.width, pix.height))
                         page_id = cur.fetchone()['id']
-                        uploaded_pages.append({'id': page_id, 'page_number': next_page, 'width': img.width, 'height': img.height})
+                        uploaded_pages.append({'id': page_id, 'page_number': next_page, 'width': pix.width, 'height': pix.height})
                         next_page += 1
+                    pdf_doc.close()
                 except Exception as pdf_err:
                     logger.error(f"PDF dönüştürme hatası: {pdf_err}")
                     return jsonify({"error": f"PDF işlenirken hata: {str(pdf_err)}"}), 500
@@ -9411,21 +9415,41 @@ def get_exam_pages(exam_id):
         exam = cur.fetchone()
         
         subject_questions = {}
+        subject_names = {
+            'turkce': 'Türkçe', 'matematik': 'Matematik', 'fen': 'Fen Bilimleri',
+            'inkilap': 'İnkılap Tarihi', 'din': 'Din Kültürü', 'ingilizce': 'İngilizce',
+            'sosyal': 'Sosyal Bilgiler'
+        }
         if exam and exam.get('question_counts'):
             qc = exam['question_counts']
             if isinstance(qc, str):
                 qc = json.loads(qc)
-            subject_names = {
-                'turkce': 'Türkçe', 'matematik': 'Matematik', 'fen': 'Fen Bilimleri',
-                'inkilap': 'İnkılap Tarihi', 'din': 'Din Kültürü', 'ingilizce': 'İngilizce',
-                'sosyal': 'Sosyal Bilgiler'
-            }
             for subj_key, count in qc.items():
                 if isinstance(count, (int, float)) and count > 0:
                     subject_questions[subj_key] = {
                         'label': subject_names.get(subj_key, subj_key),
                         'count': int(count)
                     }
+        
+        if not subject_questions:
+            cur.execute("""
+                SELECT subjects FROM report_card_results WHERE exam_id = %s LIMIT 1
+            """, (exam_id,))
+            sample = cur.fetchone()
+            if sample and sample.get('subjects'):
+                subjs = sample['subjects']
+                if isinstance(subjs, str):
+                    subjs = json.loads(subjs)
+                for subj_key, subj_data in subjs.items():
+                    qcount = subj_data.get('question_count', 0)
+                    if not qcount:
+                        qcount = len(subj_data.get('answers', []))
+                    if qcount > 0:
+                        label = subj_data.get('subject_label', subject_names.get(subj_key, subj_key))
+                        subject_questions[subj_key] = {
+                            'label': label,
+                            'count': int(qcount)
+                        }
         
         return jsonify({"pages": pages, "regions": regions, "subject_questions": subject_questions})
     except Exception as ex:

@@ -5,7 +5,7 @@ integrations = ["javascript_object_storage:1.0.0", "python_gemini_ai_integration
 
 [nix]
 channel = "stable-25_05"
-packages = ["cairo", "ffmpeg-full", "freetype", "ghostscript", "glibcLocales", "gobject-introspection", "gtk3", "jbig2dec", "jre", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "mupdf", "openjpeg", "pkg-config", "poppler_utils", "qhull", "qpdf", "tcl", "tk", "unzip", "zlib", "poppler", "zip"]
+packages = ["cairo", "ffmpeg-full", "freetype", "ghostscript", "glibcLocales", "gobject-introspection", "gtk3", "gumbo", "harfbuzz", "jbig2dec", "jre", "lcms2", "libimagequant", "libjpeg", "libjpeg_turbo", "libtiff", "libwebp", "libxcrypt", "mupdf", "openjpeg", "pkg-config", "poppler", "poppler_utils", "qhull", "qpdf", "swig", "tcl", "tk", "unzip", "xcbuild", "zip", "zlib"]
 
 [workflows]
 runButton = "Project"
