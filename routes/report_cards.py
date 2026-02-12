@@ -3982,6 +3982,7 @@ def get_class_outcome_pdf():
     
     exam_ids_str = request.args.get('exam_ids', '')
     class_name = request.args.get('class_name', '')
+    subject_filter = request.args.get('subject', '')
     
     if not exam_ids_str:
         return jsonify({"error": "Sınav ID'leri gerekli"}), 400
@@ -4023,6 +4024,8 @@ def get_class_outcome_pdf():
             
             for subj_key, subj_data in subjects.items():
                 subject_label = subj_data.get('subject_label', subj_key)
+                if subject_filter and subject_label != subject_filter:
+                    continue
                 if subject_label not in outcome_stats:
                     outcome_stats[subject_label] = {}
                 
@@ -4053,6 +4056,8 @@ def get_class_outcome_pdf():
         
         elements.append(Paragraph("SINIF KAZANIM ANALİZİ", title_style))
         elements.append(Paragraph(f"Sınıf: {class_name or 'Tüm Sınıflar'}", normal_style))
+        if subject_filter:
+            elements.append(Paragraph(f"Ders: {subject_filter}", normal_style))
         elements.append(Paragraph(f"Tarih: {datetime.now().strftime('%d.%m.%Y')}", normal_style))
         elements.append(Spacer(1, 15))
         
@@ -7509,6 +7514,8 @@ def student_error_pdf_download(result_id):
             if result_class not in teacher_classes and result_class_normalized not in teacher_classes_normalized:
                 return jsonify({"error": "Bu sınıfa erişim yetkiniz yok"}), 403
         
+        subject_filter = request.args.get('subject', '')
+        
         subjects = result.get('subjects', {})
         if isinstance(subjects, str):
             subjects = json.loads(subjects)
@@ -7528,10 +7535,14 @@ def student_error_pdf_download(result_id):
         elements.append(Paragraph(f"Öğrenci: {result['student_name']}", normal_style))
         elements.append(Paragraph(f"Sınıf: {result['class_name']}", normal_style))
         elements.append(Paragraph(f"Sınav: {result['exam_name']}", normal_style))
+        if subject_filter:
+            elements.append(Paragraph(f"Ders: {subject_filter}", normal_style))
         elements.append(Spacer(1, 15))
         
         for subj_key, subj_data in subjects.items():
             subject_label = subj_data.get('subject_label', subj_key)
+            if subject_filter and subject_label != subject_filter:
+                continue
             errors = []
             
             for ans in subj_data.get('answers', []):
@@ -7640,6 +7651,8 @@ def student_outcome_pdf_download(result_id):
             if result_class not in teacher_classes and result_class_normalized not in teacher_classes_normalized:
                 return jsonify({"error": "Bu sınıfa erişim yetkiniz yok"}), 403
         
+        subject_filter = request.args.get('subject', '')
+        
         subjects = result.get('subjects', {})
         if isinstance(subjects, str):
             subjects = json.loads(subjects)
@@ -7659,10 +7672,14 @@ def student_outcome_pdf_download(result_id):
         elements.append(Paragraph(f"Öğrenci: {result['student_name']}", normal_style))
         elements.append(Paragraph(f"Sınıf: {result['class_name']}", normal_style))
         elements.append(Paragraph(f"Sınav: {result['exam_name']}", normal_style))
+        if subject_filter:
+            elements.append(Paragraph(f"Ders: {subject_filter}", normal_style))
         elements.append(Spacer(1, 15))
         
         for subj_key, subj_data in subjects.items():
             subject_label = subj_data.get('subject_label', subj_key)
+            if subject_filter and subject_label != subject_filter:
+                continue
             
             outcome_stats = {}
             for ans in subj_data.get('answers', []):
@@ -8278,6 +8295,7 @@ def student_multi_outcome_pdf():
         
         student_name = results[0].get('student_name', student_no)
         class_name = results[0].get('class_name', '')
+        subject_filter = request.args.get('subject', '')
         
         outcome_data = {}
         for result in results:
@@ -8287,6 +8305,8 @@ def student_multi_outcome_pdf():
             
             for subj_key, subj_data in subjects.items():
                 subject_label = subj_data.get('subject_label', subj_key)
+                if subject_filter and subject_label != subject_filter:
+                    continue
                 if subject_label not in outcome_data:
                     outcome_data[subject_label] = {}
                 
@@ -8321,6 +8341,8 @@ def student_multi_outcome_pdf():
         
         elements.append(Paragraph("ÖĞRENCİ KAZANIM ANALİZİ", title_style))
         elements.append(Paragraph(f"Öğrenci: {student_name} | Sınıf: {class_name}", normal_style))
+        if subject_filter:
+            elements.append(Paragraph(f"Ders: {subject_filter}", normal_style))
         elements.append(Paragraph(f"Tarih: {datetime.now().strftime('%d.%m.%Y')}", normal_style))
         elements.append(Spacer(1, 12))
         
@@ -8374,6 +8396,7 @@ def student_multi_error_pdf():
     
     student_no = request.args.get('student_no', '')
     exam_ids_str = request.args.get('exam_ids', '')
+    subject_filter = request.args.get('subject', '')
     
     if not student_no or not exam_ids_str:
         return jsonify({"error": "Parametreler eksik"}), 400
@@ -8412,6 +8435,8 @@ def student_multi_error_pdf():
             
             for subj_key, subj_data in subjects.items():
                 subject_label = subj_data.get('subject_label', subj_key)
+                if subject_filter and subject_label != subject_filter:
+                    continue
                 if subject_label not in error_list:
                     error_list[subject_label] = []
                 
@@ -8458,6 +8483,8 @@ def student_multi_error_pdf():
         
         elements.append(Paragraph("HATA KARNESİ", title_style))
         elements.append(Paragraph(f"Öğrenci: {student_name} | Sınıf: {class_name}", normal_style))
+        if subject_filter:
+            elements.append(Paragraph(f"Ders: {subject_filter}", normal_style))
         elements.append(Paragraph(f"Toplam: {total_correct} Doğru / {total_wrong} Hatalı / {total_blank} Boş", normal_style))
         elements.append(Paragraph(f"Tarih: {datetime.now().strftime('%d.%m.%Y')}", normal_style))
         elements.append(Spacer(1, 12))
@@ -8642,6 +8669,7 @@ def class_error_pdf_multi():
     
     exam_ids_str = request.args.get('exam_ids', '')
     class_name = request.args.get('class_name', '')
+    subject_filter = request.args.get('subject', '')
     
     if not exam_ids_str:
         return jsonify({"error": "Sınav ID'leri gerekli"}), 400
@@ -8681,22 +8709,25 @@ def class_error_pdf_multi():
         student_count = len(results)
         
         for result in results:
+            exam_name = result.get('exam_name', '')
             subjects = result.get('subjects') or {}
             if isinstance(subjects, str):
                 subjects = json.loads(subjects)
             
             for subj_key, subj_data in subjects.items():
                 subject_label = subj_data.get('subject_label', subj_key)
+                if subject_filter and subject_label != subject_filter:
+                    continue
                 if subject_label not in error_stats:
                     error_stats[subject_label] = {}
                 
                 for ans in subj_data.get('answers', []):
                     q_no = ans.get('question_number', '-')
                     outcome = ans.get('outcome', '') or '-'
-                    key = f"{q_no}_{outcome}"
+                    key = f"{exam_name}|{q_no}_{outcome}"
                     
                     if key not in error_stats[subject_label]:
-                        error_stats[subject_label][key] = {'question_number': q_no, 'outcome': outcome, 'correct': 0, 'wrong': 0, 'blank': 0, 'total': 0}
+                        error_stats[subject_label][key] = {'exam_name': exam_name, 'question_number': q_no, 'outcome': outcome, 'correct': 0, 'wrong': 0, 'blank': 0, 'total': 0}
                     
                     error_stats[subject_label][key]['total'] += 1
                     if ans.get('status') == 'correct':
@@ -8723,6 +8754,8 @@ def class_error_pdf_multi():
         
         elements.append(Paragraph("SINIF HATA ANALİZİ", title_style))
         elements.append(Paragraph(f"Sınıf: {class_name or 'Tüm Sınıflar'} | Öğrenci: {student_count}", normal_style))
+        if subject_filter:
+            elements.append(Paragraph(f"Ders: {subject_filter}", normal_style))
         elements.append(Paragraph(f"Toplam: {total_correct} Doğru / {total_wrong} Yanlış / {total_blank} Boş", normal_style))
         elements.append(Paragraph(f"Tarih: {datetime.now().strftime('%d.%m.%Y')}", normal_style))
         elements.append(Spacer(1, 15))
@@ -8732,11 +8765,12 @@ def class_error_pdf_multi():
             
             sorted_questions = sorted(questions.values(), key=lambda x: x['wrong'] + x['blank'], reverse=True)
             
-            table_data = [['S.No', 'Kazanım', 'Yanlış', 'Boş', 'Hata %']]
+            table_data = [['Sınav', 'S.No', 'Kazanım', 'Yanlış', 'Boş', 'Hata %']]
             for q in sorted_questions[:20]:
                 total = q['total']
                 error_rate = round(((q['wrong'] + q['blank']) / total * 100), 1) if total > 0 else 0
                 table_data.append([
+                    Paragraph(q.get('exam_name', ''), cell_style),
                     str(q['question_number']),
                     Paragraph(q['outcome'], cell_style),
                     str(q['wrong']),
@@ -8744,14 +8778,14 @@ def class_error_pdf_multi():
                     f"%{error_rate}"
                 ])
             
-            t = Table(table_data, colWidths=[40, 305, 45, 45, 50])
+            t = Table(table_data, colWidths=[80, 30, 240, 40, 40, 50])
             t.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#fee2e2')),
                 ('FONTNAME', (0, 0), (-1, -1), PDF_FONT),
                 ('FONTSIZE', (0, 0), (-1, 0), 9),
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#fca5a5')),
-                ('ALIGN', (0, 0), (0, -1), 'CENTER'),
-                ('ALIGN', (2, 0), (-1, -1), 'CENTER'),
+                ('ALIGN', (1, 0), (1, -1), 'CENTER'),
+                ('ALIGN', (3, 0), (-1, -1), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, -1), 'TOP'),
                 ('TOPPADDING', (0, 0), (-1, -1), 4),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
@@ -8960,6 +8994,7 @@ def my_multi_outcome_pdf():
         return jsonify({"error": "Yetkisiz erişim"}), 403
     
     result_ids_str = request.args.get('result_ids', '')
+    subject_filter = request.args.get('subject', '')
     if not result_ids_str:
         return jsonify({"error": "Sonuç ID'leri gerekli"}), 400
     
@@ -8996,6 +9031,8 @@ def my_multi_outcome_pdf():
             
             for subj_key, subj_data in subjects.items():
                 subject_label = subj_data.get('subject_label', subj_key)
+                if subject_filter and subject_label != subject_filter:
+                    continue
                 if subject_label not in outcome_data:
                     outcome_data[subject_label] = {}
                 
@@ -9026,6 +9063,8 @@ def my_multi_outcome_pdf():
         
         elements.append(Paragraph("KAZANIM ANALİZİ", title_style))
         elements.append(Paragraph(f"Öğrenci: {student_name} | Sınıf: {class_name}", normal_style))
+        if subject_filter:
+            elements.append(Paragraph(f"Ders: {subject_filter}", normal_style))
         elements.append(Paragraph(f"Tarih: {datetime.now().strftime('%d.%m.%Y')}", normal_style))
         elements.append(Spacer(1, 12))
         
@@ -9078,6 +9117,7 @@ def my_multi_error_pdf():
         return jsonify({"error": "Yetkisiz erişim"}), 403
     
     result_ids_str = request.args.get('result_ids', '')
+    subject_filter = request.args.get('subject', '')
     if not result_ids_str:
         return jsonify({"error": "Sonuç ID'leri gerekli"}), 400
     
@@ -9119,6 +9159,8 @@ def my_multi_error_pdf():
             
             for subj_key, subj_data in subjects.items():
                 subject_label = subj_data.get('subject_label', subj_key)
+                if subject_filter and subject_label != subject_filter:
+                    continue
                 if subject_label not in error_list:
                     error_list[subject_label] = []
                 
@@ -9165,6 +9207,8 @@ def my_multi_error_pdf():
         
         elements.append(Paragraph("HATA KARNESİ", title_style))
         elements.append(Paragraph(f"Öğrenci: {student_name} | Sınıf: {class_name}", normal_style))
+        if subject_filter:
+            elements.append(Paragraph(f"Ders: {subject_filter}", normal_style))
         elements.append(Paragraph(f"Toplam: {total_correct} Doğru / {total_wrong} Hatalı / {total_blank} Boş", normal_style))
         elements.append(Paragraph(f"Tarih: {datetime.now().strftime('%d.%m.%Y')}", normal_style))
         elements.append(Spacer(1, 12))
@@ -9692,6 +9736,8 @@ def build_booklet_question_mapping(cur, exam_id, from_booklet, to_booklet):
 @report_cards_bp.route('/api/wrong-questions-pdf/<int:result_id>')
 @login_required
 def generate_wrong_questions_pdf(result_id):
+    if current_user.role not in ['admin', 'teacher']:
+        return jsonify({"error": "Yetkisiz erişim"}), 403
     from app import object_storage
     
     conn = get_db()

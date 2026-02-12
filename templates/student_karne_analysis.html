@@ -302,12 +302,7 @@ async function loadMyExams() {
                         <div class="stat-label">Net</div>
                     </div>
                 </div>
-                <div style="margin-top:12px;text-align:right;">
-                    <button onclick="event.stopPropagation();downloadWrongQuestionsPdf(${exam.result_id})" 
-                        style="background:#7c3aed;color:white;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:500;">
-                        📝 Tekrar Coz PDF
-                    </button>
-                </div>
+                
             </div>
         `).join('');
         
@@ -434,11 +429,17 @@ async function showErrors(resultId) {
 }
 
 function downloadErrorPdf(resultId) {
-    window.open(`/admin/report-cards/api/student-error-pdf/${resultId}`, '_blank');
+    const subj = document.getElementById('stuErrorSubjectFilter')?.value;
+    let url = `/admin/report-cards/api/student-error-pdf/${resultId}`;
+    if (subj) url += `?subject=${encodeURIComponent(subj)}`;
+    window.open(url, '_blank');
 }
 
 function downloadOutcomePdf(resultId) {
-    window.open(`/admin/report-cards/api/student-outcome-pdf/${resultId}`, '_blank');
+    const subj = document.getElementById('stuOutcomeSubjectFilter')?.value;
+    let url = `/admin/report-cards/api/student-outcome-pdf/${resultId}`;
+    if (subj) url += `?subject=${encodeURIComponent(subj)}`;
+    window.open(url, '_blank');
 }
 
 function openMultiExamModal() {
@@ -594,13 +595,19 @@ async function loadMultiError() {
 function downloadMultiOutcomePdf() {
     const selected = Array.from(document.querySelectorAll('.multi-exam-cb:checked')).map(cb => cb.value);
     if (selected.length === 0) { alert('Lütfen en az bir sınav seçin'); return; }
-    window.open(`/admin/report-cards/api/my-multi-outcome-pdf?result_ids=${selected.join(',')}`, '_blank');
+    let url = `/admin/report-cards/api/my-multi-outcome-pdf?result_ids=${selected.join(',')}`;
+    const subj = document.getElementById('multiSubjectFilter')?.value;
+    if (subj) url += `&subject=${encodeURIComponent(subj)}`;
+    window.open(url, '_blank');
 }
 
 function downloadMultiErrorPdf() {
     const selected = Array.from(document.querySelectorAll('.multi-exam-cb:checked')).map(cb => cb.value);
     if (selected.length === 0) { alert('Lütfen en az bir sınav seçin'); return; }
-    window.open(`/admin/report-cards/api/my-multi-error-pdf?result_ids=${selected.join(',')}`, '_blank');
+    let url = `/admin/report-cards/api/my-multi-error-pdf?result_ids=${selected.join(',')}`;
+    const subj = document.getElementById('multiSubjectFilter')?.value;
+    if (subj) url += `&subject=${encodeURIComponent(subj)}`;
+    window.open(url, '_blank');
 }
 
 function openProgressModal() {
@@ -705,24 +712,6 @@ async function loadProgressData() {
     }
 }
 
-async function downloadWrongQuestionsPdf(resultId) {
-    try {
-        const response = await fetch(`/admin/report-cards/api/wrong-questions-pdf/${resultId}`);
-        if (!response.ok) {
-            const data = await response.json();
-            alert(data.error || 'PDF olusturulamadi');
-            return;
-        }
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Tekrar_Coz_${resultId}.pdf`;
-        a.click();
-        URL.revokeObjectURL(url);
-    } catch (error) {
-        alert('PDF indirme hatasi: ' + error.message);
-    }
-}
+
 </script>
 {% endblock %}

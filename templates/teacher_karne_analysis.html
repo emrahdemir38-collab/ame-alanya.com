@@ -582,7 +582,12 @@ async function showOutcome(resultId, studentName) {
     
     const pdfBtn = document.getElementById('outcomePdfBtn');
     pdfBtn.style.display = 'inline-block';
-    pdfBtn.onclick = () => window.open(`/admin/report-cards/api/student-outcome-pdf/${resultId}`, '_blank');
+    pdfBtn.onclick = () => {
+        const subj = document.getElementById('singleOutcomeSubjectFilter').value;
+        let url = `/admin/report-cards/api/student-outcome-pdf/${resultId}`;
+        if (subj) url += `?subject=${encodeURIComponent(subj)}`;
+        window.open(url, '_blank');
+    };
     
     const filterSelect = document.getElementById('singleOutcomeSubjectFilter');
     filterSelect.innerHTML = '<option value="">Tum Dersler</option>' + ALL_SUBJECTS.map(s => '<option value="' + s + '">' + s + '</option>').join('');
@@ -653,7 +658,12 @@ async function showError(resultId, studentName) {
     
     const pdfBtn = document.getElementById('errorPdfBtn');
     pdfBtn.style.display = 'inline-block';
-    pdfBtn.onclick = () => window.open(`/admin/report-cards/api/student-error-pdf/${resultId}`, '_blank');
+    pdfBtn.onclick = () => {
+        const subj = document.getElementById('singleErrorSubjectFilter').value;
+        let url = `/admin/report-cards/api/student-error-pdf/${resultId}`;
+        if (subj) url += `?subject=${encodeURIComponent(subj)}`;
+        window.open(url, '_blank');
+    };
     
     const filterSelect = document.getElementById('singleErrorSubjectFilter');
     filterSelect.innerHTML = '<option value="">Tum Dersler</option>' + ALL_SUBJECTS.map(s => '<option value="' + s + '">' + s + '</option>').join('');
@@ -967,6 +977,8 @@ function downloadClassOutcomePdf() {
     
     let url = `/admin/report-cards/api/class-outcome-pdf?exam_ids=${selectedExams.join(',')}`;
     if (className) url += `&class_name=${encodeURIComponent(className)}`;
+    const subj = document.getElementById('classOutcomeSubjectFilter')?.value;
+    if (subj) url += `&subject=${encodeURIComponent(subj)}`;
     window.open(url, '_blank');
 }
 
@@ -1138,6 +1150,8 @@ function downloadClassErrorPdf() {
     
     let url = `/admin/report-cards/api/class-error-pdf?exam_ids=${selectedExams.join(',')}`;
     if (className) url += `&class_name=${encodeURIComponent(className)}`;
+    const subj = document.getElementById('classErrorSubjectFilter')?.value;
+    if (subj) url += `&subject=${encodeURIComponent(subj)}`;
     window.open(url, '_blank');
 }
 
@@ -1324,7 +1338,10 @@ function downloadStudentOutcomePdf() {
     const studentNo = document.getElementById('stuOutcomeStudentSelect').value;
     const selectedExams = Array.from(document.querySelectorAll('.stu-outcome-exam-cb:checked')).map(cb => cb.value);
     if (!studentNo || selectedExams.length === 0) { alert('Ogrenci ve sinav secin'); return; }
-    window.open(`/admin/report-cards/api/student-multi-outcome-pdf?student_no=${studentNo}&exam_ids=${selectedExams.join(',')}`, '_blank');
+    let url = `/admin/report-cards/api/student-multi-outcome-pdf?student_no=${studentNo}&exam_ids=${selectedExams.join(',')}`;
+    const subj = document.getElementById('stuOutcomeSubjectFilter')?.value;
+    if (subj) url += `&subject=${encodeURIComponent(subj)}`;
+    window.open(url, '_blank');
 }
 
 // ==================== ÖĞRENCİ HATA KARNESİ (ÇOKLU SINAV) ====================
@@ -1500,7 +1517,10 @@ function downloadStudentErrorPdf() {
     const studentNo = document.getElementById('stuErrorStudentSelect').value;
     const selectedExams = Array.from(document.querySelectorAll('.stu-error-exam-cb:checked')).map(cb => cb.value);
     if (!studentNo || selectedExams.length === 0) { alert('Ogrenci ve sinav secin'); return; }
-    window.open(`/admin/report-cards/api/student-multi-error-pdf?student_no=${studentNo}&exam_ids=${selectedExams.join(',')}`, '_blank');
+    let url = `/admin/report-cards/api/student-multi-error-pdf?student_no=${studentNo}&exam_ids=${selectedExams.join(',')}`;
+    const subj = document.getElementById('stuErrorSubjectFilter')?.value;
+    if (subj) url += `&subject=${encodeURIComponent(subj)}`;
+    window.open(url, '_blank');
 }
 
 function openStudentMultiExamModal(studentNo, studentName, className) {
