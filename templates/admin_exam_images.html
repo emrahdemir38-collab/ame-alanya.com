@@ -31,8 +31,6 @@
 
     .marker-line {
         position: absolute;
-        left: 0;
-        right: 0;
         height: 3px;
         background: #ef4444;
         pointer-events: none;
@@ -53,12 +51,34 @@
 
     .region-overlay {
         position: absolute;
-        left: 0;
-        right: 0;
         background: rgba(124, 58, 237, 0.08);
         border: 1px dashed rgba(124, 58, 237, 0.3);
         pointer-events: none;
         z-index: 5;
+    }
+
+    .temp-corner {
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        background: #ef4444;
+        border: 2px solid white;
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 15;
+        transform: translate(-50%, -50%);
+    }
+    .temp-corner::after {
+        content: attr(data-label);
+        position: absolute;
+        left: 16px;
+        top: -6px;
+        background: #ef4444;
+        color: white;
+        font-size: 0.7rem;
+        padding: 1px 6px;
+        border-radius: 4px;
+        white-space: nowrap;
     }
 
     .subject-tag {
@@ -241,7 +261,9 @@ async function loadEditorContent() {
             subject_key: r.subject_key,
             question_number: r.question_number,
             y_start: r.y_start_norm,
-            y_end: r.y_end_norm
+            y_end: r.y_end_norm,
+            x_start: r.x_start_norm ?? 0,
+            x_end: r.x_end_norm ?? 1
         }));
         
         renderEditor();
@@ -278,7 +300,7 @@ function buildToolbarHtml() {
     if (subjectKeys.length > 0) {
         html += `
             <div class="instructions">
-                <strong>Nasil calisir:</strong> 1) Ders secin 2) Soru numarasini secin 3) Sayfadaki sorunun baslangic noktasina tiklayin 4) Bitis noktasina tiklayin. Her soru icin bu islemi tekrarlayin.
+                <strong>Nasil calisir:</strong> 1) Ders secin 2) Soru numarasini secin 3) Sorunun sol ust kosesine tiklayin 4) Sag alt kosesine tiklayin. Her soru icin bu islemi tekrarlayin.
             </div>
             <div class="toolbar" id="subjectToolbar">
                 <div style="margin-bottom:12px;">
@@ -421,11 +443,12 @@ function handlePageClick(event, pageId) {
     
     const img = event.target;
     const rect = img.getBoundingClientRect();
+    const xNorm = (event.clientX - rect.left) / rect.width;
     const yNorm = (event.clientY - rect.top) / rect.height;
     
     if (!clickState) {
-        clickState = { pageId, yStart: yNorm };
-        showTempLine(pageId, yNorm, 'Baslangic');
+        clickState = { pageId, xStart: xNorm, yStart: yNorm };
+        showTempCorner(pageId, xNorm, yNorm, 'Sol ust');
     } else {
         if (clickState.pageId !== pageId) {
             alert('Baslangic ve bitis ayni sayfada olmali');
@@ -434,9 +457,10 @@ function handlePageClick(event, pageId) {
             return;
         }
         
-        const yEnd = yNorm;
-        const yStartFinal = Math.min(clickState.yStart, yEnd);
-        const yEndFinal = Math.max(clickState.yStart, yEnd);
+        const xStartFinal = Math.min(clickState.xStart, xNorm);
+        const xEndFinal = Math.max(clickState.xStart, xNorm);
+        const yStartFinal = Math.min(clickState.yStart, yNorm);
+        const yEndFinal = Math.max(clickState.yStart, yNorm);
         
         const existingIdx = markers.findIndex(m => m.subject_key === activeSubject && m.question_number === activeQuestionNum);
         if (existingIdx >= 0) markers.splice(existingIdx, 1);
@@ -445,6 +469,8 @@ function handlePageClick(event, pageId) {
             page_id: pageId,
             subject_key: activeSubject,
             question_number: activeQuestionNum,
+            x_start: xStartFinal,
+            x_end: xEndFinal,
             y_start: yStartFinal,
             y_end: yEndFinal
         });
@@ -468,17 +494,18 @@ function handlePageClick(event, pageId) {
     }
 }
 
-function showTempLine(pageId, yNorm, label) {
+function showTempCorner(pageId, xNorm, yNorm, label) {
     const container = document.getElementById(`pageContainer_${pageId}`);
     if (!container) return;
     const img = container.querySelector('img');
     if (!img) return;
     
-    const line = document.createElement('div');
-    line.className = 'marker-line temp-line';
-    line.style.top = (yNorm * img.offsetHeight) + 'px';
-    line.setAttribute('data-label', label);
-    container.appendChild(line);
+    const dot = document.createElement('div');
+    dot.className = 'temp-corner temp-line';
+    dot.style.left = (xNorm * img.offsetWidth) + 'px';
+    dot.style.top = (yNorm * img.offsetHeight) + 'px';
+    dot.setAttribute('data-label', label);
+    container.appendChild(dot);
 }
 
 function removeTempLines() {
@@ -497,16 +524,24 @@ function renderPageMarkers(pageId) {
     
     for (const m of pageMarkers) {
         const label = `${subjectQuestions[m.subject_key]?.label || m.subject_key} S${m.question_number}`;
+        const xS = (m.x_start ?? 0) * img.offsetWidth;
+        const xE = (m.x_end ?? 1) * img.offsetWidth;
+        const yS = m.y_start * img.offsetHeight;
+        const yE = m.y_end * img.offsetHeight;
         
         const overlay = document.createElement('div');
         overlay.className = 'region-overlay';
-        overlay.style.top = (m.y_start * img.offsetHeight) + 'px';
-        overlay.style.height = ((m.y_end - m.y_start) * img.offsetHeight) + 'px';
+        overlay.style.left = xS + 'px';
+        overlay.style.width = (xE - xS) + 'px';
+        overlay.style.top = yS + 'px';
+        overlay.style.height = (yE - yS) + 'px';
         container.appendChild(overlay);
         
         const startLine = document.createElement('div');
         startLine.className = 'marker-line';
-        startLine.style.top = (m.y_start * img.offsetHeight) + 'px';
+        startLine.style.left = xS + 'px';
+        startLine.style.width = (xE - xS) + 'px';
+        startLine.style.top = yS + 'px';
         startLine.setAttribute('data-label', label);
         container.appendChild(startLine);
     }
