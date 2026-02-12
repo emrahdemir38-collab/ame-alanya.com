@@ -173,6 +173,7 @@ let subjectQuestions = {};
 let activeSubject = null;
 let activeQuestionNum = 1;
 let markers = [];
+let imageBookletType = 'A';
 
 const SUBJECT_COLORS = {
     'turkce': 'turkce', 'matematik': 'matematik', 'fen': 'fen',
@@ -232,6 +233,7 @@ async function loadEditorContent() {
         currentPages = data.pages || [];
         currentRegions = data.regions || [];
         subjectQuestions = data.subject_questions || {};
+        imageBookletType = data.image_booklet_type || 'A';
         markers = currentRegions.map(r => ({
             page_id: r.page_id,
             subject_key: r.subject_key,
@@ -261,13 +263,20 @@ function renderEditor() {
     let html = `
         <div class="toolbar">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
-                <div>
-                    <label style="font-weight:600;margin-right:8px;">Gorsel Yukle:</label>
-                    <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.webp" multiple style="font-size:0.9rem;">
-                    <button class="action-btn btn-blue" onclick="uploadFiles()" style="margin-left:8px;">Yukle</button>
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                    <div>
+                        <label style="font-weight:600;margin-right:8px;">Gorsel Yukle:</label>
+                        <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.webp" multiple style="font-size:0.9rem;">
+                        <button class="action-btn btn-blue" onclick="uploadFiles()" style="margin-left:8px;">Yukle</button>
+                    </div>
+                    <div style="border-left:2px solid #e5e7eb;padding-left:12px;">
+                        <label style="font-weight:600;margin-right:6px;">Kitapcik:</label>
+                        <button onclick="setBookletType('A')" style="padding:6px 16px;border-radius:8px;border:2px solid ${imageBookletType==='A'?'#7c3aed':'#d1d5db'};background:${imageBookletType==='A'?'#ede9fe':'white'};font-weight:${imageBookletType==='A'?'700':'400'};cursor:pointer;color:${imageBookletType==='A'?'#7c3aed':'#374151'};">A</button>
+                        <button onclick="setBookletType('B')" style="padding:6px 16px;border-radius:8px;border:2px solid ${imageBookletType==='B'?'#7c3aed':'#d1d5db'};background:${imageBookletType==='B'?'#ede9fe':'white'};font-weight:${imageBookletType==='B'?'700':'400'};cursor:pointer;color:${imageBookletType==='B'?'#7c3aed':'#374151'};">B</button>
+                    </div>
                 </div>
                 <div>
-                    <span style="color:#6b7280;font-size:0.9rem;">${currentPages.length} sayfa | ${markers.length} soru isaretli</span>
+                    <span style="color:#6b7280;font-size:0.9rem;">${currentPages.length} sayfa | ${markers.length} soru isaretli | Kitapcik ${imageBookletType}</span>
                 </div>
             </div>
         </div>
@@ -588,6 +597,25 @@ async function deletePage(pageId) {
         }
     } catch (error) {
         alert('Silme hatasi: ' + error.message);
+    }
+}
+
+async function setBookletType(type) {
+    try {
+        const response = await fetch(`/admin/report-cards/api/exam-images/${currentExamId}/set-booklet`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ booklet_type: type })
+        });
+        const data = await response.json();
+        if (data.success) {
+            imageBookletType = type;
+            renderEditor();
+        } else {
+            alert('Hata: ' + (data.error || 'Bilinmeyen hata'));
+        }
+    } catch (error) {
+        alert('Kitapcik degistirme hatasi: ' + error.message);
     }
 }
 

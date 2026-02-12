@@ -9282,7 +9282,7 @@ def get_exams_for_images():
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("""
-            SELECT e.id, e.exam_name, e.grade_level, e.exam_date,
+            SELECT e.id, e.exam_name, e.grade_level, e.exam_date, e.image_booklet_type,
                    (SELECT COUNT(*) FROM report_card_exam_pages p WHERE p.exam_id = e.id) as page_count,
                    (SELECT COUNT(*) FROM report_card_question_regions q WHERE q.exam_id = e.id) as region_count
             FROM report_card_exams e
@@ -9411,7 +9411,7 @@ def get_exam_pages(exam_id):
         """, (exam_id,))
         regions = cur.fetchall()
         
-        cur.execute("SELECT question_counts, answer_key_a FROM report_card_exams WHERE id = %s", (exam_id,))
+        cur.execute("SELECT question_counts, answer_key_a, image_booklet_type FROM report_card_exams WHERE id = %s", (exam_id,))
         exam = cur.fetchone()
         
         subject_questions = {}
@@ -9451,9 +9451,32 @@ def get_exam_pages(exam_id):
                             'count': int(qcount)
                         }
         
-        return jsonify({"pages": pages, "regions": regions, "subject_questions": subject_questions})
+        image_booklet = exam.get('image_booklet_type', 'A') if exam else 'A'
+        return jsonify({"pages": pages, "regions": regions, "subject_questions": subject_questions, "image_booklet_type": image_booklet})
     except Exception as ex:
         logger.error(f"Sayfa listesi hatası: {ex}")
+        return jsonify({"error": str(ex)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@report_cards_bp.route('/api/exam-images/<int:exam_id>/set-booklet', methods=['POST'])
+@login_required
+def set_image_booklet_type(exam_id):
+    if current_user.role != 'admin':
+        return jsonify({"error": "Yetkisiz"}), 403
+    data = request.get_json()
+    booklet = data.get('booklet_type', 'A').upper()
+    if booklet not in ('A', 'B'):
+        return jsonify({"error": "Geçersiz kitapçık tipi"}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("UPDATE report_card_exams SET image_booklet_type = %s WHERE id = %s", (booklet, exam_id))
+        conn.commit()
+        return jsonify({"success": True, "booklet_type": booklet})
+    except Exception as ex:
+        conn.rollback()
         return jsonify({"error": str(ex)}), 500
     finally:
         cur.close()
@@ -9562,6 +9585,110 @@ def delete_exam_page(exam_id, page_id):
 
 # ==================== HATALI SORU PDF OLUŞTURMA ====================
 
+def build_booklet_question_mapping(cur, exam_id, from_booklet, to_booklet):
+    """Build a mapping from one booklet's question numbers to another's.
+    Returns dict: {subject_key: {from_q_num: to_q_num, ...}, ...}
+    
+    Strategy 1: Use kazanimlar from fmt_answer_keys (has soru/b_soru pairs) - most reliable
+    Strategy 2: Derive from student results by matching (outcome, correct_answer) pairs
+    """
+    if from_booklet == to_booklet:
+        return {}
+    
+    mapping = {}
+    
+    cur.execute("SELECT exam_name, grade_level FROM report_card_exams WHERE id = %s", (exam_id,))
+    exam_info = cur.fetchone()
+    if not exam_info:
+        return {}
+    
+    cur.execute("""
+        SELECT kazanimlar FROM fmt_answer_keys 
+        WHERE exam_name = %s AND kazanimlar IS NOT NULL
+        LIMIT 1
+    """, (exam_info['exam_name'],))
+    ak_row = cur.fetchone()
+    
+    if ak_row and ak_row.get('kazanimlar'):
+        kaz = ak_row['kazanimlar']
+        if isinstance(kaz, str):
+            kaz = json.loads(kaz)
+        for subj_key, questions in kaz.items():
+            subj_map = {}
+            for q in questions:
+                a_num = q.get('soru')
+                b_num = q.get('b_soru')
+                if a_num and b_num:
+                    if from_booklet == 'A' and to_booklet == 'B':
+                        subj_map[a_num] = b_num
+                    else:
+                        subj_map[b_num] = a_num
+            if subj_map:
+                mapping[subj_key] = subj_map
+        if mapping:
+            logger.info(f"Kitapçık eşleştirme (kazanımlar): {from_booklet}→{to_booklet}, {sum(len(v) for v in mapping.values())} soru eşleştirildi")
+            return mapping
+    
+    cur.execute("""
+        SELECT subjects FROM report_card_results 
+        WHERE exam_id = %s AND subjects::text LIKE %s 
+        LIMIT 1
+    """, (exam_id, f'%"booklet_type": "{from_booklet}"%'))
+    from_row = cur.fetchone()
+    
+    cur.execute("""
+        SELECT subjects FROM report_card_results 
+        WHERE exam_id = %s AND subjects::text LIKE %s 
+        LIMIT 1
+    """, (exam_id, f'%"booklet_type": "{to_booklet}"%'))
+    to_row = cur.fetchone()
+    
+    if from_row and to_row:
+        from_subjs = from_row['subjects']
+        to_subjs = to_row['subjects']
+        if isinstance(from_subjs, str):
+            from_subjs = json.loads(from_subjs)
+        if isinstance(to_subjs, str):
+            to_subjs = json.loads(to_subjs)
+        
+        for subj_key in from_subjs:
+            if subj_key not in to_subjs:
+                continue
+            from_answers = from_subjs[subj_key].get('answers', [])
+            to_answers = to_subjs[subj_key].get('answers', [])
+            
+            to_by_oca = {}
+            for ta in to_answers:
+                key = (ta.get('outcome', ''), ta.get('correct_answer', ''))
+                if key[0] and key[1]:
+                    if key not in to_by_oca:
+                        to_by_oca[key] = []
+                    to_by_oca[key].append(ta.get('question_number'))
+            
+            subj_map = {}
+            used_to_nums = set()
+            for fa in from_answers:
+                key = (fa.get('outcome', ''), fa.get('correct_answer', ''))
+                if not key[0] or not key[1]:
+                    continue
+                candidates = to_by_oca.get(key, [])
+                for c in candidates:
+                    if c not in used_to_nums:
+                        subj_map[fa.get('question_number')] = c
+                        used_to_nums.add(c)
+                        break
+            if subj_map:
+                mapping[subj_key] = subj_map
+        
+        if mapping:
+            total = sum(len(v) for v in mapping.values())
+            logger.info(f"Kitapçık eşleştirme (sonuçlardan): {from_booklet}→{to_booklet}, {total} soru eşleştirildi")
+    else:
+        logger.warning(f"Kitapçık eşleştirme yapılamadı: exam_id={exam_id}, {from_booklet}→{to_booklet}, her iki kitapçıktan sonuç bulunamadı")
+    
+    return mapping
+
+
 @report_cards_bp.route('/api/wrong-questions-pdf/<int:result_id>')
 @login_required
 def generate_wrong_questions_pdf(result_id):
@@ -9572,7 +9699,7 @@ def generate_wrong_questions_pdf(result_id):
     
     try:
         cur.execute("""
-            SELECT r.*, e.exam_name, e.id as exam_id
+            SELECT r.*, e.exam_name, e.id as exam_id, e.image_booklet_type
             FROM report_card_results r
             JOIN report_card_exams e ON r.exam_id = e.id
             WHERE r.id = %s
@@ -9624,6 +9751,19 @@ def generate_wrong_questions_pdf(result_id):
         if not wrong_questions:
             return jsonify({"error": "Hatalı soru bulunamadı"}), 404
         
+        image_booklet = result.get('image_booklet_type', 'A') or 'A'
+        
+        student_booklet = result.get('booklet_type', '') or ''
+        if not student_booklet:
+            first_subj = next(iter(subjects.values()), {})
+            student_booklet = first_subj.get('booklet_type', 'A') or 'A'
+        student_booklet = student_booklet.upper()
+        
+        q_mapping = {}
+        if student_booklet != image_booklet:
+            q_mapping = build_booklet_question_mapping(cur, exam_id, student_booklet, image_booklet)
+            logger.info(f"Kitapçık dönüşümü: öğrenci={student_booklet} → görsel={image_booklet}, mapping dersleri: {list(q_mapping.keys())}")
+        
         cur.execute("""
             SELECT qr.*, ep.image_key, ep.width_px, ep.height_px
             FROM report_card_question_regions qr
@@ -9641,7 +9781,13 @@ def generate_wrong_questions_pdf(result_id):
         
         cropped_items = []
         for wq in wrong_questions:
-            key = f"{wq['subject_key']}_{wq['question_number']}"
+            lookup_q_num = wq['question_number']
+            if q_mapping and wq['subject_key'] in q_mapping:
+                mapped = q_mapping[wq['subject_key']].get(lookup_q_num)
+                if mapped:
+                    lookup_q_num = mapped
+            
+            key = f"{wq['subject_key']}_{lookup_q_num}"
             region = region_map.get(key)
             if not region:
                 continue
@@ -9680,8 +9826,12 @@ def generate_wrong_questions_pdf(result_id):
                 'correct_answer': wq['correct_answer']
             })
         
+        unmapped_count = len(wrong_questions) - len(cropped_items)
+        
         if not cropped_items:
-            return jsonify({"error": "Eşleşen soru görseli bulunamadı"}), 404
+            if student_booklet != image_booklet and not q_mapping:
+                return jsonify({"error": f"Kitapcik eslestirmesi yapilamadi. Ogrenci {student_booklet} kitapcigi, gorsel {image_booklet} kitapcigi. Lutfen kazanimli cevap anahtari yukleyin."}), 404
+            return jsonify({"error": "Eslesen soru gorseli bulunamadi"}), 404
         
         pdf_buffer = BytesIO()
         doc = SimpleDocTemplate(pdf_buffer, pagesize=A4, topMargin=30, bottomMargin=30, leftMargin=40, rightMargin=40)
@@ -9693,16 +9843,21 @@ def generate_wrong_questions_pdf(result_id):
             subtitle_style = ParagraphStyle('WrongSubtitle', parent=styles['Normal'], fontName='DejaVuSans', fontSize=10, spaceAfter=12, textColor=colors.grey)
             subject_style = ParagraphStyle('WrongSubject', parent=styles['Heading2'], fontName='DejaVuSans-Bold', fontSize=12, spaceBefore=16, spaceAfter=6, textColor=colors.HexColor('#7c3aed'))
             info_style = ParagraphStyle('WrongInfo', parent=styles['Normal'], fontName='DejaVuSans', fontSize=8, textColor=colors.grey, spaceAfter=4)
+            warn_style = ParagraphStyle('WrongWarn', parent=styles['Normal'], fontName='DejaVuSans', fontSize=8, textColor=colors.HexColor('#dc2626'), spaceAfter=8)
         except:
             title_style = ParagraphStyle('WrongTitle', parent=styles['Title'], fontSize=14, spaceAfter=6)
             subtitle_style = ParagraphStyle('WrongSubtitle', parent=styles['Normal'], fontSize=10, spaceAfter=12, textColor=colors.grey)
             subject_style = ParagraphStyle('WrongSubject', parent=styles['Heading2'], fontSize=12, spaceBefore=16, spaceAfter=6, textColor=colors.HexColor('#7c3aed'))
             info_style = ParagraphStyle('WrongInfo', parent=styles['Normal'], fontSize=8, textColor=colors.grey, spaceAfter=4)
+            warn_style = ParagraphStyle('WrongWarn', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#dc2626'), spaceAfter=8)
         
         student_name = result.get('student_name', '')
         exam_name = result.get('exam_name', '')
         elements.append(Paragraph(f"Tekrar Coz - {student_name}", title_style))
-        elements.append(Paragraph(f"{exam_name} | Hatali/Bos: {len(cropped_items)} soru", subtitle_style))
+        subtitle = f"{exam_name} | Hatali/Bos: {len(wrong_questions)} soru, gorseli bulunan: {len(cropped_items)}"
+        elements.append(Paragraph(subtitle, subtitle_style))
+        if unmapped_count > 0 and student_booklet != image_booklet:
+            elements.append(Paragraph(f"Not: {unmapped_count} sorunun gorseli kitapcik farkindan dolayi eslestirilemedi (Ogrenci: {student_booklet}, Gorsel: {image_booklet})", warn_style))
         elements.append(Spacer(1, 10))
         
         current_subject = None

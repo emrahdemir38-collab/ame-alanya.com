@@ -3671,6 +3671,7 @@ def init_database():
                 answer_key_a JSON,
                 answer_key_b JSON,
                 question_counts JSON,
+                image_booklet_type VARCHAR(1) DEFAULT 'A',
                 created_by INTEGER REFERENCES users(id),
                 created_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul')
             )
@@ -3761,6 +3762,11 @@ def init_database():
             """)
         except Exception as e:
             logger.info(f"parent_id column already exists or error: {e}")
+        
+        try:
+            cur.execute("ALTER TABLE report_card_exams ADD COLUMN IF NOT EXISTS image_booklet_type VARCHAR(1) DEFAULT 'A'")
+        except Exception as e:
+            logger.info(f"image_booklet_type column: {e}")
         
         # Dashboard Widget System (Task #10)
         cur.execute("""
