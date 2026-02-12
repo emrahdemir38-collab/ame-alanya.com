@@ -9779,17 +9779,38 @@ def generate_wrong_questions_pdf(result_id):
         
         page_images_cache = {}
         
+        marked_subjects = set()
+        for rk in region_map:
+            subj = rk.rsplit('_', 1)[0]
+            marked_subjects.add(subj)
+        
         cropped_items = []
+        no_region_count = 0
+        no_mapping_count = 0
         for wq in wrong_questions:
             lookup_q_num = wq['question_number']
+            mapping_failed = False
             if q_mapping and wq['subject_key'] in q_mapping:
                 mapped = q_mapping[wq['subject_key']].get(lookup_q_num)
                 if mapped:
                     lookup_q_num = mapped
+                else:
+                    mapping_failed = True
+            elif student_booklet != image_booklet and wq['subject_key'] not in (q_mapping or {}):
+                mapping_failed = True
             
             key = f"{wq['subject_key']}_{lookup_q_num}"
             region = region_map.get(key)
             if not region:
+                if mapping_failed:
+                    no_mapping_count += 1
+                    logger.debug(f"Eşleştirme başarısız: {wq['subject_key']} S{wq['question_number']} (A→B mapping yok)")
+                elif wq['subject_key'] not in marked_subjects:
+                    no_region_count += 1
+                    logger.debug(f"Bölge yok: {wq['subject_key']} S{lookup_q_num} (ders için görsel işaretlenmemiş)")
+                else:
+                    no_region_count += 1
+                    logger.debug(f"Bölge yok: {wq['subject_key']} S{lookup_q_num} (soru işaretlenmemiş)")
                 continue
             
             image_key = region['image_key']
@@ -9826,9 +9847,13 @@ def generate_wrong_questions_pdf(result_id):
                 'correct_answer': wq['correct_answer']
             })
         
-        unmapped_count = len(wrong_questions) - len(cropped_items)
+        missing_total = len(wrong_questions) - len(cropped_items)
+        
+        logger.info(f"Tekrar Çöz PDF: {len(wrong_questions)} hatalı soru, {len(cropped_items)} görsel bulundu, {no_region_count} bölge yok, {no_mapping_count} eşleştirme başarısız")
         
         if not cropped_items:
+            if no_region_count > 0 and no_mapping_count == 0:
+                return jsonify({"error": "Soru gorselleri henuz isaretlenmemis. Admin panelinden soru bolgelerini isaretleyin."}), 404
             if student_booklet != image_booklet and not q_mapping:
                 return jsonify({"error": f"Kitapcik eslestirmesi yapilamadi. Ogrenci {student_booklet} kitapcigi, gorsel {image_booklet} kitapcigi. Lutfen kazanimli cevap anahtari yukleyin."}), 404
             return jsonify({"error": "Eslesen soru gorseli bulunamadi"}), 404
@@ -9856,8 +9881,14 @@ def generate_wrong_questions_pdf(result_id):
         elements.append(Paragraph(f"Tekrar Coz - {student_name}", title_style))
         subtitle = f"{exam_name} | Hatali/Bos: {len(wrong_questions)} soru, gorseli bulunan: {len(cropped_items)}"
         elements.append(Paragraph(subtitle, subtitle_style))
-        if unmapped_count > 0 and student_booklet != image_booklet:
-            elements.append(Paragraph(f"Not: {unmapped_count} sorunun gorseli kitapcik farkindan dolayi eslestirilemedi (Ogrenci: {student_booklet}, Gorsel: {image_booklet})", warn_style))
+        if missing_total > 0:
+            warnings = []
+            if no_region_count > 0:
+                warnings.append(f"{no_region_count} sorunun gorseli henuz isaretlenmemis")
+            if no_mapping_count > 0:
+                warnings.append(f"{no_mapping_count} soru kitapcik farkindan dolayi eslestirilemedi (Ogrenci: {student_booklet}, Gorsel: {image_booklet})")
+            if warnings:
+                elements.append(Paragraph(f"Not: {' | '.join(warnings)}", warn_style))
         elements.append(Spacer(1, 10))
         
         current_subject = None
