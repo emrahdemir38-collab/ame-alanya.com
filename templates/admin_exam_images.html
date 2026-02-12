@@ -364,12 +364,13 @@ function renderEditor() {
     const content = document.getElementById('editorContent');
     
     const subjectKeys = Object.keys(subjectQuestions);
-    if (!activeSubject && subjectKeys.length > 0) activeSubject = subjectKeys[0];
-    
-    const nextQ = getNextUnmarkedQuestion();
-    if (nextQ) {
-        activeSubject = nextQ.subject;
-        activeQuestionNum = nextQ.num;
+    if (!activeSubject && subjectKeys.length > 0) {
+        activeSubject = subjectKeys[0];
+        const nextQ = getNextUnmarkedQuestion();
+        if (nextQ) {
+            activeSubject = nextQ.subject;
+            activeQuestionNum = nextQ.num;
+        }
     }
     
     let html = `<div id="toolbarArea">${buildToolbarHtml()}</div>`;
@@ -530,7 +531,14 @@ function getFirstUnmarkedForSubject(sk) {
 }
 
 function getNextUnmarkedQuestion() {
-    for (const sk of Object.keys(subjectQuestions)) {
+    if (activeSubject) {
+        const un = getFirstUnmarkedForSubject(activeSubject);
+        if (un) return { subject: activeSubject, num: un };
+    }
+    const subjectKeys = Object.keys(subjectQuestions);
+    const startIdx = activeSubject ? subjectKeys.indexOf(activeSubject) : 0;
+    for (let i = 1; i < subjectKeys.length; i++) {
+        const sk = subjectKeys[(startIdx + i) % subjectKeys.length];
         const un = getFirstUnmarkedForSubject(sk);
         if (un) return { subject: sk, num: un };
     }
