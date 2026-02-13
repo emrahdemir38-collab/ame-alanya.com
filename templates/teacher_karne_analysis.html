@@ -1802,8 +1802,22 @@ async function downloadWrongQuestionsPdf(resultId) {
     try {
         const response = await fetch(`/admin/report-cards/api/wrong-questions-pdf/${resultId}`);
         if (!response.ok) {
-            const data = await response.json();
-            alert(data.error || 'PDF olusturulamadi');
+            try {
+                const data = await response.json();
+                alert(data.error || 'PDF oluşturulamadı');
+            } catch(e) {
+                alert('PDF oluşturulamadı (Hata kodu: ' + response.status + ')');
+            }
+            return;
+        }
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/pdf')) {
+            try {
+                const data = await response.json();
+                alert(data.error || 'PDF oluşturulamadı');
+            } catch(e) {
+                alert('Beklenmeyen yanıt alındı');
+            }
             return;
         }
         const blob = await response.blob();
@@ -1814,7 +1828,7 @@ async function downloadWrongQuestionsPdf(resultId) {
         a.click();
         URL.revokeObjectURL(url);
     } catch (error) {
-        alert('PDF indirme hatasi: ' + error.message);
+        alert('PDF indirme hatası: ' + error.message);
     }
 }
 
