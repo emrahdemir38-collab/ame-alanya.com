@@ -6312,20 +6312,34 @@ def fix_student_names():
         cur.execute("""
             UPDATE report_card_results r
             SET student_name = u.full_name,
-                class_name = u.class_name,
-                student_id = u.id
+                class_name = u.class_name
             FROM users u
             WHERE u.role = 'student'
             AND CAST(u.student_no AS VARCHAR) = r.student_no
-            AND (r.student_name != u.full_name OR r.class_name != u.class_name OR r.student_id IS NULL)
+            AND (r.student_name != u.full_name OR r.class_name != u.class_name)
         """)
-        updated = cur.rowcount
+        name_updated = cur.rowcount
+
+        cur.execute("""
+            UPDATE report_card_results r
+            SET student_id = u.id
+            FROM users u
+            WHERE u.role = 'student'
+            AND CAST(u.student_no AS VARCHAR) = r.student_no
+            AND r.student_id IS NULL
+            AND NOT EXISTS (
+                SELECT 1 FROM report_card_results r2
+                WHERE r2.exam_id = r.exam_id AND r2.student_id = u.id
+            )
+        """)
+        id_updated = cur.rowcount
         conn.commit()
         
+        total = name_updated + id_updated
         return jsonify({
             "success": True,
-            "updated_count": updated,
-            "message": f"{updated} öğrenci kaydı güncellendi"
+            "updated_count": total,
+            "message": f"{name_updated} isim/sınıf, {id_updated} öğrenci ID güncellendi"
         })
     except Exception as e:
         conn.rollback()
