@@ -439,6 +439,9 @@
             <button class="upload-btn" style="background: linear-gradient(135deg, #f59e0b, #d97706);" onclick="fixStudentNumbers()">
                 <span>🔧</span> No Düzelt
             </button>
+            <button class="upload-btn" style="background: linear-gradient(135deg, #0ea5e9, #0284c7);" onclick="fixStudentNames()">
+                <span>🔄</span> İsimleri Güncelle
+            </button>
             {% endif %}
             <button class="upload-btn" style="background: linear-gradient(135deg, #ef4444, #dc2626);" onclick="openErrorReportModal()">
                 <span>📊</span> Hata Karnesi Oluştur
@@ -975,6 +978,22 @@ async function fixStudentNumbers() {
         const response = await fetch('/admin/report-cards/api/fix-student-numbers');
         const data = await response.json();
         
+        if (data.success) {
+            alert('✅ ' + data.message);
+            location.reload();
+        } else {
+            alert('Hata: ' + (data.error || 'Bilinmeyen hata'));
+        }
+    } catch (error) {
+        alert('Hata: ' + error.message);
+    }
+}
+
+async function fixStudentNames() {
+    if (!confirm('Tüm sınav sonuçlarındaki öğrenci isimleri ve sınıfları kayıtlı kullanıcı bilgilerine göre güncellenecek. Devam edilsin mi?')) return;
+    try {
+        const response = await fetch('/admin/report-cards/api/fix-student-names', {method: 'POST'});
+        const data = await response.json();
         if (data.success) {
             alert('✅ ' + data.message);
             location.reload();
