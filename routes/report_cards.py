@@ -6302,7 +6302,7 @@ def fetch_student_names_from_db(students):
 @report_cards_bp.route('/api/fix-student-names', methods=['POST'])
 @login_required
 def fix_student_names():
-    if current_user.role != 'admin':
+    if current_user.role not in ['admin', 'teacher']:
         return jsonify({"error": "Yetkisiz erişim"}), 403
     
     conn = get_db()
