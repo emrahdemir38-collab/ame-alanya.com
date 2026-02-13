@@ -5635,11 +5635,15 @@ def save_image_results():
                 user_id = None
                 if student_no:
                     cur.execute("""
-                        SELECT id FROM users WHERE role = 'student' AND username = %s
+                        SELECT id, full_name, class_name FROM users 
+                        WHERE role = 'student' AND CAST(student_no AS VARCHAR) = %s
+                        LIMIT 1
                     """, (student_no,))
                     user = cur.fetchone()
                     if user:
                         user_id = user['id']
+                        student_name = user['full_name']
+                        class_name = user['class_name'] or class_name
                 
                 totals = student.get('totals', {})
                 subjects = student.get('subjects', {})
@@ -6269,31 +6273,15 @@ def fetch_student_names_from_db(students):
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
         for student in students:
-            student_no = student.get('student_no', '')
-            csv_class = student.get('class_name', '')  # CSV'den gelen sınıf bilgisi
+            student_no = str(student.get('student_no', '')).lstrip('0') or '0'
             
-            if student_no:
-                result = None
-                
-                # Önce student_no + sınıf ile eşleştir (aynı numara farklı sınıflarda olabilir)
-                if csv_class:
-                    csv_class_normalized = csv_class.replace('/', '')  # "7/B" -> "7B"
-                    cur.execute("""
-                        SELECT full_name, class_name FROM users 
-                        WHERE role = 'student' AND student_no = %s
-                        AND (REPLACE(class_name, '/', '') = %s OR class_name = %s)
-                        LIMIT 1
-                    """, (student_no, csv_class_normalized, csv_class))
-                    result = cur.fetchone()
-                
-                # Sınıf eşleşmesi bulunamazsa sadece student_no ile ara
-                if not result:
-                    cur.execute("""
-                        SELECT full_name, class_name FROM users 
-                        WHERE role = 'student' AND student_no = %s
-                        LIMIT 1
-                    """, (student_no,))
-                    result = cur.fetchone()
+            if student_no and student_no != '0':
+                cur.execute("""
+                    SELECT full_name, class_name FROM users 
+                    WHERE role = 'student' AND CAST(student_no AS VARCHAR) = %s
+                    LIMIT 1
+                """, (student_no,))
+                result = cur.fetchone()
                 
                 if result:
                     student['name'] = result['full_name']
@@ -6310,6 +6298,43 @@ def fetch_student_names_from_db(students):
 
 
 # ==================== YENİ TABLO YAPISINA UYGUN ENDPOINT'LER ====================
+
+@report_cards_bp.route('/api/fix-student-names', methods=['POST'])
+@login_required
+def fix_student_names():
+    if current_user.role != 'admin':
+        return jsonify({"error": "Yetkisiz erişim"}), 403
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    try:
+        cur.execute("""
+            UPDATE report_card_results r
+            SET student_name = u.full_name,
+                class_name = u.class_name,
+                student_id = u.id
+            FROM users u
+            WHERE u.role = 'student'
+            AND CAST(u.student_no AS VARCHAR) = r.student_no
+            AND (r.student_name != u.full_name OR r.class_name != u.class_name OR r.student_id IS NULL)
+        """)
+        updated = cur.rowcount
+        conn.commit()
+        
+        return jsonify({
+            "success": True,
+            "updated_count": updated,
+            "message": f"{updated} öğrenci kaydı güncellendi"
+        })
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"İsim düzeltme hatası: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
 
 @report_cards_bp.route('/api/exams-list', methods=['GET'])
 @login_required
