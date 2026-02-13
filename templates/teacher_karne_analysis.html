@@ -332,6 +332,11 @@
             <button class="action-btn btn-green" onclick="openStudentErrorModal()">
                 ❌ Ogrenci Hata Karnesi
             </button>
+            {% if current_user.role == 'admin' %}
+            <button class="action-btn" style="background:#0ea5e9;color:white;" onclick="fixStudentNames()">
+                🔄 Isimleri Guncelle
+            </button>
+            {% endif %}
         </div>
     </div>
     
@@ -1829,6 +1834,22 @@ async function downloadWrongQuestionsPdf(resultId) {
         URL.revokeObjectURL(url);
     } catch (error) {
         alert('PDF indirme hatası: ' + error.message);
+    }
+}
+
+async function fixStudentNames() {
+    if (!confirm('Tum sinav sonuclarindaki ogrenci isimleri ve siniflari kayitli kullanici bilgilerine gore guncellenecek. Devam edilsin mi?')) return;
+    try {
+        const response = await fetch('/admin/report-cards/api/fix-student-names', {method: 'POST'});
+        const data = await response.json();
+        if (data.success) {
+            alert(data.message || 'Guncelleme tamamlandi');
+            location.reload();
+        } else {
+            alert(data.error || 'Guncelleme basarisiz');
+        }
+    } catch (error) {
+        alert('Hata: ' + error.message);
     }
 }
 
