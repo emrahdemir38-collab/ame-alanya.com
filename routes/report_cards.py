@@ -6302,7 +6302,7 @@ def fetch_student_names_from_db(students):
 @report_cards_bp.route('/api/fix-student-names', methods=['POST'])
 @login_required
 def fix_student_names():
-    if current_user.role not in ['admin', 'teacher']:
+    if current_user.role != 'admin':
         return jsonify({"error": "Yetkisiz erişim"}), 403
     
     conn = get_db()
@@ -6310,36 +6310,37 @@ def fix_student_names():
     
     try:
         cur.execute("""
-            UPDATE report_card_results r
-            SET student_name = u.full_name,
-                class_name = u.class_name
-            FROM users u
-            WHERE u.role = 'student'
-            AND CAST(u.student_no AS VARCHAR) = r.student_no
-            AND (r.student_name != u.full_name OR r.class_name != u.class_name)
+            DELETE FROM report_card_results
+            WHERE id IN (
+                SELECT r.id FROM (
+                    SELECT id, ROW_NUMBER() OVER (PARTITION BY exam_id, student_no ORDER BY id) as rn
+                    FROM report_card_results
+                ) r WHERE r.rn > 1
+            )
         """)
-        name_updated = cur.rowcount
+        duplicates_removed = cur.rowcount
 
         cur.execute("""
             UPDATE report_card_results r
-            SET student_id = u.id
+            SET student_name = u.full_name,
+                class_name = u.class_name,
+                student_id = u.id
             FROM users u
             WHERE u.role = 'student'
             AND CAST(u.student_no AS VARCHAR) = r.student_no
-            AND r.student_id IS NULL
-            AND NOT EXISTS (
-                SELECT 1 FROM report_card_results r2
-                WHERE r2.exam_id = r.exam_id AND r2.student_id = u.id
-            )
         """)
-        id_updated = cur.rowcount
+        updated = cur.rowcount
         conn.commit()
         
-        total = name_updated + id_updated
+        msg = f"{updated} kayıt güncellendi"
+        if duplicates_removed > 0:
+            msg += f", {duplicates_removed} çift kayıt silindi"
+        
         return jsonify({
             "success": True,
-            "updated_count": total,
-            "message": f"{name_updated} isim/sınıf, {id_updated} öğrenci ID güncellendi"
+            "updated_count": updated,
+            "duplicates_removed": duplicates_removed,
+            "message": msg
         })
     except Exception as e:
         conn.rollback()
