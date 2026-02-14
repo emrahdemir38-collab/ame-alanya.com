@@ -566,6 +566,111 @@ def admin_dashboard():
         return redirect('/')
     return render_template("admin_dashboard.html")
 
+@app.route("/api/admin/sync-db", methods=["POST"])
+@login_required
+def admin_sync_db():
+    if current_user.role != 'admin':
+        return jsonify({"success": False, "error": "Yetkisiz"}), 403
+
+    import psycopg2
+    import psycopg2.extras
+    import json as json_mod
+
+    prod_url = os.environ.get('PROD_DATABASE_URL')
+    dev_url = os.environ.get('DATABASE_URL')
+
+    if not prod_url:
+        return jsonify({"success": False, "error": "PROD_DATABASE_URL ayarlanmamis"})
+    if not dev_url:
+        return jsonify({"success": False, "error": "DATABASE_URL bulunamadi"})
+
+    if prod_url == dev_url:
+        return jsonify({"success": False, "error": "Production ve Development veritabanlari ayni! Bu islem yapilamaz."})
+
+    tables_to_sync = [
+        'users', 'classes', 'teacher_classes',
+        'report_card_exams', 'report_card_exam_pages',
+        'report_card_question_regions', 'report_card_results',
+        'book_entries',
+    ]
+    tables_to_truncate = [
+        'book_entries', 'report_card_results',
+        'report_card_question_regions', 'report_card_exam_pages',
+        'report_card_exams', 'teacher_classes', 'classes',
+        'user_sessions', 'users',
+    ]
+
+    try:
+        prod_conn = psycopg2.connect(prod_url, cursor_factory=psycopg2.extras.RealDictCursor)
+        prod_cur = prod_conn.cursor()
+        dev_conn = psycopg2.connect(dev_url)
+        dev_cur = dev_conn.cursor()
+
+        for table in tables_to_truncate:
+            try:
+                dev_cur.execute(f"TRUNCATE TABLE {table} CASCADE")
+            except:
+                dev_conn.rollback()
+        dev_conn.commit()
+
+        results = {}
+        for table in tables_to_sync:
+            prod_cur.execute(f"SELECT * FROM {table} ORDER BY id")
+            rows = prod_cur.fetchall()
+            if not rows:
+                results[table] = {"prod": 0, "dev": 0}
+                continue
+
+            columns = list(rows[0].keys())
+            json_columns = set()
+            prod_cur.execute("""
+                SELECT column_name FROM information_schema.columns 
+                WHERE table_name = %s AND data_type IN ('json', 'jsonb')
+            """, (table,))
+            for r in prod_cur.fetchall():
+                json_columns.add(r['column_name'])
+
+            placeholders = ['%s::json' if col in json_columns else '%s' for col in columns]
+            insert_sql = f"INSERT INTO {table} ({','.join(columns)}) VALUES ({','.join(placeholders)}) ON CONFLICT (id) DO NOTHING"
+
+            values_list = []
+            for row in rows:
+                values = []
+                for col in columns:
+                    val = row[col]
+                    if col in json_columns and val is not None:
+                        if isinstance(val, (dict, list)):
+                            values.append(json_mod.dumps(val, ensure_ascii=False))
+                        else:
+                            values.append(val if isinstance(val, str) else json_mod.dumps(val, ensure_ascii=False))
+                    else:
+                        values.append(val)
+                values_list.append(tuple(values))
+
+            psycopg2.extras.execute_batch(dev_cur, insert_sql, values_list, page_size=200)
+            dev_conn.commit()
+
+            try:
+                dev_cur.execute(f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), COALESCE((SELECT MAX(id) FROM {table}), 1))")
+                dev_conn.commit()
+            except:
+                dev_conn.rollback()
+
+            dev_cur.execute(f"SELECT COUNT(*) FROM {table}")
+            dev_count = dev_cur.fetchone()[0]
+            results[table] = {"prod": len(rows), "dev": dev_count}
+
+        prod_cur.close()
+        prod_conn.close()
+        dev_cur.close()
+        dev_conn.close()
+
+        return jsonify({"success": True, "results": results})
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+
 @app.route("/admin/question-analysis")
 @login_required
 def admin_question_analysis():
