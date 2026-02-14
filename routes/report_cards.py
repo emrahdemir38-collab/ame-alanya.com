@@ -10009,7 +10009,7 @@ def generate_wrong_questions_pdf(result_id):
         student_name = result.get('student_name', '')
         exam_name = result.get('exam_name', '')
         elements.append(Paragraph(f"Tekrar Coz - {student_name}", title_style))
-        subtitle = f"{exam_name} | Hatali/Bos: {len(wrong_questions)} soru, gorseli bulunan: {len(cropped_items)}"
+        subtitle = f"{exam_name} | {len(cropped_items)} soru"
         elements.append(Paragraph(subtitle, subtitle_style))
         if missing_total > 0:
             warnings = []
@@ -10029,9 +10029,8 @@ def generate_wrong_questions_pdf(result_id):
                 current_subject = item['subject_label']
                 elements.append(Paragraph(f"{current_subject}", subject_style))
             
-            status_text = "Yanlis" if item['status'] == 'wrong' else "Bos"
             elements.append(Paragraph(
-                f"Soru {item['question_number']} | {status_text} | Cevabiniz: {item['student_answer']} | Dogru: {item['correct_answer']}",
+                f"Soru {item['question_number']}",
                 info_style
             ))
             
