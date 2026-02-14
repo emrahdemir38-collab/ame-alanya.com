@@ -407,6 +407,14 @@ let classes = [];
 const userRole = '{{ current_user.role }}';
 const ALL_SUBJECTS = ['Türkçe', 'Matematik', 'Fen Bilimleri', 'Sosyal Bilgiler', 'İngilizce', 'Din Kültürü', 'İnkılap Tarihi'];
 
+function getKazanimDurum(rate) {
+    if (rate >= 85) return {label: 'Çok İyi', color: '#166534', bg: '#dcfce7'};
+    if (rate >= 70) return {label: 'İyi', color: '#15803d', bg: '#f0fdf4'};
+    if (rate >= 50) return {label: 'Geliştirilebilir', color: '#a16207', bg: '#fefce8'};
+    if (rate >= 25) return {label: 'Tekrar Edilmeli', color: '#c2410c', bg: '#fff7ed'};
+    return {label: 'Acil Önlem', color: '#dc2626', bg: '#fef2f2'};
+}
+
 function subjectFilterHtml(selectId) {
     return `<div>
         <label style="font-weight: 600; display: block; margin-bottom: 8px;">Ders Filtresi:</label>
@@ -624,6 +632,7 @@ function renderOutcomeAnalysis(data, container) {
                             <th>Dogru</th>
                             <th>Hatali</th>
                             <th>Basari</th>
+                            <th>Durum</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -632,12 +641,14 @@ function renderOutcomeAnalysis(data, container) {
         for (const [outcomeName, stats] of Object.entries(outcomes)) {
             const successRate = stats.success_rate || 0;
             const successClass = successRate >= 70 ? 'correct' : (successRate >= 50 ? 'blank' : 'wrong');
+            const durum = getKazanimDurum(successRate);
             html += `
                 <tr>
                     <td style="font-size: 0.85rem;">${outcomeName}</td>
                     <td class="correct">${stats.correct || 0}</td>
                     <td class="wrong">${stats.wrong || 0}</td>
                     <td class="${successClass}">${successRate}%</td>
+                    <td style="font-weight:600; font-size:0.8rem; color:${durum.color}; background:${durum.bg}; border-radius:6px; text-align:center;">${durum.label}</td>
                 </tr>
             `;
         }
@@ -1307,17 +1318,19 @@ async function loadStudentOutcomeAnalysis() {
             html += `<div class="subject-block" style="margin-bottom: 16px;">
                 <h4 class="subject-title" style="color: #6366f1; margin-bottom: 8px;">📚 ${subject}</h4>
                 <table class="exams-table"><thead><tr>
-                    <th>Kazanim</th><th>Dogru</th><th>Hatali</th><th>Bos</th><th>Basari %</th>
+                    <th>Kazanim</th><th>Dogru</th><th>Hatali</th><th>Bos</th><th>Basari %</th><th>Durum</th>
                 </tr></thead><tbody>`;
             
             for (const [outcome, stats] of Object.entries(outcomes)) {
                 const total = stats.total || 1;
                 const success = Math.round((stats.correct / total) * 100);
                 const color = success >= 70 ? '#22c55e' : success >= 50 ? '#f59e0b' : '#ef4444';
+                const durum = getKazanimDurum(success);
                 html += `<tr>
                     <td style="max-width: 300px; word-wrap: break-word;">${outcome}</td>
                     <td>${stats.correct}</td><td>${stats.wrong}</td><td>${stats.blank}</td>
                     <td style="color: ${color}; font-weight: 600;">%${success}</td>
+                    <td style="font-weight:600; font-size:0.8rem; color:${durum.color}; background:${durum.bg}; border-radius:6px; text-align:center; white-space:nowrap;">${durum.label}</td>
                 </tr>`;
             }
             html += '</tbody></table></div>';
@@ -1614,6 +1627,7 @@ async function loadStudentMultiOutcome(studentNo, studentName) {
                                 <th>Dogru</th>
                                 <th>Hatali</th>
                                 <th>Basari</th>
+                                <th>Durum</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1622,12 +1636,14 @@ async function loadStudentMultiOutcome(studentNo, studentName) {
             for (const [outcomeName, stats] of Object.entries(outcomes)) {
                 const successRate = stats.success_rate || 0;
                 const successClass = successRate >= 70 ? 'correct' : (successRate >= 50 ? 'blank' : 'wrong');
+                const durum = getKazanimDurum(successRate);
                 html += `
                     <tr>
                         <td style="font-size: 0.85rem;">${outcomeName}</td>
                         <td class="correct">${stats.correct || 0}</td>
                         <td class="wrong">${stats.wrong || 0}</td>
                         <td class="${successClass}">${successRate}%</td>
+                        <td style="font-weight:600; font-size:0.8rem; color:${durum.color}; background:${durum.bg}; border-radius:6px; text-align:center;">${durum.label}</td>
                     </tr>
                 `;
             }

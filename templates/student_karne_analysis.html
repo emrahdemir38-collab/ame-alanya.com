@@ -243,6 +243,14 @@
 let myExams = [];
 const ALL_SUBJECTS = ['Türkçe', 'Matematik', 'Fen Bilimleri', 'Sosyal Bilgiler', 'İngilizce', 'Din Kültürü', 'İnkılap Tarihi'];
 
+function getKazanimDurum(rate) {
+    if (rate >= 85) return {label: 'Çok İyi', color: '#166534', bg: '#dcfce7'};
+    if (rate >= 70) return {label: 'İyi', color: '#15803d', bg: '#f0fdf4'};
+    if (rate >= 50) return {label: 'Geliştirilebilir', color: '#a16207', bg: '#fefce8'};
+    if (rate >= 25) return {label: 'Tekrar Edilmeli', color: '#c2410c', bg: '#fff7ed'};
+    return {label: 'Acil Önlem', color: '#dc2626', bg: '#fef2f2'};
+}
+
 function filterStudentSubjectBlocks(containerId, selectId) {
     const selectedSubject = document.getElementById(selectId).value.toLowerCase();
     const container = document.getElementById(containerId);
@@ -343,18 +351,20 @@ async function showOutcome(resultId) {
             html += `<div class="subject-block">
                 <div class="subject-title">${subject}</div>
                 <table class="outcome-table">
-                    <thead><tr><th>Kazanım</th><th>D</th><th>Y</th><th>B</th><th>%</th></tr></thead>
+                    <thead><tr><th>Kazanım</th><th>D</th><th>Y</th><th>B</th><th>%</th><th>Durum</th></tr></thead>
                     <tbody>`;
             
             for (const [outcome, stats] of Object.entries(outcomes)) {
                 const successRate = stats.success_rate || 0;
                 const rateClass = successRate >= 80 ? 'correct' : (successRate >= 50 ? '' : 'wrong');
+                const durum = getKazanimDurum(successRate);
                 html += `<tr>
                     <td>${outcome}</td>
                     <td class="correct">${stats.correct}</td>
                     <td class="wrong">${stats.wrong}</td>
                     <td class="blank">${stats.blank}</td>
                     <td class="${rateClass}" style="font-weight: bold;">%${successRate}</td>
+                    <td style="font-weight:600; font-size:0.75rem; color:${durum.color}; background:${durum.bg}; border-radius:6px; text-align:center;">${durum.label}</td>
                 </tr>`;
             }
             
@@ -522,12 +532,13 @@ async function loadMultiOutcome() {
             html += `<div class="subject-block">
                 <div class="subject-title">${subject}</div>
                 <table class="outcome-table">
-                    <thead><tr><th>Kazanım</th><th>Doğru</th><th>Hatalı</th><th>Boş</th><th>%</th></tr></thead>
+                    <thead><tr><th>Kazanım</th><th>Doğru</th><th>Hatalı</th><th>Boş</th><th>%</th><th>Durum</th></tr></thead>
                     <tbody>`;
             for (const [outcome, stats] of Object.entries(outcomes)) {
                 const rate = stats.success_rate || 0;
                 const cls = rate >= 80 ? 'correct' : (rate >= 50 ? '' : 'wrong');
-                html += `<tr><td>${outcome}</td><td class="correct">${stats.correct}</td><td class="wrong">${stats.wrong}</td><td class="blank">${stats.blank}</td><td class="${cls}" style="font-weight:bold;">%${rate}</td></tr>`;
+                const durum = getKazanimDurum(rate);
+                html += `<tr><td>${outcome}</td><td class="correct">${stats.correct}</td><td class="wrong">${stats.wrong}</td><td class="blank">${stats.blank}</td><td class="${cls}" style="font-weight:bold;">%${rate}</td><td style="font-weight:600;font-size:0.75rem;color:${durum.color};background:${durum.bg};border-radius:6px;text-align:center;">${durum.label}</td></tr>`;
             }
             html += '</tbody></table></div>';
         }

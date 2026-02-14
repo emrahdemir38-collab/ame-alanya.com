@@ -86,6 +86,17 @@ PDF_FONT, PDF_FONT_BOLD = register_turkish_fonts()
 
 report_cards_bp = Blueprint('report_cards', __name__, url_prefix='/admin/report-cards')
 
+def get_kazanim_durum(rate):
+    if rate >= 85:
+        return {'label': 'Çok İyi', 'color': colors.HexColor('#166534'), 'bg': colors.HexColor('#dcfce7')}
+    if rate >= 70:
+        return {'label': 'İyi', 'color': colors.HexColor('#15803d'), 'bg': colors.HexColor('#f0fdf4')}
+    if rate >= 50:
+        return {'label': 'Geliştirilebilir', 'color': colors.HexColor('#a16207'), 'bg': colors.HexColor('#fefce8')}
+    if rate >= 25:
+        return {'label': 'Tekrar Edilmeli', 'color': colors.HexColor('#c2410c'), 'bg': colors.HexColor('#fff7ed')}
+    return {'label': 'Acil Önlem', 'color': colors.HexColor('#dc2626'), 'bg': colors.HexColor('#fef2f2')}
+
 def parse_outcome_code(outcome):
     """Kazanım kodunu sıralama için parse et. Örn: 7.1.3.2 -> (7, 1, 3, 2)"""
     if not outcome:
@@ -3500,39 +3511,55 @@ def student_outcome_analysis_pdf():
             
             if weak:
                 elements.append(Paragraph("Geliştirilmesi Gereken:", normal_style))
-                data = [['Kazanım', 'Başarı']]
+                data = [['Kazanım', 'Başarı', 'Durum']]
+                row_colors_w = []
                 for item in weak[:10]:
                     text = item['text'][:70] + '...' if len(item['text']) > 70 else item['text']
-                    data.append([Paragraph(text, normal_style), f"%{item['rate']}"])
+                    durum = get_kazanim_durum(item['rate'])
+                    data.append([Paragraph(text, normal_style), f"%{item['rate']}", durum['label']])
+                    row_colors_w.append(durum)
                 
-                table = Table(data, colWidths=[400, 60])
-                table.setStyle(TableStyle([
+                table = Table(data, colWidths=[330, 55, 80])
+                style_cmds = [
                     ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#fef2f2')),
                     ('FONTNAME', (0, 0), (-1, 0), PDF_FONT_BOLD),
                     ('FONTNAME', (0, 1), (-1, -1), PDF_FONT),
                     ('FONTSIZE', (0, 0), (-1, -1), 9),
                     ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ]))
+                    ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+                ]
+                for i, d in enumerate(row_colors_w):
+                    style_cmds.append(('BACKGROUND', (2, i+1), (2, i+1), d['bg']))
+                    style_cmds.append(('TEXTCOLOR', (2, i+1), (2, i+1), d['color']))
+                table.setStyle(TableStyle(style_cmds))
                 elements.append(table)
                 elements.append(Spacer(1, 10))
             
             if strong:
                 elements.append(Paragraph("Güçlü Alanlar:", normal_style))
-                data = [['Kazanım', 'Başarı']]
+                data = [['Kazanım', 'Başarı', 'Durum']]
+                row_colors_s = []
                 for item in strong[:10]:
                     text = item['text'][:70] + '...' if len(item['text']) > 70 else item['text']
-                    data.append([Paragraph(text, normal_style), f"%{item['rate']}"])
+                    durum = get_kazanim_durum(item['rate'])
+                    data.append([Paragraph(text, normal_style), f"%{item['rate']}", durum['label']])
+                    row_colors_s.append(durum)
                 
-                table = Table(data, colWidths=[400, 60])
-                table.setStyle(TableStyle([
+                table = Table(data, colWidths=[330, 55, 80])
+                style_cmds = [
                     ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f0fdf4')),
                     ('FONTNAME', (0, 0), (-1, 0), PDF_FONT_BOLD),
                     ('FONTNAME', (0, 1), (-1, -1), PDF_FONT),
                     ('FONTSIZE', (0, 0), (-1, -1), 9),
                     ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ]))
+                    ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+                ]
+                for i, d in enumerate(row_colors_s):
+                    style_cmds.append(('BACKGROUND', (2, i+1), (2, i+1), d['bg']))
+                    style_cmds.append(('TEXTCOLOR', (2, i+1), (2, i+1), d['color']))
+                table.setStyle(TableStyle(style_cmds))
                 elements.append(table)
             
             elements.append(Spacer(1, 15))
@@ -3850,20 +3877,28 @@ def get_student_outcome_pdf():
             
             if weak:
                 cell_style = ParagraphStyle('Cell', parent=styles['Normal'], fontName=PDF_FONT, fontSize=8, leading=10)
-                data = [['Geliştirilmesi Gereken Kazanımlar', 'Başarı']]
+                data = [['Geliştirilmesi Gereken Kazanımlar', 'Başarı', 'Durum']]
+                row_colors_w2 = []
                 for item in weak[:8]:
                     text = item['text'] or ''
-                    data.append([Paragraph(text, cell_style), f"%{item['rate']}"])
+                    durum = get_kazanim_durum(item['rate'])
+                    data.append([Paragraph(text, cell_style), f"%{item['rate']}", durum['label']])
+                    row_colors_w2.append(durum)
                 
-                table = Table(data, colWidths=[400, 60])
-                table.setStyle(TableStyle([
+                table = Table(data, colWidths=[330, 50, 80])
+                style_cmds = [
                     ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#fef2f2')),
                     ('FONTNAME', (0, 0), (-1, 0), PDF_FONT_BOLD),
                     ('FONTNAME', (0, 1), (-1, -1), PDF_FONT),
                     ('FONTSIZE', (0, 0), (-1, -1), 8),
                     ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ]))
+                    ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+                ]
+                for i, d in enumerate(row_colors_w2):
+                    style_cmds.append(('BACKGROUND', (2, i+1), (2, i+1), d['bg']))
+                    style_cmds.append(('TEXTCOLOR', (2, i+1), (2, i+1), d['color']))
+                table.setStyle(TableStyle(style_cmds))
                 elements.append(table)
             
             elements.append(Spacer(1, 10))
@@ -4064,20 +4099,24 @@ def get_class_outcome_pdf():
         for subject, outcomes in outcome_stats.items():
             elements.append(Paragraph(subject, subject_style))
             
-            table_data = [['Kazanım', 'Doğru', 'Yanlış', 'Boş', 'Başarı %']]
+            table_data = [['Kazanım', 'Doğru', 'Yanlış', 'Boş', 'Başarı %', 'Durum']]
+            row_colors = []
             for outcome, stats in outcomes.items():
                 total = stats['total']
                 success = round((stats['correct'] / total * 100), 1) if total > 0 else 0
+                durum = get_kazanim_durum(success)
                 table_data.append([
                     Paragraph(outcome, cell_style),
                     str(stats['correct']),
                     str(stats['wrong']),
                     str(stats['blank']),
-                    f"%{success}"
+                    f"%{success}",
+                    durum['label']
                 ])
+                row_colors.append(durum)
             
-            t = Table(table_data, colWidths=[300, 45, 45, 45, 50])
-            t.setStyle(TableStyle([
+            t = Table(table_data, colWidths=[240, 40, 40, 40, 45, 80])
+            style_cmds = [
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e0e7ff')),
                 ('FONTNAME', (0, 0), (-1, -1), PDF_FONT),
                 ('FONTSIZE', (0, 0), (-1, 0), 9),
@@ -4086,7 +4125,11 @@ def get_class_outcome_pdf():
                 ('VALIGN', (0, 0), (-1, -1), 'TOP'),
                 ('TOPPADDING', (0, 0), (-1, -1), 4),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-            ]))
+            ]
+            for i, d in enumerate(row_colors):
+                style_cmds.append(('BACKGROUND', (5, i+1), (5, i+1), d['bg']))
+                style_cmds.append(('TEXTCOLOR', (5, i+1), (5, i+1), d['color']))
+            t.setStyle(TableStyle(style_cmds))
             elements.append(t)
             elements.append(Spacer(1, 10))
         
@@ -6792,15 +6835,18 @@ def get_student_outcome_pdf_new(result_id):
                 else:
                     outcome_stats[outcome]['blank'] += 1
             
-            table_data = [['Kazanim', 'D', 'Y', 'B', '%']]
+            table_data = [['Kazanim', 'D', 'Y', 'B', '%', 'Durum']]
+            row_colors = []
             for outcome, stats in outcome_stats.items():
                 total = stats['correct'] + stats['wrong'] + stats['blank']
                 rate = round((stats['correct'] / total) * 100) if total > 0 else 0
-                table_data.append([outcome[:60], str(stats['correct']), str(stats['wrong']), str(stats['blank']), f'{rate}%'])
+                durum = get_kazanim_durum(rate)
+                table_data.append([outcome[:60], str(stats['correct']), str(stats['wrong']), str(stats['blank']), f'{rate}%', durum['label']])
+                row_colors.append(durum)
             
             if len(table_data) > 1:
-                t = Table(table_data, colWidths=[300, 40, 40, 40, 50])
-                t.setStyle(TableStyle([
+                t = Table(table_data, colWidths=[240, 35, 35, 35, 40, 80])
+                style_cmds = [
                     ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f3f4f6')),
                     ('FONTNAME', (0, 0), (-1, -1), PDF_FONT),
                     ('FONTSIZE', (0, 0), (-1, -1), 8),
@@ -6809,7 +6855,11 @@ def get_student_outcome_pdf_new(result_id):
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                     ('LEFTPADDING', (0, 0), (-1, -1), 4),
                     ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-                ]))
+                ]
+                for i, d in enumerate(row_colors):
+                    style_cmds.append(('BACKGROUND', (5, i+1), (5, i+1), d['bg']))
+                    style_cmds.append(('TEXTCOLOR', (5, i+1), (5, i+1), d['color']))
+                t.setStyle(TableStyle(style_cmds))
                 elements.append(t)
         
         doc.build(elements)
@@ -6900,15 +6950,18 @@ def get_class_outcome_pdf_new(exam_id):
         for subject_label, outcomes in outcome_totals.items():
             elements.append(Paragraph(subject_label, subject_style))
             
-            table_data = [['Kazanim', 'D', 'Y', 'B', '%']]
+            table_data = [['Kazanim', 'D', 'Y', 'B', '%', 'Durum']]
+            row_colors = []
             for outcome, stats in outcomes.items():
                 total = stats['correct'] + stats['wrong'] + stats['blank']
                 rate = round((stats['correct'] / total) * 100) if total > 0 else 0
-                table_data.append([outcome[:60], str(stats['correct']), str(stats['wrong']), str(stats['blank']), f'{rate}%'])
+                durum = get_kazanim_durum(rate)
+                table_data.append([outcome[:60], str(stats['correct']), str(stats['wrong']), str(stats['blank']), f'{rate}%', durum['label']])
+                row_colors.append(durum)
             
             if len(table_data) > 1:
-                t = Table(table_data, colWidths=[300, 40, 40, 40, 50])
-                t.setStyle(TableStyle([
+                t = Table(table_data, colWidths=[240, 35, 35, 35, 40, 80])
+                style_cmds = [
                     ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f3f4f6')),
                     ('FONTNAME', (0, 0), (-1, -1), PDF_FONT),
                     ('FONTSIZE', (0, 0), (-1, -1), 8),
@@ -6917,7 +6970,11 @@ def get_class_outcome_pdf_new(exam_id):
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                     ('LEFTPADDING', (0, 0), (-1, -1), 4),
                     ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-                ]))
+                ]
+                for i, d in enumerate(row_colors):
+                    style_cmds.append(('BACKGROUND', (5, i+1), (5, i+1), d['bg']))
+                    style_cmds.append(('TEXTCOLOR', (5, i+1), (5, i+1), d['color']))
+                t.setStyle(TableStyle(style_cmds))
                 elements.append(t)
         
         doc.build(elements)
@@ -8389,27 +8446,35 @@ def student_multi_outcome_pdf():
         for subject, outcomes in sorted_outcome_data.items():
             elements.append(Paragraph(subject, subject_style))
             
-            table_data = [['Kazanım', 'Doğru', 'Yanlış', 'Boş', 'Başarı %']]
+            table_data = [['Kazanım', 'Doğru', 'Yanlış', 'Boş', 'Başarı %', 'Durum']]
+            row_colors = []
             for outcome, stats in outcomes.items():
                 total = stats['total'] or 1
                 success = round((stats['correct'] / total * 100), 1)
+                durum = get_kazanim_durum(success)
                 table_data.append([
                     Paragraph(outcome, cell_style),
                     str(stats['correct']),
                     str(stats['wrong']),
                     str(stats['blank']),
-                    f"%{success}"
+                    f"%{success}",
+                    durum['label']
                 ])
+                row_colors.append(durum)
             
-            t = Table(table_data, colWidths=[300, 40, 40, 40, 50])
-            t.setStyle(TableStyle([
+            t = Table(table_data, colWidths=[240, 35, 35, 35, 40, 80])
+            style_cmds = [
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e0e7ff')),
                 ('FONTNAME', (0, 0), (-1, -1), PDF_FONT),
                 ('FONTSIZE', (0, 0), (-1, -1), 8),
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
                 ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ]))
+            ]
+            for i, d in enumerate(row_colors):
+                style_cmds.append(('BACKGROUND', (5, i+1), (5, i+1), d['bg']))
+                style_cmds.append(('TEXTCOLOR', (5, i+1), (5, i+1), d['color']))
+            t.setStyle(TableStyle(style_cmds))
             elements.append(t)
             elements.append(Spacer(1, 8))
         
