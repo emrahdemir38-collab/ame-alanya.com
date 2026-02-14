@@ -1798,36 +1798,41 @@ function downloadClassAnalysisPdf() {
     window.open(`/admin/report-cards/api/class-analysis-pdf/${examId}`, '_blank');
 }
 
+function showPdfLoading() {
+    let overlay = document.getElementById('pdfLoadingOverlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'pdfLoadingOverlay';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;justify-content:center;align-items:center;z-index:2147483647;';
+        overlay.innerHTML = '<div style="background:white;border-radius:16px;padding:32px 48px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.3);"><div style="font-size:2.5rem;margin-bottom:12px;">📝</div><p style="font-size:1.1rem;font-weight:600;color:#1f2937;margin:0;">PDF Hazırlanıyor...</p><p style="color:#6b7280;margin-top:8px;font-size:0.9rem;">Lütfen bekleyin</p></div>';
+        document.body.appendChild(overlay);
+    }
+    overlay.style.display = 'flex';
+    return overlay;
+}
+
+function hidePdfLoading() {
+    const overlay = document.getElementById('pdfLoadingOverlay');
+    if (overlay) overlay.style.display = 'none';
+}
+
 async function downloadWrongQuestionsPdf(resultId) {
+    const overlay = showPdfLoading();
+
     try {
-        const response = await fetch(`/admin/report-cards/api/wrong-questions-pdf/${resultId}`);
-        if (!response.ok) {
-            try {
-                const data = await response.json();
-                alert(data.error || 'PDF oluşturulamadı');
-            } catch(e) {
-                alert('PDF oluşturulamadı (Hata kodu: ' + response.status + ')');
-            }
+        const response = await fetch(`/admin/report-cards/api/wrong-questions-pdf-check/${resultId}`);
+        const data = await response.json();
+        
+        if (!data.available) {
+            hidePdfLoading();
+            alert(data.error || 'PDF oluşturulamadı');
             return;
         }
-        const contentType = response.headers.get('content-type') || '';
-        if (!contentType.includes('application/pdf')) {
-            try {
-                const data = await response.json();
-                alert(data.error || 'PDF oluşturulamadı');
-            } catch(e) {
-                alert('Beklenmeyen yanıt alındı');
-            }
-            return;
-        }
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Tekrar_Coz_${resultId}.pdf`;
-        a.click();
-        URL.revokeObjectURL(url);
+        
+        hidePdfLoading();
+        window.location.href = `/admin/report-cards/api/wrong-questions-pdf/${resultId}`;
     } catch (error) {
+        hidePdfLoading();
         alert('PDF indirme hatası: ' + error.message);
     }
 }

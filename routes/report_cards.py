@@ -9773,6 +9773,50 @@ def build_booklet_question_mapping(cur, exam_id, from_booklet, to_booklet):
     return mapping
 
 
+@report_cards_bp.route('/api/wrong-questions-pdf-check/<int:result_id>')
+@login_required
+def check_wrong_questions_pdf(result_id):
+    if current_user.role not in ['admin', 'teacher']:
+        return jsonify({"available": False, "error": "Yetkisiz erişim"}), 403
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT r.id, r.subjects, r.exam_id
+            FROM report_card_results r
+            WHERE r.id = %s
+        """, (result_id,))
+        result = cur.fetchone()
+        if not result:
+            return jsonify({"available": False, "error": "Sonuç bulunamadı"})
+        
+        cur.execute("SELECT COUNT(*) as cnt FROM report_card_question_regions WHERE exam_id = %s", (result['exam_id'],))
+        if cur.fetchone()['cnt'] == 0:
+            return jsonify({"available": False, "error": "Bu sınav için soru görselleri henüz işaretlenmemiş"})
+        
+        subjects = result.get('subjects') or {}
+        if isinstance(subjects, str):
+            subjects = json.loads(subjects)
+        
+        has_wrong = False
+        for subj_data in subjects.values():
+            for ans in subj_data.get('answers', []):
+                if ans.get('status') in ('wrong', 'blank'):
+                    has_wrong = True
+                    break
+            if has_wrong:
+                break
+        
+        if not has_wrong:
+            return jsonify({"available": False, "error": "Bu öğrencinin hatalı sorusu bulunmuyor"})
+        
+        return jsonify({"available": True})
+    finally:
+        cur.close()
+        conn.close()
+
+
 @report_cards_bp.route('/api/wrong-questions-pdf/<int:result_id>')
 @login_required
 def generate_wrong_questions_pdf(result_id):
