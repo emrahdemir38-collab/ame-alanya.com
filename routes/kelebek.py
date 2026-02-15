@@ -584,75 +584,93 @@ def _run_butterfly_algorithm(plan_id, conn):
         if room_grade:
             study_room_by_grade.setdefault(room_grade, []).append(room_name)
 
-    for grade, students in non_exam_by_grade.items():
-        available_rooms = study_room_by_grade.get(grade, [])
-        if not available_rooms:
-            all_study = [r for r in study_rooms if r not in [sr for srs in study_room_by_grade.values() for sr in srs]]
-            if all_study:
-                available_rooms = all_study
+    non_exam_by_class = {}
+    for s in non_exam_students:
+        non_exam_by_class.setdefault(s['class_name'], []).append(s)
+    for cls in non_exam_by_class:
+        random.shuffle(non_exam_by_class[cls])
 
-        random.shuffle(students)
-        student_idx = 0
-        for room_name in available_rooms:
-            if student_idx >= len(students):
-                break
-            room_info = relevant_rooms[room_name]
-            room_capacity = room_info['capacity']
-            desk_num = 1
-            while student_idx < len(students) and desk_num <= room_info['desks']:
-                for pos in ['left', 'right']:
-                    if student_idx >= len(students):
-                        break
-                    s = students[student_idx]
-                    cur.execute("""
-                        INSERT INTO kelebek_assignments (plan_id, room_id, participant_id, desk_number, seat_position, row_number)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                    """, (plan_id, room_ids[room_name], s['id'], desk_num, pos, desk_num))
-                    student_idx += 1
-                desk_num += 1
+    study_room_capacity = {}
+    study_room_filled = {}
+    for room_name in study_rooms:
+        study_room_capacity[room_name] = relevant_rooms[room_name]['capacity']
+        study_room_filled[room_name] = 0
 
-    assigned_non_exam_ids = set()
-    cur.execute("SELECT participant_id FROM kelebek_assignments WHERE plan_id = %s", (plan_id,))
-    for row in cur.fetchall():
-        assigned_non_exam_ids.add(row['participant_id'])
-
-    unplaced_study = [s for s in non_exam_students if s['id'] not in assigned_non_exam_ids]
-
-    if unplaced_study:
-        room_occupancy = {}
-        for rn in study_rooms:
-            cur.execute("SELECT COUNT(*) as cnt FROM kelebek_assignments WHERE room_id = %s", (room_ids[rn],))
-            room_occupancy[rn] = cur.fetchone()['cnt']
-
-        available_study_rooms = [rn for rn in study_rooms if room_occupancy.get(rn, 0) < relevant_rooms[rn]['capacity']]
-
-        if available_study_rooms:
-            random.shuffle(unplaced_study)
-            student_idx = 0
-            for room_name in available_study_rooms:
-                if student_idx >= len(unplaced_study):
+    def fill_study_room(room_name, students_to_place):
+        placed = []
+        room_info = relevant_rooms[room_name]
+        current_filled = study_room_filled[room_name]
+        current_desk = (current_filled // 2) + 1
+        current_pos_idx = current_filled % 2
+        positions = ['left', 'right']
+        s_idx = 0
+        while s_idx < len(students_to_place) and current_desk <= room_info['desks']:
+            start_pos = current_pos_idx if current_desk == (current_filled // 2) + 1 else 0
+            for pos_i in range(start_pos, 2):
+                if s_idx >= len(students_to_place):
                     break
-                room_info = relevant_rooms[room_name]
-                current_count = room_occupancy.get(room_name, 0)
-                current_desk = (current_count // 2) + 1
-                current_pos_idx = current_count % 2
+                s = students_to_place[s_idx]
+                cur.execute("""
+                    INSERT INTO kelebek_assignments (plan_id, room_id, participant_id, desk_number, seat_position, row_number)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (plan_id, room_ids[room_name], s['id'], current_desk, positions[pos_i], current_desk))
+                study_room_filled[room_name] += 1
+                placed.append(s)
+                s_idx += 1
+            current_desk += 1
+        return placed
 
-                if current_count == 0:
-                    cur.execute("UPDATE kelebek_rooms SET grade_for_study = NULL WHERE id = %s AND (SELECT COUNT(*) FROM kelebek_assignments WHERE room_id = %s) = 0", (room_ids[room_name], room_ids[room_name]))
+    for room_name in study_rooms:
+        home_students = list(non_exam_by_class.get(room_name, []))
+        if home_students:
+            placed = fill_study_room(room_name, home_students)
+            placed_ids = set(s['id'] for s in placed)
+            non_exam_by_class[room_name] = [s for s in non_exam_by_class.get(room_name, []) if s['id'] not in placed_ids]
 
-                while student_idx < len(unplaced_study) and current_desk <= room_info['desks']:
-                    positions = ['left', 'right']
-                    start_pos = current_pos_idx if current_desk == (current_count // 2) + 1 else 0
-                    for pos_i in range(start_pos, 2):
-                        if student_idx >= len(unplaced_study):
-                            break
-                        s = unplaced_study[student_idx]
-                        cur.execute("""
-                            INSERT INTO kelebek_assignments (plan_id, room_id, participant_id, desk_number, seat_position, row_number)
-                            VALUES (%s, %s, %s, %s, %s, %s)
-                        """, (plan_id, room_ids[room_name], s['id'], current_desk, positions[pos_i], current_desk))
-                        student_idx += 1
-                    current_desk += 1
+    for room_name in study_rooms:
+        remaining_cap = study_room_capacity[room_name] - study_room_filled[room_name]
+        if remaining_cap <= 0:
+            continue
+
+        room_grade = None
+        for ch in room_name:
+            if ch.isdigit():
+                room_grade = int(ch)
+                break
+
+        same_grade_classes = sorted(
+            [cls for cls in non_exam_by_class if cls != room_name and len(non_exam_by_class[cls]) > 0
+             and any(ch.isdigit() and int(ch) == room_grade for ch in cls)],
+            key=lambda cls: len(non_exam_by_class[cls]), reverse=True
+        ) if room_grade else []
+
+        for cls in same_grade_classes:
+            if study_room_filled[room_name] >= study_room_capacity[room_name]:
+                break
+            available = non_exam_by_class[cls]
+            if not available:
+                continue
+            placed = fill_study_room(room_name, available)
+            placed_ids = set(s['id'] for s in placed)
+            non_exam_by_class[cls] = [s for s in non_exam_by_class[cls] if s['id'] not in placed_ids]
+
+    all_unplaced_study = []
+    for cls, students in non_exam_by_class.items():
+        all_unplaced_study.extend(students)
+    random.shuffle(all_unplaced_study)
+
+    if all_unplaced_study:
+        for room_name in study_rooms:
+            if not all_unplaced_study:
+                break
+            remaining_cap = study_room_capacity[room_name] - study_room_filled[room_name]
+            if remaining_cap <= 0:
+                continue
+            batch = all_unplaced_study[:remaining_cap]
+            all_unplaced_study = all_unplaced_study[remaining_cap:]
+            if study_room_filled[room_name] == 0:
+                cur.execute("UPDATE kelebek_rooms SET grade_for_study = NULL WHERE id = %s", (room_ids[room_name],))
+            fill_study_room(room_name, batch)
 
     for cls in exam_by_class:
         random.shuffle(exam_by_class[cls])
