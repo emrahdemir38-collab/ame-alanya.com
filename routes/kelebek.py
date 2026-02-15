@@ -660,17 +660,14 @@ def _run_butterfly_algorithm(plan_id, conn):
     random.shuffle(all_unplaced_study)
 
     if all_unplaced_study:
-        for room_name in study_rooms:
+        empty_study_rooms = [rn for rn in study_rooms if study_room_filled[rn] == 0]
+        for room_name in empty_study_rooms:
             if not all_unplaced_study:
                 break
-            remaining_cap = study_room_capacity[room_name] - study_room_filled[room_name]
-            if remaining_cap <= 0:
-                continue
-            batch = all_unplaced_study[:remaining_cap]
-            all_unplaced_study = all_unplaced_study[remaining_cap:]
-            if study_room_filled[room_name] == 0:
-                cur.execute("UPDATE kelebek_rooms SET grade_for_study = NULL WHERE id = %s", (room_ids[room_name],))
-            fill_study_room(room_name, batch)
+            cur.execute("UPDATE kelebek_rooms SET grade_for_study = NULL WHERE id = %s", (room_ids[room_name],))
+            placed = fill_study_room(room_name, all_unplaced_study)
+            placed_ids = set(s['id'] for s in placed)
+            all_unplaced_study = [s for s in all_unplaced_study if s['id'] not in placed_ids]
 
     for cls in exam_by_class:
         random.shuffle(exam_by_class[cls])
