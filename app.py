@@ -19037,6 +19037,7 @@ from routes.daily_tracking import daily_tracking_bp
 # from routes.exam_calendar import exam_calendar_bp  # Disabled - using app.py endpoints instead
 from routes.teacher_study_plan import teacher_study_plan_bp
 from routes.report_cards import report_cards_bp, init_object_storage
+from routes.kelebek import kelebek_bp, init_kelebek_tables
 
 # Object Storage'ı report_cards modülüne aktar
 init_object_storage(object_storage)
@@ -19050,11 +19051,16 @@ app.register_blueprint(daily_tracking_bp)
 # app.register_blueprint(exam_calendar_bp)  # Disabled - using app.py endpoints instead
 app.register_blueprint(teacher_study_plan_bp)
 app.register_blueprint(report_cards_bp)
+app.register_blueprint(kelebek_bp)
 # ==================== MODÜLER BLUEPRINT'LER SONU ====================
 
 # Uygulama başlarken veritabanını initialize et
 with app.app_context():
     init_database()
+    conn_kb = get_db()
+    init_kelebek_tables(conn_kb)
+    conn_kb.close()
+    logger.info("✅ Kelebek tabloları kontrol edildi/oluşturuldu")
     
     init_admin_user()
     
