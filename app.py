@@ -2400,24 +2400,34 @@ def admin_eokul_compare():
 
         col_map = {}
         for col in df.columns:
-            col_lower = str(col).strip().lower()
-            if col_lower in ('sınıf', 'sınıfı', 'sinif', 'sinifi'):
+            col_lower = str(col).strip().lower().replace('İ', 'i').replace('I', 'ı')
+            if col_lower in ('sınıf', 'sınıfı', 'sinif', 'sinifi', 'sınıfı'):
                 col_map['class'] = col
-            elif col_lower in ('okul no', 'okul numarası', 'numara', 'no', 'öğrenci no', 'ogrenci no'):
+            elif col_lower in ('okul no', 'okul numarası', 'numara', 'öğrenci no', 'ogrenci no', 'okul numarasi'):
                 col_map['no'] = col
             elif col_lower in ('ad soyad', 'adsoyad', 'ad-soyad', 'öğrenci adı soyadı'):
                 col_map['full_name'] = col
-            elif col_lower in ('adı', 'ad', 'adi', 'öğrenci adı', 'ogrenci adi'):
+            elif col_lower in ('adı', 'ad', 'adi', 'öğrenci adı', 'ogrenci adi', 'adı'):
                 col_map['first_name'] = col
-            elif col_lower in ('soyadı', 'soyad', 'soyadi', 'öğrenci soyadı'):
+            elif col_lower in ('soyadı', 'soyad', 'soyadi', 'öğrenci soyadı', 'soyadı'):
                 col_map['last_name'] = col
 
-        if 'class' not in col_map:
-            return jsonify({"error": "Excel'de Sınıf sütunu bulunamadı. Sütun adları: " + ", ".join(df.columns.tolist())}), 400
+        col_names_str = ", ".join([str(c) for c in df.columns.tolist()])
 
-        has_name = 'full_name' in col_map or ('first_name' in col_map and 'last_name' in col_map)
-        if not has_name:
-            return jsonify({"error": "Excel'de Ad Soyad veya Adı/Soyadı sütunları bulunamadı. Sütun adları: " + ", ".join(df.columns.tolist())}), 400
+        if 'class' not in col_map or not ('full_name' in col_map or ('first_name' in col_map and 'last_name' in col_map)):
+            cols = df.columns.tolist()
+            if len(cols) >= 4:
+                col_map = {
+                    'class': cols[0],
+                    'no': cols[1],
+                    'first_name': cols[2],
+                    'last_name': cols[3]
+                }
+                logger.info(f"E-Okul: Sütunlar otomatik algılandı (pozisyona göre): Sınıf={cols[0]}, No={cols[1]}, Ad={cols[2]}, Soyad={cols[3]}")
+            elif 'class' not in col_map:
+                return jsonify({"error": "Excel'de Sınıf sütunu bulunamadı. Sütun adları: " + col_names_str}), 400
+            else:
+                return jsonify({"error": "Excel'de Ad Soyad veya Adı/Soyadı sütunları bulunamadı. Sütun adları: " + col_names_str}), 400
 
         excel_students = []
         skipped = 0
