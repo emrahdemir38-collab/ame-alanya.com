@@ -318,7 +318,8 @@ async function loadPlans() {
             return;
         }
         list.innerHTML = data.plans.map(p => {
-            const grades = JSON.parse(p.grade_levels || '[]');
+            let grades = p.grade_levels || [];
+            if (typeof grades === 'string') { try { grades = JSON.parse(grades); } catch(ex) { grades = []; } }
             const gradeStr = grades.map(g => g + '. Sınıf').join(', ');
             const dateStr = p.exam_date ? new Date(p.exam_date).toLocaleDateString('tr-TR') : '-';
             const statusClass = 'status-' + (p.status || 'draft');
@@ -367,7 +368,8 @@ async function openPlan(planId) {
 
 function renderPlanDetail(data) {
     const plan = data.plan;
-    const grades = plan.grade_levels || [];
+    let grades = plan.grade_levels || [];
+    if (typeof grades === 'string') { try { grades = JSON.parse(grades); } catch(ex) { grades = []; } }
     const gradeStr = grades.map(g => g + '. Sınıf').join(', ');
     const dateStr = plan.exam_date ? new Date(plan.exam_date).toLocaleDateString('tr-TR') : '-';
 
