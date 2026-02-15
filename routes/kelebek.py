@@ -502,47 +502,49 @@ def _run_butterfly_algorithm(plan_id, conn):
     study_rooms = []
     used_rooms = set()
 
+    total_exam_students = len(exam_students)
+
+    for room in ALWAYS_STUDY_ROOMS:
+        if room in relevant_rooms:
+            study_rooms.append(room)
+            used_rooms.add(room)
+
+    candidate_exam_rooms = []
     if 'Yedek Sınıf' in relevant_rooms:
-        exam_rooms.append('Yedek Sınıf')
+        candidate_exam_rooms.append('Yedek Sınıf')
         used_rooms.add('Yedek Sınıf')
 
     for room in PRIORITY_EXAM_ROOMS:
         if room in relevant_rooms and room not in used_rooms and room not in ALWAYS_STUDY_ROOMS:
-            exam_rooms.append(room)
-            used_rooms.add(room)
-
-    for room in ALWAYS_STUDY_ROOMS:
-        if room in relevant_rooms and room not in used_rooms:
-            study_rooms.append(room)
+            candidate_exam_rooms.append(room)
             used_rooms.add(room)
 
     fifth_grade_rooms = [r for r in relevant_rooms if r.startswith('5') and r not in used_rooms]
     if fifth_grade_rooms:
         fifth_grade_rooms.sort(key=lambda r: exam_count_by_class.get(r, 0), reverse=True)
-        if fifth_grade_rooms:
-            exam_rooms.append(fifth_grade_rooms[0])
-            used_rooms.add(fifth_grade_rooms[0])
-            for r in fifth_grade_rooms[1:]:
-                study_rooms.append(r)
-                used_rooms.add(r)
-
-    total_exam_capacity = sum(relevant_rooms[r]['capacity'] for r in exam_rooms)
-    total_exam_students = len(exam_students)
+        candidate_exam_rooms.append(fifth_grade_rooms[0])
+        used_rooms.add(fifth_grade_rooms[0])
+        for r in fifth_grade_rooms[1:]:
+            study_rooms.append(r)
+            used_rooms.add(r)
 
     remaining_rooms = [r for r in relevant_rooms if r not in used_rooms]
     remaining_rooms.sort(key=lambda r: relevant_rooms[r]['capacity'], reverse=True)
-
     for room in remaining_rooms:
-        if total_exam_capacity >= total_exam_students:
-            break
-        exam_rooms.append(room)
+        candidate_exam_rooms.append(room)
         used_rooms.add(room)
-        total_exam_capacity += relevant_rooms[room]['capacity']
 
-    for room in remaining_rooms:
-        if room not in used_rooms:
+    running_capacity = 0
+    for room in candidate_exam_rooms:
+        if running_capacity < total_exam_students:
+            exam_rooms.append(room)
+            running_capacity += relevant_rooms[room]['capacity']
+        else:
             study_rooms.append(room)
-            used_rooms.add(room)
+
+    for room in relevant_rooms:
+        if room not in set(exam_rooms) and room not in set(study_rooms):
+            study_rooms.append(room)
 
     room_ids = {}
     for room_name in exam_rooms:
