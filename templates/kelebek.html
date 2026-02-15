@@ -493,13 +493,35 @@ function renderAssignments(data) {
     if (unassignedExam.length > 0) {
         html += `<div class="info-banner" style="background:#fef2f2;border-color:#fca5a5;color:#dc2626;">
             <span class="icon">⚠️</span>
-            <div><strong>${unassignedExam.length} sınava giren ogrenci yerlestirilemedi!</strong> Sınav sınıflarında yeterli kapasite yok.</div>
+            <div>
+                <strong>${unassignedExam.length} sınava giren ogrenci yerlestirilemedi!</strong> Sınav sınıflarında yeterli kapasite yok.
+                <details style="margin-top:8px;">
+                    <summary style="cursor:pointer;font-weight:600;font-size:0.85rem;">Yerlesemeyen ogrenci listesi</summary>
+                    <div style="margin-top:6px;max-height:200px;overflow-y:auto;">
+                        <table style="width:100%;font-size:0.8rem;border-collapse:collapse;">
+                            <tr style="background:#fecaca;"><th style="padding:4px 8px;text-align:left;">Ad Soyad</th><th style="padding:4px 8px;text-align:left;">Sınıf</th></tr>
+                            ${unassignedExam.map(s => `<tr style="border-bottom:1px solid #fecaca;"><td style="padding:4px 8px;">${s.student_name}</td><td style="padding:4px 8px;">${s.class_name}</td></tr>`).join('')}
+                        </table>
+                    </div>
+                </details>
+            </div>
         </div>`;
     }
     if (unassignedNonExam.length > 0) {
         html += `<div class="info-banner" style="background:#fffbeb;border-color:#fde68a;color:#92400e;">
             <span class="icon">⚠️</span>
-            <div><strong>${unassignedNonExam.length} sınava girmeyen ogrenci yerlestirilemedi!</strong> Ders sınıflarında yeterli kapasite yok.</div>
+            <div>
+                <strong>${unassignedNonExam.length} sınava girmeyen ogrenci yerlestirilemedi!</strong> Ders sınıflarında yeterli kapasite yok.
+                <details style="margin-top:8px;">
+                    <summary style="cursor:pointer;font-weight:600;font-size:0.85rem;">Yerlesemeyen ogrenci listesi</summary>
+                    <div style="margin-top:6px;max-height:200px;overflow-y:auto;">
+                        <table style="width:100%;font-size:0.8rem;border-collapse:collapse;">
+                            <tr style="background:#fde68a;"><th style="padding:4px 8px;text-align:left;">Ad Soyad</th><th style="padding:4px 8px;text-align:left;">Sınıf</th></tr>
+                            ${unassignedNonExam.map(s => `<tr style="border-bottom:1px solid #fde68a;"><td style="padding:4px 8px;">${s.student_name}</td><td style="padding:4px 8px;">${s.class_name}</td></tr>`).join('')}
+                        </table>
+                    </div>
+                </details>
+            </div>
         </div>`;
     }
 

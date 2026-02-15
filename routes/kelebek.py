@@ -116,7 +116,7 @@ def init_kelebek_tables(conn):
         cur.close()
 
 
-@kelebek_bp.route('/')
+@kelebek_bp.route('/', strict_slashes=False)
 @login_required
 def kelebek_page():
     if current_user.role not in ['admin']:
@@ -645,9 +645,13 @@ def _run_butterfly_algorithm(plan_id, conn):
                     VALUES (%s, %s, %s, %s, 'right', %s)
                 """, (plan_id, room_id, right_student['id'], desk_num, desk_num))
             else:
-                remaining_same = [g for g in active_grades if len(grade_queues.get(g, [])) > 0]
+                remaining_same = [g for g in active_grades if g == left_grade and len(grade_queues.get(g, [])) > 0]
                 if remaining_same:
-                    pass
+                    same_student = grade_queues[remaining_same[0]].pop(0)
+                    cur.execute("""
+                        INSERT INTO kelebek_assignments (plan_id, room_id, participant_id, desk_number, seat_position, row_number)
+                        VALUES (%s, %s, %s, %s, 'right', %s)
+                    """, (plan_id, room_id, same_student['id'], desk_num, desk_num))
 
     cur.execute("UPDATE kelebek_plans SET status = 'generated', updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul') WHERE id = %s", (plan_id,))
     conn.commit()
@@ -758,9 +762,11 @@ def get_summary(plan_id):
         for row in cur.fetchall():
             assigned_ids.add(row['participant_id'])
 
-        cur.execute("SELECT id, student_name, class_name FROM kelebek_participants WHERE plan_id = %s", (plan_id,))
+        cur.execute("SELECT id, student_name, class_name, is_exam_taker FROM kelebek_participants WHERE plan_id = %s", (plan_id,))
         all_parts = cur.fetchall()
         unassigned = [p for p in all_parts if p['id'] not in assigned_ids]
+        unassigned_exam = [p for p in unassigned if p['is_exam_taker']]
+        unassigned_study = [p for p in unassigned if not p['is_exam_taker']]
 
         return jsonify({
             "success": True,
@@ -771,7 +777,10 @@ def get_summary(plan_id):
                 "per_grade": per_grade,
                 "rooms": rooms,
                 "unassigned_count": len(unassigned),
-                "unassigned_students": [{"name": u['student_name'], "class": u['class_name']} for u in unassigned[:50]]
+                "unassigned_exam_count": len(unassigned_exam),
+                "unassigned_study_count": len(unassigned_study),
+                "unassigned_exam_students": [{"name": u['student_name'], "class": u['class_name']} for u in unassigned_exam],
+                "unassigned_study_students": [{"name": u['student_name'], "class": u['class_name']} for u in unassigned_study]
             }
         })
     except Exception as e:
@@ -941,6 +950,83 @@ def download_room_list_pdf(plan_id):
 
         if not rooms:
             elements.append(Paragraph("Henüz oda ataması yapılmamış", subtitle_style))
+
+        assigned_ids = set(a['participant_id'] for a in all_assignments)
+        cur.execute("SELECT id, student_name, class_name, is_exam_taker FROM kelebek_participants WHERE plan_id = %s", (plan_id,))
+        all_participants = cur.fetchall()
+        unassigned_exam = [p for p in all_participants if p['id'] not in assigned_ids and p['is_exam_taker']]
+        unassigned_study = [p for p in all_participants if p['id'] not in assigned_ids and not p['is_exam_taker']]
+
+        if unassigned_exam or unassigned_study:
+            elements.append(PageBreak())
+            elements.append(Paragraph("YERLEŞTİRİLEMEYEN ÖĞRENCİLER", room_title_style))
+            elements.append(Spacer(1, 10))
+
+            warn_style = ParagraphStyle('WarnStyle', parent=styles['Normal'], fontName=PDF_FONT, fontSize=10, alignment=TA_LEFT, textColor=colors.HexColor('#dc2626'))
+
+            if unassigned_exam:
+                elements.append(Paragraph(f"⚠ Sınava Giren - Yerleştirilemeyen: {len(unassigned_exam)} öğrenci", warn_style))
+                elements.append(Spacer(1, 6))
+                u_table = [[
+                    Paragraph('No', header_cell_style),
+                    Paragraph('Ad Soyad', header_cell_style),
+                    Paragraph('Sınıf', header_cell_style),
+                ]]
+                for idx, p in enumerate(sorted(unassigned_exam, key=lambda x: x['class_name']), 1):
+                    u_table.append([
+                        Paragraph(str(idx), cell_style),
+                        Paragraph(p['student_name'], cell_style_left),
+                        Paragraph(p['class_name'], cell_style),
+                    ])
+                col_widths = [1.5*cm, 12*cm, 3*cm]
+                t = Table(u_table, colWidths=col_widths, repeatRows=1)
+                t.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#dc2626')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), PDF_FONT_BOLD),
+                    ('FONTNAME', (0, 1), (-1, -1), PDF_FONT),
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#fef2f2')]),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('TOPPADDING', (0, 0), (-1, -1), 4),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                ]))
+                elements.append(t)
+                elements.append(Spacer(1, 16))
+
+            if unassigned_study:
+                warn_study_style = ParagraphStyle('WarnStudy', parent=styles['Normal'], fontName=PDF_FONT, fontSize=10, alignment=TA_LEFT, textColor=colors.HexColor('#92400e'))
+                elements.append(Paragraph(f"⚠ Ders Çalışacak - Yerleştirilemeyen: {len(unassigned_study)} öğrenci", warn_study_style))
+                elements.append(Spacer(1, 6))
+                u_table = [[
+                    Paragraph('No', header_cell_style),
+                    Paragraph('Ad Soyad', header_cell_style),
+                    Paragraph('Sınıf', header_cell_style),
+                ]]
+                for idx, p in enumerate(sorted(unassigned_study, key=lambda x: x['class_name']), 1):
+                    u_table.append([
+                        Paragraph(str(idx), cell_style),
+                        Paragraph(p['student_name'], cell_style_left),
+                        Paragraph(p['class_name'], cell_style),
+                    ])
+                col_widths = [1.5*cm, 12*cm, 3*cm]
+                t = Table(u_table, colWidths=col_widths, repeatRows=1)
+                t.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#92400e')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), PDF_FONT_BOLD),
+                    ('FONTNAME', (0, 1), (-1, -1), PDF_FONT),
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#fffbeb')]),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('TOPPADDING', (0, 0), (-1, -1), 4),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                ]))
+                elements.append(t)
 
         doc.build(elements)
         buffer.seek(0)
