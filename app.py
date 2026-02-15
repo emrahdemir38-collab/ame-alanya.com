@@ -2373,6 +2373,169 @@ def admin_delete_all_users():
         logger.error(f"Delete all users error: {str(e)}")
         return jsonify({"error": f"Toplu silme hatası: {str(e)}"}), 500
 
+@app.route("/api/admin/users/eokul-compare", methods=["POST"])
+@login_required
+def admin_eokul_compare():
+    if current_user.role != 'admin':
+        return jsonify({"error": "Yetkisiz erişim"}), 403
+
+    if "file" not in request.files:
+        return jsonify({"error": "Dosya bulunamadı"}), 400
+
+    file = request.files["file"]
+    if not file.filename:
+        return jsonify({"error": "Dosya seçilmedi"}), 400
+
+    try:
+        df = pd.read_excel(file)
+
+        def turkish_upper(text):
+            if not text:
+                return ''
+            text = text.replace('i', 'İ').replace('ı', 'I')
+            return text.upper().strip()
+
+        def normalize_name(text):
+            return ' '.join(turkish_upper(text).split())
+
+        col_map = {}
+        for col in df.columns:
+            col_lower = str(col).strip().lower()
+            if col_lower in ('sınıf', 'sınıfı', 'sinif', 'sinifi'):
+                col_map['class'] = col
+            elif col_lower in ('okul no', 'okul numarası', 'numara', 'no', 'öğrenci no', 'ogrenci no'):
+                col_map['no'] = col
+            elif col_lower in ('ad soyad', 'adsoyad', 'ad-soyad', 'öğrenci adı soyadı'):
+                col_map['full_name'] = col
+            elif col_lower in ('adı', 'ad', 'adi', 'öğrenci adı', 'ogrenci adi'):
+                col_map['first_name'] = col
+            elif col_lower in ('soyadı', 'soyad', 'soyadi', 'öğrenci soyadı'):
+                col_map['last_name'] = col
+
+        if 'class' not in col_map:
+            return jsonify({"error": "Excel'de Sınıf sütunu bulunamadı. Sütun adları: " + ", ".join(df.columns.tolist())}), 400
+
+        has_name = 'full_name' in col_map or ('first_name' in col_map and 'last_name' in col_map)
+        if not has_name:
+            return jsonify({"error": "Excel'de Ad Soyad veya Adı/Soyadı sütunları bulunamadı. Sütun adları: " + ", ".join(df.columns.tolist())}), 400
+
+        excel_students = []
+        skipped = 0
+        for _, row in df.iterrows():
+            class_name = str(row[col_map['class']]).strip()
+            if not class_name or class_name == 'nan':
+                skipped += 1
+                continue
+
+            class_name = turkish_upper(class_name).replace(' ', '')
+
+            if 'full_name' in col_map:
+                full_name = str(row[col_map['full_name']]).strip()
+            else:
+                first = str(row[col_map['first_name']]).strip()
+                last = str(row[col_map['last_name']]).strip()
+                if first == 'nan': first = ''
+                if last == 'nan': last = ''
+                full_name = f"{first} {last}"
+
+            if not full_name.strip() or full_name.strip() == 'nan':
+                skipped += 1
+                continue
+
+            student_no = ''
+            if 'no' in col_map:
+                student_no = str(row[col_map['no']]).strip()
+                if student_no == 'nan':
+                    student_no = ''
+                student_no = student_no.replace('.0', '')
+
+            excel_students.append({
+                'full_name': normalize_name(full_name),
+                'class_name': class_name,
+                'student_no': student_no
+            })
+
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT id, username, full_name, class_name, student_no FROM users WHERE role = 'student'")
+        db_students = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        db_lookup = {}
+        for s in db_students:
+            key = (normalize_name(s['full_name']), turkish_upper(s['class_name'] or '').replace(' ', ''))
+            if key not in db_lookup:
+                db_lookup[key] = []
+            db_lookup[key].append(s)
+
+        excel_lookup = set()
+        for s in excel_students:
+            excel_lookup.add((s['full_name'], s['class_name']))
+
+        new_students = []
+        for s in excel_students:
+            key = (s['full_name'], s['class_name'])
+            if key not in db_lookup:
+                new_students.append(s)
+
+        gone_students = []
+        for key, students in db_lookup.items():
+            if key not in excel_lookup:
+                for s in students:
+                    gone_students.append({
+                        'id': s['id'],
+                        'full_name': s['full_name'],
+                        'class_name': s['class_name'] or '',
+                        'student_no': s['student_no'] or '',
+                        'username': s['username']
+                    })
+
+        new_students.sort(key=lambda x: (x['class_name'], x['full_name']))
+        gone_students.sort(key=lambda x: (x['class_name'], x['full_name']))
+
+        return jsonify({
+            "success": True,
+            "excel_count": len(excel_students),
+            "db_count": len(db_students),
+            "new_students": new_students,
+            "gone_students": gone_students,
+            "new_count": len(new_students),
+            "gone_count": len(gone_students)
+        })
+
+    except Exception as e:
+        logger.error(f"E-okul comparison error: {str(e)}")
+        return jsonify({"error": f"Karşılaştırma hatası: {str(e)}"}), 400
+
+
+@app.route("/api/admin/users/eokul-delete", methods=["POST"])
+@login_required
+def admin_eokul_delete():
+    if current_user.role != 'admin':
+        return jsonify({"error": "Yetkisiz erişim"}), 403
+
+    data = request.get_json()
+    user_ids = data.get('user_ids', [])
+    if not user_ids:
+        return jsonify({"error": "Silinecek kullanıcı seçilmedi"}), 400
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        deleted = 0
+        for uid in user_ids:
+            cur.execute("DELETE FROM users WHERE id = %s AND role = 'student'", (uid,))
+            deleted += cur.rowcount
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"success": True, "deleted_count": deleted})
+    except Exception as e:
+        logger.error(f"E-okul delete error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/admin/users/upload-excel", methods=["POST"])
 @login_required
 def admin_upload_excel():
