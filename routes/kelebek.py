@@ -294,7 +294,7 @@ def download_excel_template():
         top=Side(style='thin'), bottom=Side(style='thin')
     )
 
-    headers = ['Sınıf', 'Okul Numarası', 'Ad Soyad']
+    headers = ['Sınıf', 'Okul Numarası', 'Adı', 'Soyadı']
     for col_idx, header in enumerate(headers, 1):
         cell = ws.cell(row=1, column=col_idx, value=header)
         cell.fill = header_fill
@@ -303,16 +303,16 @@ def download_excel_template():
         cell.border = thin_border
 
     sample_data = [
-        ('5A', '501', 'Ahmet YILMAZ'),
-        ('5A', '502', 'Ayşe KAYA'),
-        ('6B', '601', 'Mehmet DEMİR'),
-        ('7A', '701', 'Fatma ÖZ'),
-        ('8C', '801', 'Ali CAN'),
+        ('5A', '501', 'Ahmet', 'YILMAZ'),
+        ('5A', '502', 'Ayşe', 'KAYA'),
+        ('6B', '601', 'Mehmet', 'DEMİR'),
+        ('7A', '701', 'Fatma', 'ÖZ'),
+        ('8C', '801', 'Ali', 'CAN'),
     ]
 
     sample_font = Font(color="999999", italic=True)
-    for row_idx, (sinif, no, ad) in enumerate(sample_data, 2):
-        for col_idx, value in enumerate([sinif, no, ad], 1):
+    for row_idx, (sinif, no, adi, soyadi) in enumerate(sample_data, 2):
+        for col_idx, value in enumerate([sinif, no, adi, soyadi], 1):
             cell = ws.cell(row=row_idx, column=col_idx, value=value)
             cell.font = sample_font
             cell.border = thin_border
@@ -320,7 +320,8 @@ def download_excel_template():
 
     ws.column_dimensions['A'].width = 12
     ws.column_dimensions['B'].width = 18
-    ws.column_dimensions['C'].width = 30
+    ws.column_dimensions['C'].width = 20
+    ws.column_dimensions['D'].width = 20
 
     ws.row_dimensions[1].height = 30
 
@@ -376,7 +377,9 @@ def upload_participants(plan_id):
                 continue
             class_name = str(row[0]).strip()
             student_no = str(row[1]).strip() if row[1] else ''
-            student_name = str(row[2]).strip() if len(row) > 2 and row[2] else ''
+            first_name = str(row[2]).strip() if len(row) > 2 and row[2] else ''
+            last_name = str(row[3]).strip() if len(row) > 3 and row[3] else ''
+            student_name = (first_name + ' ' + last_name).strip()
 
             if not student_name:
                 continue
