@@ -574,7 +574,7 @@ function renderAssignments(data) {
         studyRooms.forEach(room => {
             const ra = assignmentsByRoom[room.id] || [];
             const students = ra.map(a => participantMap[a.participant_id]).filter(Boolean);
-            const gradeLabel = room.grade_for_study ? room.grade_for_study + '. Sınıf' : '';
+            const gradeLabel = room.grade_for_study ? room.grade_for_study + '. Sınıf' : (students.length > 0 ? 'Karma' : '');
 
             html += `<div class="room-card">
                 <div class="room-card-header study">

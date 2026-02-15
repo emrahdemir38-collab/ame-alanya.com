@@ -607,6 +607,49 @@ def _run_butterfly_algorithm(plan_id, conn):
                     student_idx += 1
                 desk_num += 1
 
+    assigned_non_exam_ids = set()
+    cur.execute("SELECT participant_id FROM kelebek_assignments WHERE plan_id = %s", (plan_id,))
+    for row in cur.fetchall():
+        assigned_non_exam_ids.add(row['participant_id'])
+
+    unplaced_study = [s for s in non_exam_students if s['id'] not in assigned_non_exam_ids]
+
+    if unplaced_study:
+        room_occupancy = {}
+        for rn in study_rooms:
+            cur.execute("SELECT COUNT(*) as cnt FROM kelebek_assignments WHERE room_id = %s", (room_ids[rn],))
+            room_occupancy[rn] = cur.fetchone()['cnt']
+
+        available_study_rooms = [rn for rn in study_rooms if room_occupancy.get(rn, 0) < relevant_rooms[rn]['capacity']]
+
+        if available_study_rooms:
+            random.shuffle(unplaced_study)
+            student_idx = 0
+            for room_name in available_study_rooms:
+                if student_idx >= len(unplaced_study):
+                    break
+                room_info = relevant_rooms[room_name]
+                current_count = room_occupancy.get(room_name, 0)
+                current_desk = (current_count // 2) + 1
+                current_pos_idx = current_count % 2
+
+                if current_count == 0:
+                    cur.execute("UPDATE kelebek_rooms SET grade_for_study = NULL WHERE id = %s AND (SELECT COUNT(*) FROM kelebek_assignments WHERE room_id = %s) = 0", (room_ids[room_name], room_ids[room_name]))
+
+                while student_idx < len(unplaced_study) and current_desk <= room_info['desks']:
+                    positions = ['left', 'right']
+                    start_pos = current_pos_idx if current_desk == (current_count // 2) + 1 else 0
+                    for pos_i in range(start_pos, 2):
+                        if student_idx >= len(unplaced_study):
+                            break
+                        s = unplaced_study[student_idx]
+                        cur.execute("""
+                            INSERT INTO kelebek_assignments (plan_id, room_id, participant_id, desk_number, seat_position, row_number)
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                        """, (plan_id, room_ids[room_name], s['id'], current_desk, positions[pos_i], current_desk))
+                        student_idx += 1
+                    current_desk += 1
+
     for grade in exam_by_grade:
         random.shuffle(exam_by_grade[grade])
 
@@ -860,8 +903,11 @@ def download_room_list_pdf(plan_id):
             if exam_date_str:
                 info_text += f" | Tarih: {exam_date_str}"
             info_text += f" | Kapasite: {room['capacity']} | Sıra: {room['desk_count']}"
-            if room['room_type'] == 'study' and room.get('grade_for_study'):
-                info_text += f" | {room['grade_for_study']}. Sınıf Ders Çalışma"
+            if room['room_type'] == 'study':
+                if room.get('grade_for_study'):
+                    info_text += f" | {room['grade_for_study']}. Sınıf Ders Çalışma"
+                else:
+                    info_text += " | Karma Ders Sınıfı"
             elements.append(Paragraph(info_text, subtitle_style))
             elements.append(Spacer(1, 10))
 
