@@ -308,11 +308,12 @@ function switchTabDirect(tab) {
     });
 }
 
-async function loadPlans() {
+async function loadPlans(retryCount = 0) {
+    const list = document.getElementById('plansList');
     try {
         const res = await fetch('/admin/kelebek/api/plans');
+        if (!res.ok) throw new Error('Sunucu hatası: ' + res.status);
         const data = await res.json();
-        const list = document.getElementById('plansList');
         if (!data.plans || data.plans.length === 0) {
             list.innerHTML = '<div class="empty-state"><div class="icon">🦋</div><p>Henuz bir plan olusturulmamıs</p></div>';
             return;
@@ -337,7 +338,15 @@ async function loadPlans() {
                 </div>
             `;
         }).join('');
-    } catch(e) { console.error(e); }
+    } catch(e) {
+        console.error('Plan listesi yüklenemedi:', e);
+        if (retryCount < 3) {
+            list.innerHTML = '<div class="empty-state"><div class="icon">⏳</div><p>Planlar yükleniyor...</p></div>';
+            setTimeout(() => loadPlans(retryCount + 1), 2000);
+        } else {
+            list.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>Planlar yüklenemedi. <a href="#" onclick="loadPlans(); return false;">Tekrar dene</a></p></div>';
+        }
+    }
 }
 
 async function deletePlan(planId) {
