@@ -474,6 +474,10 @@ def _run_butterfly_algorithm(plan_id, conn):
     for s in exam_students:
         exam_by_grade.setdefault(s['grade_level'], []).append(s)
 
+    exam_by_class = {}
+    for s in exam_students:
+        exam_by_class.setdefault(s['class_name'], []).append(s)
+
     non_exam_by_grade = {}
     for s in non_exam_students:
         non_exam_by_grade.setdefault(s['grade_level'], []).append(s)
@@ -650,56 +654,105 @@ def _run_butterfly_algorithm(plan_id, conn):
                         student_idx += 1
                     current_desk += 1
 
-    for grade in exam_by_grade:
-        random.shuffle(exam_by_grade[grade])
+    for cls in exam_by_class:
+        random.shuffle(exam_by_class[cls])
 
-    grade_queues = {}
-    for grade, students in exam_by_grade.items():
-        grade_queues[grade] = list(students)
+    class_queues = {}
+    for cls, students in exam_by_class.items():
+        class_queues[cls] = list(students)
+
+    overflow_students = []
 
     for room_name in exam_rooms:
         room_info = relevant_rooms[room_name]
         room_id = room_ids[room_name]
         num_desks = room_info['desks']
 
-        total_remaining = sum(len(q) for q in grade_queues.values())
-        if total_remaining == 0:
-            break
+        home_students = list(class_queues.get(room_name, []))
+        home_for_left = home_students[:num_desks]
+        home_overflow = home_students[num_desks:]
 
-        room_share = min(num_desks * 2, total_remaining)
+        if room_name in class_queues:
+            class_queues[room_name] = []
 
-        for desk_num in range(1, num_desks + 1):
-            active_grades = sorted(grade_queues.keys(), key=lambda g: len(grade_queues[g]), reverse=True)
-            active_grades = [g for g in active_grades if len(grade_queues[g]) > 0]
+        overflow_students.extend(home_overflow)
 
-            if not active_grades:
-                break
-
-            left_grade = active_grades[0]
-            left_student = grade_queues[left_grade].pop(0)
-
+        for desk_num, student in enumerate(home_for_left, 1):
             cur.execute("""
                 INSERT INTO kelebek_assignments (plan_id, room_id, participant_id, desk_number, seat_position, row_number)
                 VALUES (%s, %s, %s, %s, 'left', %s)
-            """, (plan_id, room_id, left_student['id'], desk_num, desk_num))
+            """, (plan_id, room_id, student['id'], desk_num, desk_num))
 
-            right_grades = [g for g in active_grades if g != left_grade and len(grade_queues[g]) > 0]
-            if right_grades:
-                right_grades.sort(key=lambda g: len(grade_queues[g]), reverse=True)
-                right_grade = right_grades[0]
-                right_student = grade_queues[right_grade].pop(0)
-                cur.execute("""
-                    INSERT INTO kelebek_assignments (plan_id, room_id, participant_id, desk_number, seat_position, row_number)
-                    VALUES (%s, %s, %s, %s, 'right', %s)
-                """, (plan_id, room_id, right_student['id'], desk_num, desk_num))
-            else:
-                remaining_same = [g for g in active_grades if g == left_grade and len(grade_queues.get(g, [])) > 0]
-                if remaining_same:
-                    same_student = grade_queues[remaining_same[0]].pop(0)
+    all_remaining = []
+    for cls, students in class_queues.items():
+        all_remaining.extend(students)
+    all_remaining.extend(overflow_students)
+    random.shuffle(all_remaining)
+
+    remaining_by_grade = {}
+    for s in all_remaining:
+        remaining_by_grade.setdefault(s['grade_level'], []).append(s)
+
+    for room_name in exam_rooms:
+        room_info = relevant_rooms[room_name]
+        room_id = room_ids[room_name]
+        num_desks = room_info['desks']
+
+        room_grade = None
+        for ch in room_name:
+            if ch.isdigit():
+                room_grade = int(ch)
+                break
+
+        cur.execute("SELECT desk_number FROM kelebek_assignments WHERE room_id = %s ORDER BY desk_number", (room_id,))
+        filled_left_desks = set(row['desk_number'] for row in cur.fetchall())
+
+        for desk_num in range(1, num_desks + 1):
+            if desk_num in filled_left_desks:
+                other_grades = [g for g in remaining_by_grade if g != room_grade and len(remaining_by_grade[g]) > 0]
+                if other_grades:
+                    other_grades.sort(key=lambda g: len(remaining_by_grade[g]), reverse=True)
+                    student = remaining_by_grade[other_grades[0]].pop(0)
                     cur.execute("""
                         INSERT INTO kelebek_assignments (plan_id, room_id, participant_id, desk_number, seat_position, row_number)
                         VALUES (%s, %s, %s, %s, 'right', %s)
-                    """, (plan_id, room_id, same_student['id'], desk_num, desk_num))
+                    """, (plan_id, room_id, student['id'], desk_num, desk_num))
+                else:
+                    any_remaining = [g for g in remaining_by_grade if len(remaining_by_grade[g]) > 0]
+                    if any_remaining:
+                        student = remaining_by_grade[any_remaining[0]].pop(0)
+                        cur.execute("""
+                            INSERT INTO kelebek_assignments (plan_id, room_id, participant_id, desk_number, seat_position, row_number)
+                            VALUES (%s, %s, %s, %s, 'right', %s)
+                        """, (plan_id, room_id, student['id'], desk_num, desk_num))
+            else:
+                any_left = [g for g in remaining_by_grade if len(remaining_by_grade[g]) > 0]
+                if not any_left:
+                    continue
+                any_left.sort(key=lambda g: len(remaining_by_grade[g]), reverse=True)
+                left_student = remaining_by_grade[any_left[0]].pop(0)
+                left_grade = left_student['grade_level']
+                cur.execute("""
+                    INSERT INTO kelebek_assignments (plan_id, room_id, participant_id, desk_number, seat_position, row_number)
+                    VALUES (%s, %s, %s, %s, 'left', %s)
+                """, (plan_id, room_id, left_student['id'], desk_num, desk_num))
+
+                other_grades = [g for g in remaining_by_grade if g != left_grade and len(remaining_by_grade[g]) > 0]
+                if other_grades:
+                    other_grades.sort(key=lambda g: len(remaining_by_grade[g]), reverse=True)
+                    right_student = remaining_by_grade[other_grades[0]].pop(0)
+                    cur.execute("""
+                        INSERT INTO kelebek_assignments (plan_id, room_id, participant_id, desk_number, seat_position, row_number)
+                        VALUES (%s, %s, %s, %s, 'right', %s)
+                    """, (plan_id, room_id, right_student['id'], desk_num, desk_num))
+                else:
+                    same_left = [g for g in remaining_by_grade if len(remaining_by_grade[g]) > 0]
+                    if same_left:
+                        right_student = remaining_by_grade[same_left[0]].pop(0)
+                        cur.execute("""
+                            INSERT INTO kelebek_assignments (plan_id, room_id, participant_id, desk_number, seat_position, row_number)
+                            VALUES (%s, %s, %s, %s, 'right', %s)
+                        """, (plan_id, room_id, right_student['id'], desk_num, desk_num))
 
     cur.execute("UPDATE kelebek_plans SET status = 'generated', updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul') WHERE id = %s", (plan_id,))
     conn.commit()
