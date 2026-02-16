@@ -1,0 +1,1958 @@
+diff --git a/app.py b/app.py
+index 57878f5..239f81d 100644
+--- a/app.py
++++ b/app.py
+@@ -19211,6 +19211,7 @@ from routes.daily_tracking import daily_tracking_bp
+ from routes.teacher_study_plan import teacher_study_plan_bp
+ from routes.report_cards import report_cards_bp, init_object_storage
+ from routes.kelebek import kelebek_bp, init_kelebek_tables
++from routes.lgs_results import lgs_results_bp, init_lgs_tables
+ 
+ # Object Storage'ı report_cards modülüne aktar
+ init_object_storage(object_storage)
+@@ -19225,6 +19226,7 @@ app.register_blueprint(daily_tracking_bp)
+ app.register_blueprint(teacher_study_plan_bp)
+ app.register_blueprint(report_cards_bp)
+ app.register_blueprint(kelebek_bp)
++app.register_blueprint(lgs_results_bp)
+ # ==================== MODÜLER BLUEPRINT'LER SONU ====================
+ 
+ # Uygulama başlarken veritabanını initialize et
+@@ -19234,6 +19236,8 @@ with app.app_context():
+     init_kelebek_tables(conn_kb)
+     conn_kb.close()
+     logger.info("✅ Kelebek tabloları kontrol edildi/oluşturuldu")
++    init_lgs_tables()
++    logger.info("✅ LGS sonuç tabloları kontrol edildi/oluşturuldu")
+     
+     init_admin_user()
+     
+diff --git a/attached_assets/LGS-Puan-Sonuc-Listeleme-kod-el-ile-yazmali-2024_1771247203025.xlsm b/attached_assets/LGS-Puan-Sonuc-Listeleme-kod-el-ile-yazmali-2024_1771247203025.xlsm
+new file mode 100644
+index 0000000..d9b776d
+Binary files /dev/null and b/attached_assets/LGS-Puan-Sonuc-Listeleme-kod-el-ile-yazmali-2024_1771247203025.xlsm differ
+diff --git a/attached_assets/LGS-Sonuc-Listesi-2024_1771247203025.xlsm b/attached_assets/LGS-Sonuc-Listesi-2024_1771247203025.xlsm
+new file mode 100644
+index 0000000..16a0b25
+Binary files /dev/null and b/attached_assets/LGS-Sonuc-Listesi-2024_1771247203025.xlsm differ
+diff --git "a/attached_assets/LGS_2024_toplu_sonu\303\247_1771247203025.xlsm" "b/attached_assets/LGS_2024_toplu_sonu\303\247_1771247203025.xlsm"
+new file mode 100644
+index 0000000..2f9bfcf
+Binary files /dev/null and "b/attached_assets/LGS_2024_toplu_sonu\303\247_1771247203025.xlsm" differ
+diff --git a/pyproject.toml b/pyproject.toml
+index b4239b7..2ba96cd 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,6 +4,7 @@ version = "0.1.0"
+ description = "Add your description here"
+ requires-python = ">=3.11"
+ dependencies = [
++    "beautifulsoup4>=4.14.3",
+     "flask>=3.1.2",
+     "flask-cors>=6.0.1",
+     "flask-login>=0.6.3",
+diff --git a/replit.md b/replit.md
+index c3edf35..1328e57 100644
+--- a/replit.md
++++ b/replit.md
+@@ -99,6 +99,8 @@ The system is built on Python 3.11 with the Flask 3.1.2 framework. It uses a Pos
+ - ✅ **PDF Report Stability:** Removed RotatedParagraph class that caused PDF corruption; using multi-line text instead
+ - ✅ **APK Password Persistence Guide:** Created `APK_PASSWORD_PERSISTENCE.md` with TinyDB/SharedPreferences implementation steps for auto-login
+ 
++- ✅ **LGS Sonuç Çekme Sistemi:** Admin paneline MEB sonuç sayfasından toplu LGS sonucu çekme özelliği eklendi. Güvenlik kodlu ve kodsuz hibrit mod, Excel şablon indirme/yükleme, sonuç veritabanı kaydı ve Excel dışa aktarma desteği.
++
+ ## Known Issues & Workarounds
+ - **APK PDF Opening:** Resolved - Now returns PNG format instead of PDF
+ - **APK Password Persistence:** Requires Kodular implementation using TinyDB component (see `APK_PASSWORD_PERSISTENCE.md`)
+@@ -118,4 +120,6 @@ The system is built on Python 3.11 with the Flask 3.1.2 framework. It uses a Pos
+ - **Chart.js:** JavaScript library for data visualization.
+ - **matplotlib:** Chart generation for Python analytics.
+ - **google-cloud-storage:** Object storage integration.
+-- **replit.object_storage:** Replit native object storage client.
+\ No newline at end of file
++- **replit.object_storage:** Replit native object storage client.
++- **beautifulsoup4:** HTML parsing for MEB sonuç sayfası scraping.
++- **requests:** HTTP library for MEB API communication.
+\ No newline at end of file
+diff --git a/routes/lgs_results.py b/routes/lgs_results.py
+new file mode 100644
+index 0000000..15d60c1
+--- /dev/null
++++ b/routes/lgs_results.py
+@@ -0,0 +1,889 @@
++import os
++import io
++import logging
++import requests
++from datetime import datetime
++from flask import Blueprint, request, jsonify, render_template, send_file, session as flask_session, redirect
++from flask_login import login_required, current_user
++import psycopg2
++from psycopg2.extras import RealDictCursor
++from openpyxl import Workbook, load_workbook
++from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
++from bs4 import BeautifulSoup
++
++logger = logging.getLogger(__name__)
++
++lgs_results_bp = Blueprint('lgs_results', __name__)
++
++ALLOWED_MEB_DOMAINS = [
++    'sonuc.meb.gov.tr',
++    'www.meb.gov.tr',
++    'meb.gov.tr',
++]
++
++def is_allowed_url(url):
++    try:
++        from urllib.parse import urlparse
++        parsed = urlparse(url)
++        return parsed.hostname in ALLOWED_MEB_DOMAINS and parsed.scheme == 'https'
++    except:
++        return False
++
++def get_db():
++    return psycopg2.connect(os.environ.get('DATABASE_URL'))
++
++def load_cookies_to_session(s):
++    cookies_data = flask_session.get('meb_cookies', [])
++    if isinstance(cookies_data, list):
++        for c in cookies_data:
++            s.cookies.set(c['name'], c['value'], domain=c.get('domain', ''), path=c.get('path', '/'))
++    elif isinstance(cookies_data, dict):
++        for k, v in cookies_data.items():
++            s.cookies.set(k, v)
++
++def save_cookies_from_session(s):
++    cookies_list = []
++    for cookie in s.cookies:
++        cookies_list.append({
++            'name': cookie.name,
++            'value': cookie.value,
++            'domain': cookie.domain,
++            'path': cookie.path
++        })
++    flask_session['meb_cookies'] = cookies_list
++
++def init_lgs_tables():
++    conn = None
++    try:
++        conn = get_db()
++        cur = conn.cursor()
++        cur.execute("""
++            CREATE TABLE IF NOT EXISTS lgs_results (
++                id SERIAL PRIMARY KEY,
++                student_name VARCHAR(200),
++                tc_no VARCHAR(20),
++                school_no VARCHAR(20),
++                birth_date DATE,
++                exam_year INTEGER DEFAULT 2024,
++                sinav_puan DECIMAL(8,4),
++                genel_yuzdelik VARCHAR(50),
++                il_yuzdelik VARCHAR(50),
++                turkce_dogru INTEGER DEFAULT 0,
++                turkce_yanlis INTEGER DEFAULT 0,
++                turkce_bos INTEGER DEFAULT 0,
++                matematik_dogru INTEGER DEFAULT 0,
++                matematik_yanlis INTEGER DEFAULT 0,
++                matematik_bos INTEGER DEFAULT 0,
++                fen_dogru INTEGER DEFAULT 0,
++                fen_yanlis INTEGER DEFAULT 0,
++                fen_bos INTEGER DEFAULT 0,
++                inkilap_dogru INTEGER DEFAULT 0,
++                inkilap_yanlis INTEGER DEFAULT 0,
++                inkilap_bos INTEGER DEFAULT 0,
++                din_dogru INTEGER DEFAULT 0,
++                din_yanlis INTEGER DEFAULT 0,
++                din_bos INTEGER DEFAULT 0,
++                yabanci_dil_dogru INTEGER DEFAULT 0,
++                yabanci_dil_yanlis INTEGER DEFAULT 0,
++                yabanci_dil_bos INTEGER DEFAULT 0,
++                yerlestigi_okul VARCHAR(500),
++                sinif VARCHAR(10),
++                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
++                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
++                UNIQUE(tc_no, exam_year)
++            )
++        """)
++        conn.commit()
++        logger.info("LGS results table created/verified")
++    except Exception as e:
++        logger.error(f"Error creating LGS tables: {e}")
++        if conn:
++            conn.rollback()
++    finally:
++        if conn:
++            conn.close()
++
++
++@lgs_results_bp.route('/admin/lgs-results')
++@login_required
++def lgs_results_page():
++    if current_user.role != 'admin':
++        return redirect('/')
++    return render_template('admin_lgs_results.html')
++
++
++@lgs_results_bp.route('/admin/lgs-results/template')
++@login_required
++def download_lgs_template():
++    if current_user.role != 'admin':
++        return jsonify({'error': 'Yetkisiz'}), 403
++
++    wb = Workbook()
++    ws = wb.active
++    ws.title = "LGS Öğrenci Listesi"
++
++    headers = ['TC Kimlik No', 'Okul No', 'Doğum Tarihi (GG.AA.YYYY)', 'Sınıf']
++    header_fill = PatternFill(start_color='1E40AF', end_color='1E40AF', fill_type='solid')
++    header_font = Font(name='Calibri', size=12, bold=True, color='FFFFFF')
++    thin_border = Border(
++        left=Side(style='thin'),
++        right=Side(style='thin'),
++        top=Side(style='thin'),
++        bottom=Side(style='thin')
++    )
++
++    for col, header in enumerate(headers, 1):
++        cell = ws.cell(row=1, column=col, value=header)
++        cell.fill = header_fill
++        cell.font = header_font
++        cell.alignment = Alignment(horizontal='center', vertical='center')
++        cell.border = thin_border
++
++    ws.column_dimensions['A'].width = 20
++    ws.column_dimensions['B'].width = 15
++    ws.column_dimensions['C'].width = 25
++    ws.column_dimensions['D'].width = 12
++
++    example_data = [
++        ['12345678901', '65', '15.03.2012', '8A'],
++        ['98765432101', '65', '22.07.2012', '8B'],
++    ]
++    example_font = Font(name='Calibri', size=11, color='888888', italic=True)
++    for row_idx, row_data in enumerate(example_data, 2):
++        for col_idx, value in enumerate(row_data, 1):
++            cell = ws.cell(row=row_idx, column=col_idx, value=value)
++            cell.font = example_font
++            cell.alignment = Alignment(horizontal='center')
++            cell.border = thin_border
++
++    ws.cell(row=4, column=1, value="NOT: Örnek verileri silip gerçek öğrenci bilgilerini giriniz.").font = Font(color='FF0000', bold=True, size=10)
++
++    output = io.BytesIO()
++    wb.save(output)
++    output.seek(0)
++
++    return send_file(
++        output,
++        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
++        as_attachment=True,
++        download_name='LGS_Ogrenci_Sablonu.xlsx'
++    )
++
++
++@lgs_results_bp.route('/admin/lgs-results/upload-excel', methods=['POST'])
++@login_required
++def upload_lgs_excel():
++    if current_user.role != 'admin':
++        return jsonify({'error': 'Yetkisiz'}), 403
++
++    if 'file' not in request.files:
++        return jsonify({'error': 'Dosya seçilmedi'}), 400
++
++    file = request.files['file']
++    if not file.filename.endswith(('.xlsx', '.xls', '.xlsm')):
++        return jsonify({'error': 'Geçersiz dosya formatı. Excel dosyası yükleyin.'}), 400
++
++    try:
++        wb = load_workbook(file, data_only=True)
++        ws = wb.active
++
++        students = []
++        for row in ws.iter_rows(min_row=2, values_only=False):
++            tc = str(row[0].value).strip() if row[0].value else None
++            okul_no = str(row[1].value).strip() if row[1].value else None
++            dogum = row[2].value if len(row) > 2 and row[2].value else None
++            sinif = str(row[3].value).strip() if len(row) > 3 and row[3].value else ''
++
++            if not tc or tc == 'None' or not tc.isdigit():
++                continue
++            if len(tc) != 11:
++                continue
++
++            dogum_str = ''
++            if dogum:
++                if isinstance(dogum, datetime):
++                    dogum_str = dogum.strftime('%d.%m.%Y')
++                else:
++                    dogum_str = str(dogum).strip()
++
++            students.append({
++                'tc': tc,
++                'okul_no': okul_no or '',
++                'dogum_tarihi': dogum_str,
++                'sinif': sinif
++            })
++
++        if not students:
++            return jsonify({'error': 'Excel dosyasında geçerli öğrenci bulunamadı'}), 400
++
++        return jsonify({
++            'success': True,
++            'students': students,
++            'count': len(students)
++        })
++
++    except Exception as e:
++        logger.error(f"Excel upload error: {e}")
++        return jsonify({'error': f'Excel okuma hatası: {str(e)}'}), 500
++
++
++@lgs_results_bp.route('/admin/lgs-results/get-captcha', methods=['POST'])
++@login_required
++def get_meb_captcha():
++    if current_user.role != 'admin':
++        return jsonify({'error': 'Yetkisiz'}), 403
++
++    data = request.get_json()
++    sinav_url = data.get('sinav_url', 'https://sonuc.meb.gov.tr/')
++
++    if not is_allowed_url(sinav_url):
++        return jsonify({'error': 'Geçersiz URL. Sadece MEB alan adları desteklenir (sonuc.meb.gov.tr, www.meb.gov.tr)'}), 400
++
++    try:
++        s = requests.Session()
++        resp = s.get(sinav_url, timeout=10, allow_redirects=True)
++
++        if resp.status_code != 200:
++            return jsonify({'error': f'MEB sayfası açılamadı (HTTP {resp.status_code})'}), 500
++
++        soup = BeautifulSoup(resp.text, 'html.parser')
++
++        sinav_id_input = soup.find('input', {'name': 'SINAV_ID'})
++        sinav_id = sinav_id_input['value'] if sinav_id_input else ''
++
++        captcha_img = soup.find('img', {'id': 'image'})
++        if not captcha_img:
++            captcha_img = soup.find('img', {'id': 'capcha'})
++        if not captcha_img:
++            captcha_img = soup.find('img', {'name': 'capcha'})
++        if not captcha_img:
++            for img in soup.find_all('img'):
++                src = img.get('src', '')
++                if 'captcha' in src.lower():
++                    captcha_img = img
++                    break
++
++        gk_input = soup.find('input', {'name': 'GUVENLIKKODU'})
++        has_captcha = captcha_img is not None or gk_input is not None
++
++        captcha_base64 = None
++        if captcha_img:
++            captcha_src = captcha_img.get('src', '')
++            if captcha_src:
++                if captcha_src.startswith('/'):
++                    base_url = '/'.join(resp.url.rstrip('/').split('/')[:3])
++                    captcha_url = base_url + captcha_src
++                else:
++                    base_url = '/'.join(resp.url.rstrip('/').split('/')[:-1])
++                    captcha_url = base_url + '/' + captcha_src
++
++                captcha_resp = s.get(captcha_url, timeout=10)
++                if captcha_resp.status_code == 200:
++                    import base64
++                    captcha_base64 = base64.b64encode(captcha_resp.content).decode('utf-8')
++
++        save_cookies_from_session(s)
++        flask_session['meb_sinav_id'] = sinav_id
++        flask_session['meb_sinav_url'] = resp.url
++
++        form_action = 'sonuc.php'
++        form_tag = soup.find('form')
++        if form_tag and form_tag.get('action'):
++            form_action = form_tag['action']
++
++        flask_session['meb_form_action'] = form_action
++
++        field_tc = 'ADAY_NO'
++        field_okul = 'GUVENLIKNUMARASI'
++        tc_input = soup.find('input', {'name': 'ADAY_NO'})
++        if not tc_input:
++            tc_input = soup.find('input', {'name': 'TCNO'})
++            if tc_input:
++                field_tc = 'TCNO'
++        okul_input = soup.find('input', {'name': 'GUVENLIKNUMARASI'})
++        if not okul_input:
++            okul_input = soup.find('input', {'name': 'OKULNO'})
++            if okul_input:
++                field_okul = 'OKULNO'
++
++        flask_session['meb_field_tc'] = field_tc
++        flask_session['meb_field_okul'] = field_okul
++
++        return jsonify({
++            'success': True,
++            'has_captcha': has_captcha,
++            'captcha_image': captcha_base64,
++            'sinav_id': sinav_id,
++            'field_tc': field_tc,
++            'field_okul': field_okul
++        })
++
++    except requests.exceptions.Timeout:
++        return jsonify({'error': 'MEB sunucusuna bağlanılamadı (zaman aşımı)'}), 500
++    except Exception as e:
++        logger.error(f"Captcha fetch error: {e}")
++        return jsonify({'error': f'Bağlantı hatası: {str(e)}'}), 500
++
++
++@lgs_results_bp.route('/admin/lgs-results/fetch-single', methods=['POST'])
++@login_required
++def fetch_single_result():
++    if current_user.role != 'admin':
++        return jsonify({'error': 'Yetkisiz'}), 403
++
++    data = request.get_json()
++    tc = data.get('tc', '')
++    okul_no = data.get('okul_no', '')
++    gun = data.get('gun', '')
++    ay = data.get('ay', '')
++    yil = data.get('yil', '')
++    captcha_code = data.get('captcha_code', '')
++    sinif = data.get('sinif', '')
++    exam_year = data.get('exam_year', 2024)
++
++    sinav_url = flask_session.get('meb_sinav_url', 'https://sonuc.meb.gov.tr/')
++    sinav_id = flask_session.get('meb_sinav_id', '')
++    form_action = flask_session.get('meb_form_action', 'sonuc.php')
++    field_tc = flask_session.get('meb_field_tc', 'ADAY_NO')
++    field_okul = flask_session.get('meb_field_okul', 'GUVENLIKNUMARASI')
++
++    try:
++        s = requests.Session()
++        load_cookies_to_session(s)
++
++        if form_action.startswith('http'):
++            post_url = form_action
++        else:
++            base_url = '/'.join(sinav_url.rstrip('/').split('/')[:-1])
++            post_url = base_url + '/' + form_action.lstrip('/')
++
++        form_data = {
++            field_tc: tc,
++            field_okul: okul_no,
++            'GUN': gun,
++            'AY': ay,
++            'YIL': yil,
++            'SINAV_ID': sinav_id,
++            'Submit': 'Tamam'
++        }
++
++        if captcha_code:
++            form_data['GUVENLIKKODU'] = captcha_code
++
++        headers = {
++            'Referer': sinav_url,
++            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
++            'Content-Type': 'application/x-www-form-urlencoded'
++        }
++
++        resp = s.post(post_url, data=form_data, headers=headers, timeout=15, allow_redirects=True)
++
++        if resp.status_code != 200:
++            return jsonify({'error': f'MEB yanıt vermedi (HTTP {resp.status_code})'}), 500
++
++        soup = BeautifulSoup(resp.text, 'html.parser')
++
++        tables = soup.find_all('table')
++        if len(tables) < 3:
++            error_text = soup.get_text()
++            if 'hatalı' in error_text.lower() or 'yanlış' in error_text.lower():
++                return jsonify({'error': 'Güvenlik kodu hatalı veya bilgiler yanlış'}), 400
++            if 'bulunamadı' in error_text.lower():
++                return jsonify({'error': 'Sonuç bulunamadı. Bilgileri kontrol edin.'}), 404
++            return jsonify({'error': 'MEB sonuç sayfası beklenmeyen formatta. Güvenlik kodu yanlış olabilir.'}), 400
++
++        result = parse_meb_tables(tables)
++        result['tc'] = tc
++        result['sinif'] = sinif
++        result['exam_year'] = exam_year
++
++        save_lgs_result(result, tc, okul_no, gun, ay, yil, sinif, exam_year)
++
++        save_cookies_from_session(s)
++
++        return jsonify({
++            'success': True,
++            'result': result
++        })
++
++    except requests.exceptions.Timeout:
++        return jsonify({'error': 'MEB sunucusu zaman aşımına uğradı'}), 500
++    except Exception as e:
++        logger.error(f"Fetch single result error: {e}")
++        return jsonify({'error': f'Sonuç çekme hatası: {str(e)}'}), 500
++
++
++@lgs_results_bp.route('/admin/lgs-results/fetch-batch', methods=['POST'])
++@login_required
++def fetch_batch_results():
++    if current_user.role != 'admin':
++        return jsonify({'error': 'Yetkisiz'}), 403
++
++    data = request.get_json()
++    students = data.get('students', [])
++    exam_year = data.get('exam_year', 2024)
++
++    sinav_url = flask_session.get('meb_sinav_url', 'https://sonuc.meb.gov.tr/')
++    sinav_id = flask_session.get('meb_sinav_id', '')
++    form_action = flask_session.get('meb_form_action', 'sonuc.php')
++    field_tc = flask_session.get('meb_field_tc', 'ADAY_NO')
++    field_okul = flask_session.get('meb_field_okul', 'GUVENLIKNUMARASI')
++
++    results = []
++    errors = []
++
++    s = requests.Session()
++    load_cookies_to_session(s)
++
++    if form_action.startswith('http'):
++        post_url = form_action
++    else:
++        base_url = '/'.join(sinav_url.rstrip('/').split('/')[:-1])
++        post_url = base_url + '/' + form_action.lstrip('/')
++
++    headers = {
++        'Referer': sinav_url,
++        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
++        'Content-Type': 'application/x-www-form-urlencoded'
++    }
++
++    for idx, student in enumerate(students):
++        tc = student.get('tc', '')
++        okul_no = student.get('okul_no', '')
++        dogum = student.get('dogum_tarihi', '')
++        sinif = student.get('sinif', '')
++
++        parts = dogum.split('.')
++        if len(parts) == 3:
++            gun, ay, yil = parts
++        else:
++            errors.append({'tc': tc, 'error': 'Geçersiz doğum tarihi formatı'})
++            continue
++
++        try:
++            if idx > 0:
++                resp_page = s.get(sinav_url, timeout=10, allow_redirects=True)
++                soup_page = BeautifulSoup(resp_page.text, 'html.parser')
++                sinav_id_input = soup_page.find('input', {'name': 'SINAV_ID'})
++                if sinav_id_input:
++                    sinav_id = sinav_id_input['value']
++
++            form_data = {
++                field_tc: tc,
++                field_okul: okul_no,
++                'GUN': gun,
++                'AY': ay,
++                'YIL': yil,
++                'SINAV_ID': sinav_id,
++                'Submit': 'Tamam'
++            }
++
++            resp = s.post(post_url, data=form_data, headers=headers, timeout=15, allow_redirects=True)
++
++            if resp.status_code != 200:
++                errors.append({'tc': tc, 'error': f'HTTP {resp.status_code}'})
++                continue
++
++            soup = BeautifulSoup(resp.text, 'html.parser')
++            tables = soup.find_all('table')
++
++            if len(tables) < 3:
++                page_text = soup.get_text()
++                if 'güvenlik' in page_text.lower() or 'captcha' in page_text.lower():
++                    return jsonify({
++                        'error': 'Güvenlik kodu gerekli. Lütfen güvenlik kodlu moda geçin.',
++                        'captcha_required': True,
++                        'processed': len(results),
++                        'results': results,
++                        'errors': errors
++                    }), 403
++
++                errors.append({'tc': tc, 'error': 'Sonuç bulunamadı'})
++                continue
++
++            result = parse_meb_tables(tables)
++            result['tc'] = tc
++            result['sinif'] = sinif
++            result['exam_year'] = exam_year
++
++            save_lgs_result(result, tc, okul_no, gun, ay, yil, sinif, exam_year)
++            results.append(result)
++
++        except requests.exceptions.Timeout:
++            errors.append({'tc': tc, 'error': 'Zaman aşımı'})
++        except Exception as e:
++            errors.append({'tc': tc, 'error': str(e)})
++
++    save_cookies_from_session(s)
++
++    return jsonify({
++        'success': True,
++        'results': results,
++        'errors': errors,
++        'total': len(students),
++        'success_count': len(results),
++        'error_count': len(errors)
++    })
++
++
++def parse_meb_tables(tables):
++    result = {}
++    try:
++        table0 = tables[0]
++        rows0 = table0.find_all('tr')
++        if len(rows0) > 1:
++            cells = rows0[1].find_all('td')
++            ad_soyad = cells[1].get_text(strip=True) if len(cells) > 1 else ''
++        else:
++            ad_soyad = ''
++        if len(rows0) > 2:
++            cells2 = rows0[2].find_all('td')
++            yerlestigi = cells2[1].get_text(strip=True) if len(cells2) > 1 else ''
++        else:
++            yerlestigi = ''
++        result['ad_soyad'] = ad_soyad
++        if yerlestigi:
++            result['ad_soyad'] = ad_soyad
++            result['yerlestigi_okul'] = yerlestigi
++
++        table1 = tables[1]
++        rows1 = table1.find_all('tr')
++        if rows1:
++            cells1 = rows1[0].find_all('td')
++            puan_text = cells1[1].get_text(strip=True) if len(cells1) > 1 else '0'
++            puan_parts = puan_text.split(',')
++            if len(puan_parts) >= 2:
++                result['sinav_puan'] = puan_parts[0] + ',' + puan_parts[1][:4]
++            else:
++                result['sinav_puan'] = puan_text
++
++        if len(rows1) > 1:
++            cells_g = rows1[1].find_all('td')
++            result['genel_yuzdelik'] = cells_g[1].get_text(strip=True) if len(cells_g) > 1 else ''
++
++        if len(rows1) > 2:
++            cells_i = rows1[2].find_all('td')
++            result['il_yuzdelik'] = cells_i[1].get_text(strip=True) if len(cells_i) > 1 else ''
++
++        table2 = tables[2]
++        rows2 = table2.find_all('tr')
++        dersler = ['turkce', 'matematik', 'fen', 'inkilap', 'din', 'yabanci_dil']
++        for i, ders in enumerate(dersler):
++            row_idx = i + 1
++            if row_idx < len(rows2):
++                cells_d = rows2[row_idx].find_all('td')
++                result[f'{ders}_dogru'] = safe_int(cells_d[1].get_text(strip=True)) if len(cells_d) > 1 else 0
++                result[f'{ders}_yanlis'] = safe_int(cells_d[2].get_text(strip=True)) if len(cells_d) > 2 else 0
++                result[f'{ders}_bos'] = safe_int(cells_d[3].get_text(strip=True)) if len(cells_d) > 3 else 0
++            else:
++                result[f'{ders}_dogru'] = 0
++                result[f'{ders}_yanlis'] = 0
++                result[f'{ders}_bos'] = 0
++
++    except Exception as e:
++        logger.error(f"Parse MEB tables error: {e}")
++
++    return result
++
++
++def safe_int(val):
++    try:
++        return int(str(val).strip())
++    except:
++        return 0
++
++
++def save_lgs_result(result, tc, okul_no, gun, ay, yil, sinif, exam_year):
++    conn = None
++    try:
++        conn = get_db()
++        cur = conn.cursor()
++
++        birth_date = f"{yil}-{ay}-{gun}"
++        puan_str = result.get('sinav_puan', '0').replace(',', '.')
++        try:
++            puan_val = float(puan_str)
++        except:
++            puan_val = 0
++
++        cur.execute("""
++            INSERT INTO lgs_results (
++                student_name, tc_no, school_no, birth_date, exam_year,
++                sinav_puan, genel_yuzdelik, il_yuzdelik,
++                turkce_dogru, turkce_yanlis, turkce_bos,
++                matematik_dogru, matematik_yanlis, matematik_bos,
++                fen_dogru, fen_yanlis, fen_bos,
++                inkilap_dogru, inkilap_yanlis, inkilap_bos,
++                din_dogru, din_yanlis, din_bos,
++                yabanci_dil_dogru, yabanci_dil_yanlis, yabanci_dil_bos,
++                yerlestigi_okul, sinif, updated_at
++            ) VALUES (
++                %s, %s, %s, %s, %s,
++                %s, %s, %s,
++                %s, %s, %s,
++                %s, %s, %s,
++                %s, %s, %s,
++                %s, %s, %s,
++                %s, %s, %s,
++                %s, %s, %s,
++                %s, %s, CURRENT_TIMESTAMP
++            )
++            ON CONFLICT (tc_no, exam_year) DO UPDATE SET
++                student_name = EXCLUDED.student_name,
++                school_no = EXCLUDED.school_no,
++                birth_date = EXCLUDED.birth_date,
++                sinav_puan = EXCLUDED.sinav_puan,
++                genel_yuzdelik = EXCLUDED.genel_yuzdelik,
++                il_yuzdelik = EXCLUDED.il_yuzdelik,
++                turkce_dogru = EXCLUDED.turkce_dogru,
++                turkce_yanlis = EXCLUDED.turkce_yanlis,
++                turkce_bos = EXCLUDED.turkce_bos,
++                matematik_dogru = EXCLUDED.matematik_dogru,
++                matematik_yanlis = EXCLUDED.matematik_yanlis,
++                matematik_bos = EXCLUDED.matematik_bos,
++                fen_dogru = EXCLUDED.fen_dogru,
++                fen_yanlis = EXCLUDED.fen_yanlis,
++                fen_bos = EXCLUDED.fen_bos,
++                inkilap_dogru = EXCLUDED.inkilap_dogru,
++                inkilap_yanlis = EXCLUDED.inkilap_yanlis,
++                inkilap_bos = EXCLUDED.inkilap_bos,
++                din_dogru = EXCLUDED.din_dogru,
++                din_yanlis = EXCLUDED.din_yanlis,
++                din_bos = EXCLUDED.din_bos,
++                yabanci_dil_dogru = EXCLUDED.yabanci_dil_dogru,
++                yabanci_dil_yanlis = EXCLUDED.yabanci_dil_yanlis,
++                yabanci_dil_bos = EXCLUDED.yabanci_dil_bos,
++                yerlestigi_okul = EXCLUDED.yerlestigi_okul,
++                sinif = EXCLUDED.sinif,
++                updated_at = CURRENT_TIMESTAMP
++        """, (
++            result.get('ad_soyad', ''),
++            tc, okul_no, birth_date, exam_year,
++            puan_val,
++            result.get('genel_yuzdelik', ''),
++            result.get('il_yuzdelik', ''),
++            result.get('turkce_dogru', 0), result.get('turkce_yanlis', 0), result.get('turkce_bos', 0),
++            result.get('matematik_dogru', 0), result.get('matematik_yanlis', 0), result.get('matematik_bos', 0),
++            result.get('fen_dogru', 0), result.get('fen_yanlis', 0), result.get('fen_bos', 0),
++            result.get('inkilap_dogru', 0), result.get('inkilap_yanlis', 0), result.get('inkilap_bos', 0),
++            result.get('din_dogru', 0), result.get('din_yanlis', 0), result.get('din_bos', 0),
++            result.get('yabanci_dil_dogru', 0), result.get('yabanci_dil_yanlis', 0), result.get('yabanci_dil_bos', 0),
++            result.get('yerlestigi_okul', ''),
++            sinif
++        ))
++        conn.commit()
++    except Exception as e:
++        logger.error(f"Save LGS result error: {e}")
++        if conn:
++            conn.rollback()
++    finally:
++        if conn:
++            conn.close()
++
++
++@lgs_results_bp.route('/admin/lgs-results/list')
++@login_required
++def list_lgs_results():
++    if current_user.role != 'admin':
++        return jsonify({'error': 'Yetkisiz'}), 403
++
++    exam_year = request.args.get('year', type=int)
++
++    conn = None
++    try:
++        conn = get_db()
++        cur = conn.cursor(cursor_factory=RealDictCursor)
++
++        if exam_year:
++            cur.execute("SELECT * FROM lgs_results WHERE exam_year = %s ORDER BY sinav_puan DESC", (exam_year,))
++        else:
++            cur.execute("SELECT * FROM lgs_results ORDER BY exam_year DESC, sinav_puan DESC")
++
++        results = cur.fetchall()
++
++        for r in results:
++            for key, val in r.items():
++                if isinstance(val, datetime):
++                    r[key] = val.strftime('%d.%m.%Y %H:%M')
++                elif hasattr(val, '__float__'):
++                    r[key] = float(val)
++
++        return jsonify({'success': True, 'results': results})
++
++    except Exception as e:
++        logger.error(f"List LGS results error: {e}")
++        return jsonify({'error': str(e)}), 500
++    finally:
++        if conn:
++            conn.close()
++
++
++@lgs_results_bp.route('/admin/lgs-results/delete/<int:result_id>', methods=['DELETE'])
++@login_required
++def delete_lgs_result(result_id):
++    if current_user.role != 'admin':
++        return jsonify({'error': 'Yetkisiz'}), 403
++
++    conn = None
++    try:
++        conn = get_db()
++        cur = conn.cursor()
++        cur.execute("DELETE FROM lgs_results WHERE id = %s", (result_id,))
++        conn.commit()
++        return jsonify({'success': True})
++    except Exception as e:
++        logger.error(f"Delete LGS result error: {e}")
++        return jsonify({'error': str(e)}), 500
++    finally:
++        if conn:
++            conn.close()
++
++
++@lgs_results_bp.route('/admin/lgs-results/export')
++@login_required
++def export_lgs_results():
++    if current_user.role != 'admin':
++        return jsonify({'error': 'Yetkisiz'}), 403
++
++    exam_year = request.args.get('year', type=int)
++
++    conn = None
++    try:
++        conn = get_db()
++        cur = conn.cursor(cursor_factory=RealDictCursor)
++
++        if exam_year:
++            cur.execute("SELECT * FROM lgs_results WHERE exam_year = %s ORDER BY sinav_puan DESC", (exam_year,))
++        else:
++            cur.execute("SELECT * FROM lgs_results ORDER BY exam_year DESC, sinav_puan DESC")
++
++        results = cur.fetchall()
++
++        wb = Workbook()
++        ws = wb.active
++        ws.title = f"LGS Sonuçları {exam_year or 'Tümü'}"
++
++        headers = [
++            'Sıra', 'Ad Soyad', 'TC', 'Sınıf', 'Sınav Puanı',
++            'Genel Yüzdelik', 'İl Yüzdelik',
++            'Türkçe D', 'Türkçe Y', 'Türkçe B',
++            'Mat D', 'Mat Y', 'Mat B',
++            'Fen D', 'Fen Y', 'Fen B',
++            'İnk D', 'İnk Y', 'İnk B',
++            'Din D', 'Din Y', 'Din B',
++            'Yab D', 'Yab Y', 'Yab B',
++            'Yerleştiği Okul', 'Yıl'
++        ]
++
++        header_fill = PatternFill(start_color='1E40AF', end_color='1E40AF', fill_type='solid')
++        header_font = Font(name='Calibri', size=11, bold=True, color='FFFFFF')
++        thin_border = Border(
++            left=Side(style='thin'), right=Side(style='thin'),
++            top=Side(style='thin'), bottom=Side(style='thin')
++        )
++
++        for col, h in enumerate(headers, 1):
++            cell = ws.cell(row=1, column=col, value=h)
++            cell.fill = header_fill
++            cell.font = header_font
++            cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
++            cell.border = thin_border
++
++        for idx, r in enumerate(results, 1):
++            row_data = [
++                idx,
++                r.get('student_name', ''),
++                r.get('tc_no', ''),
++                r.get('sinif', ''),
++                float(r['sinav_puan']) if r.get('sinav_puan') else 0,
++                r.get('genel_yuzdelik', ''),
++                r.get('il_yuzdelik', ''),
++                r.get('turkce_dogru', 0), r.get('turkce_yanlis', 0), r.get('turkce_bos', 0),
++                r.get('matematik_dogru', 0), r.get('matematik_yanlis', 0), r.get('matematik_bos', 0),
++                r.get('fen_dogru', 0), r.get('fen_yanlis', 0), r.get('fen_bos', 0),
++                r.get('inkilap_dogru', 0), r.get('inkilap_yanlis', 0), r.get('inkilap_bos', 0),
++                r.get('din_dogru', 0), r.get('din_yanlis', 0), r.get('din_bos', 0),
++                r.get('yabanci_dil_dogru', 0), r.get('yabanci_dil_yanlis', 0), r.get('yabanci_dil_bos', 0),
++                r.get('yerlestigi_okul', ''),
++                r.get('exam_year', '')
++            ]
++            for col, val in enumerate(row_data, 1):
++                cell = ws.cell(row=idx + 1, column=col, value=val)
++                cell.alignment = Alignment(horizontal='center')
++                cell.border = thin_border
++
++        output = io.BytesIO()
++        wb.save(output)
++        output.seek(0)
++
++        return send_file(
++            output,
++            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
++            as_attachment=True,
++            download_name=f'LGS_Sonuclari_{exam_year or "Tumu"}.xlsx'
++        )
++
++    except Exception as e:
++        logger.error(f"Export LGS results error: {e}")
++        return jsonify({'error': str(e)}), 500
++    finally:
++        if conn:
++            conn.close()
++
++
++@lgs_results_bp.route('/admin/lgs-results/refresh-captcha', methods=['POST'])
++@login_required
++def refresh_captcha():
++    if current_user.role != 'admin':
++        return jsonify({'error': 'Yetkisiz'}), 403
++
++    sinav_url = flask_session.get('meb_sinav_url', 'https://sonuc.meb.gov.tr/')
++
++    try:
++        s = requests.Session()
++        load_cookies_to_session(s)
++
++        resp = s.get(sinav_url, timeout=10, allow_redirects=True)
++        soup = BeautifulSoup(resp.text, 'html.parser')
++
++        sinav_id_input = soup.find('input', {'name': 'SINAV_ID'})
++        if sinav_id_input:
++            flask_session['meb_sinav_id'] = sinav_id_input['value']
++
++        captcha_img = soup.find('img', {'id': 'image'})
++        if not captcha_img:
++            captcha_img = soup.find('img', {'id': 'capcha'})
++        if not captcha_img:
++            captcha_img = soup.find('img', {'name': 'capcha'})
++        if not captcha_img:
++            for img in soup.find_all('img'):
++                src = img.get('src', '')
++                if 'captcha' in src.lower():
++                    captcha_img = img
++                    break
++
++        captcha_base64 = None
++        if captcha_img:
++            captcha_src = captcha_img.get('src', '')
++            if captcha_src:
++                if captcha_src.startswith('/'):
++                    base_url = '/'.join(resp.url.rstrip('/').split('/')[:3])
++                    captcha_url = base_url + captcha_src
++                else:
++                    base_url = '/'.join(resp.url.rstrip('/').split('/')[:-1])
++                    captcha_url = base_url + '/' + captcha_src
++                captcha_resp = s.get(captcha_url, timeout=10)
++                if captcha_resp.status_code == 200:
++                    import base64
++                    captcha_base64 = base64.b64encode(captcha_resp.content).decode('utf-8')
++
++        save_cookies_from_session(s)
++
++        return jsonify({
++            'success': True,
++            'captcha_image': captcha_base64
++        })
++
++    except Exception as e:
++        logger.error(f"Refresh captcha error: {e}")
++        return jsonify({'error': str(e)}), 500
+diff --git a/templates/admin_lgs_results.html b/templates/admin_lgs_results.html
+new file mode 100644
+index 0000000..44bcf5c
+--- /dev/null
++++ b/templates/admin_lgs_results.html
+@@ -0,0 +1,898 @@
++{% extends "base_dashboard.html" %}
++
++{% block title %}LGS Sonuç Çekme{% endblock %}
++
++{% block extra_css %}
++<link rel="stylesheet" href="/static/css/admin-modern.css">
++<style>
++    .lgs-container { padding: 24px; max-width: 1400px; margin: 0 auto; }
++
++    .lgs-header {
++        background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%);
++        border-radius: 16px; padding: 28px 32px; color: white; margin-bottom: 24px;
++        box-shadow: 0 8px 32px rgba(30, 64, 175, 0.3);
++    }
++    .lgs-header h1 { font-size: 1.6rem; font-weight: 800; margin-bottom: 6px; }
++    .lgs-header p { opacity: 0.85; font-size: 0.95rem; }
++
++    .card {
++        background: white; border-radius: 16px; padding: 24px;
++        box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-bottom: 20px;
++        border: 1px solid #e5e7eb;
++    }
++    .card-title {
++        font-size: 1.15rem; font-weight: 700; color: #1e293b;
++        margin-bottom: 16px; display: flex; align-items: center; gap: 10px;
++    }
++    .card-title .icon { font-size: 1.4rem; }
++
++    .step-tabs {
++        display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;
++    }
++    .step-tab {
++        padding: 10px 20px; border-radius: 10px; border: 2px solid #e5e7eb;
++        background: white; font-weight: 600; cursor: pointer; transition: all 0.2s;
++        font-size: 0.9rem; display: flex; align-items: center; gap: 8px;
++    }
++    .step-tab.active { background: #1e40af; color: white; border-color: #1e40af; }
++    .step-tab.completed { background: #10b981; color: white; border-color: #10b981; }
++    .step-tab .step-num {
++        width: 24px; height: 24px; border-radius: 50%; background: rgba(0,0,0,0.1);
++        display: flex; align-items: center; justify-content: center; font-size: 0.8rem;
++    }
++    .step-tab.active .step-num { background: rgba(255,255,255,0.3); }
++
++    .step-content { display: none; }
++    .step-content.active { display: block; }
++
++    .upload-zone {
++        border: 2px dashed #cbd5e1; border-radius: 12px; padding: 40px;
++        text-align: center; cursor: pointer; transition: all 0.3s;
++        background: #f8fafc;
++    }
++    .upload-zone:hover, .upload-zone.dragover {
++        border-color: #3b82f6; background: #eff6ff;
++    }
++    .upload-zone .icon { font-size: 3rem; margin-bottom: 12px; }
++    .upload-zone .text { font-size: 1rem; color: #64748b; }
++    .upload-zone .sub-text { font-size: 0.85rem; color: #94a3b8; margin-top: 6px; }
++
++    .btn-primary {
++        background: linear-gradient(135deg, #1e40af, #3b82f6); color: white;
++        border: none; padding: 10px 24px; border-radius: 10px; font-weight: 600;
++        cursor: pointer; transition: all 0.2s; font-size: 0.9rem;
++    }
++    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(59,130,246,0.3); }
++    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
++
++    .btn-success {
++        background: linear-gradient(135deg, #059669, #10b981); color: white;
++        border: none; padding: 10px 24px; border-radius: 10px; font-weight: 600;
++        cursor: pointer; transition: all 0.2s;
++    }
++
++    .btn-outline {
++        background: white; color: #1e40af; border: 2px solid #1e40af;
++        padding: 10px 24px; border-radius: 10px; font-weight: 600;
++        cursor: pointer; transition: all 0.2s;
++    }
++    .btn-outline:hover { background: #eff6ff; }
++
++    .btn-danger {
++        background: #ef4444; color: white; border: none;
++        padding: 6px 14px; border-radius: 8px; font-weight: 600;
++        cursor: pointer; font-size: 0.8rem;
++    }
++
++    .student-table {
++        width: 100%; border-collapse: separate; border-spacing: 0;
++        font-size: 0.85rem;
++    }
++    .student-table th {
++        background: #f1f5f9; padding: 10px 12px; text-align: center;
++        font-weight: 600; color: #475569; border-bottom: 2px solid #e2e8f0;
++        position: sticky; top: 0; z-index: 1;
++    }
++    .student-table td {
++        padding: 8px 12px; text-align: center; border-bottom: 1px solid #f1f5f9;
++    }
++    .student-table tr:hover td { background: #f8fafc; }
++    .student-table .status-waiting { color: #94a3b8; }
++    .student-table .status-success { color: #10b981; font-weight: 600; }
++    .student-table .status-error { color: #ef4444; font-weight: 600; }
++    .student-table .status-processing { color: #f59e0b; font-weight: 600; }
++
++    .mode-selector {
++        display: flex; gap: 12px; margin-bottom: 20px;
++    }
++    .mode-card {
++        flex: 1; padding: 20px; border-radius: 12px; border: 2px solid #e5e7eb;
++        cursor: pointer; transition: all 0.2s; text-align: center;
++    }
++    .mode-card:hover { border-color: #3b82f6; }
++    .mode-card.active { border-color: #1e40af; background: #eff6ff; }
++    .mode-card .mode-icon { font-size: 2rem; margin-bottom: 8px; }
++    .mode-card .mode-title { font-weight: 700; font-size: 1rem; color: #1e293b; }
++    .mode-card .mode-desc { font-size: 0.8rem; color: #64748b; margin-top: 4px; }
++
++    .captcha-section {
++        background: #fef3c7; border: 1px solid #fbbf24; border-radius: 12px;
++        padding: 16px; margin: 16px 0; display: flex; align-items: center; gap: 16px;
++        flex-wrap: wrap;
++    }
++    .captcha-section img { border-radius: 6px; border: 1px solid #d4d4d4; }
++    .captcha-input {
++        padding: 10px 16px; border: 2px solid #e5e7eb; border-radius: 8px;
++        font-size: 1.1rem; font-weight: 700; letter-spacing: 3px; width: 200px;
++    }
++
++    .progress-bar-container {
++        background: #e5e7eb; border-radius: 10px; height: 12px;
++        overflow: hidden; margin: 12px 0;
++    }
++    .progress-bar-fill {
++        height: 100%; border-radius: 10px; transition: width 0.3s;
++        background: linear-gradient(90deg, #3b82f6, #10b981);
++    }
++
++    .stats-row {
++        display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
++        gap: 12px; margin-bottom: 20px;
++    }
++    .stat-card {
++        text-align: center; padding: 16px; border-radius: 12px;
++        background: #f8fafc; border: 1px solid #e5e7eb;
++    }
++    .stat-card .stat-value { font-size: 1.5rem; font-weight: 800; color: #1e40af; }
++    .stat-card .stat-label { font-size: 0.8rem; color: #64748b; margin-top: 4px; }
++
++    .table-scroll { max-height: 500px; overflow-y: auto; border-radius: 12px; border: 1px solid #e5e7eb; }
++
++    .url-input {
++        width: 100%; padding: 10px 16px; border: 2px solid #e5e7eb; border-radius: 10px;
++        font-size: 0.9rem; margin-bottom: 12px;
++    }
++    .url-input:focus { border-color: #3b82f6; outline: none; }
++
++    .year-select {
++        padding: 8px 16px; border: 2px solid #e5e7eb; border-radius: 8px;
++        font-size: 0.9rem; font-weight: 600;
++    }
++
++    .inline-flex { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
++
++    .alert {
++        padding: 12px 16px; border-radius: 10px; margin-bottom: 16px;
++        font-size: 0.9rem; display: flex; align-items: center; gap: 8px;
++    }
++    .alert-info { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
++    .alert-warning { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
++    .alert-success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
++    .alert-danger { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
++
++    .log-area {
++        background: #1e293b; color: #e2e8f0; padding: 16px; border-radius: 10px;
++        font-family: monospace; font-size: 0.8rem; max-height: 200px;
++        overflow-y: auto; margin-top: 12px; white-space: pre-wrap;
++    }
++
++    body.dark-mode .card { background: #1e293b; border-color: #334155; }
++    body.dark-mode .card-title { color: #e2e8f0; }
++    body.dark-mode .student-table th { background: #334155; color: #e2e8f0; }
++    body.dark-mode .student-table td { border-color: #334155; }
++    body.dark-mode .student-table tr:hover td { background: #2d3a4d; }
++    body.dark-mode .upload-zone { background: #0f172a; border-color: #334155; }
++    body.dark-mode .upload-zone .text { color: #94a3b8; }
++    body.dark-mode .mode-card { background: #0f172a; border-color: #334155; }
++    body.dark-mode .mode-card.active { background: #1e3a5f; border-color: #3b82f6; }
++    body.dark-mode .stat-card { background: #0f172a; border-color: #334155; }
++    body.dark-mode .url-input { background: #0f172a; color: #e2e8f0; border-color: #334155; }
++    body.dark-mode .captcha-input { background: #0f172a; color: #e2e8f0; border-color: #334155; }
++</style>
++{% endblock %}
++
++{% block content %}
++<div class="lgs-container">
++    <div class="lgs-header">
++        <h1>LGS Sonuç Çekme Sistemi</h1>
++        <p>MEB sonuç sayfasından toplu LGS sonuçlarını çekin ve analiz edin</p>
++    </div>
++
++    <div class="step-tabs">
++        <div class="step-tab active" onclick="goToStep(1)" id="stepTab1">
++            <span class="step-num">1</span> Öğrenci Listesi
++        </div>
++        <div class="step-tab" onclick="goToStep(2)" id="stepTab2">
++            <span class="step-num">2</span> Bağlantı & Mod
++        </div>
++        <div class="step-tab" onclick="goToStep(3)" id="stepTab3">
++            <span class="step-num">3</span> Sonuç Çekme
++        </div>
++        <div class="step-tab" onclick="goToStep(4)" id="stepTab4">
++            <span class="step-num">4</span> Sonuçlar
++        </div>
++    </div>
++
++    <!-- STEP 1: Öğrenci Listesi -->
++    <div class="step-content active" id="step1">
++        <div class="card">
++            <div class="card-title"><span class="icon">📋</span> Öğrenci Listesini Yükle</div>
++
++            <div class="alert alert-info">
++                Excel dosyanızda TC Kimlik No, Okul No, Doğum Tarihi (GG.AA.YYYY) ve Sınıf sütunları olmalıdır.
++            </div>
++
++            <div class="inline-flex" style="margin-bottom: 16px;">
++                <a href="/admin/lgs-results/template" class="btn-outline" download>
++                    Örnek Şablon İndir
++                </a>
++                <select class="year-select" id="examYear">
++                    <option value="2025">2025</option>
++                    <option value="2024" selected>2024</option>
++                    <option value="2023">2023</option>
++                    <option value="2022">2022</option>
++                </select>
++                <span style="font-size: 0.85rem; color: #64748b;">Sınav Yılı</span>
++            </div>
++
++            <div class="upload-zone" id="uploadZone" onclick="document.getElementById('excelFile').click()">
++                <div class="icon">📥</div>
++                <div class="text">Excel dosyasını buraya sürükleyin veya tıklayın</div>
++                <div class="sub-text">.xlsx, .xls, .xlsm formatları desteklenir</div>
++            </div>
++            <input type="file" id="excelFile" accept=".xlsx,.xls,.xlsm" style="display:none" onchange="handleFileUpload(this)">
++
++            <div id="uploadResult" style="display:none; margin-top: 16px;"></div>
++
++            <div id="studentListSection" style="display:none; margin-top: 20px;">
++                <div class="card-title"><span class="icon">👥</span> Yüklenen Öğrenciler (<span id="studentCount">0</span>)</div>
++                <div class="table-scroll">
++                    <table class="student-table" id="studentTable">
++                        <thead>
++                            <tr>
++                                <th>#</th>
++                                <th>TC Kimlik No</th>
++                                <th>Okul No</th>
++                                <th>Doğum Tarihi</th>
++                                <th>Sınıf</th>
++                                <th>Durum</th>
++                            </tr>
++                        </thead>
++                        <tbody id="studentTableBody"></tbody>
++                    </table>
++                </div>
++                <div style="margin-top: 16px; text-align: right;">
++                    <button class="btn-primary" onclick="goToStep(2)">Devam Et &rarr;</button>
++                </div>
++            </div>
++        </div>
++    </div>
++
++    <!-- STEP 2: Bağlantı & Mod -->
++    <div class="step-content" id="step2">
++        <div class="card">
++            <div class="card-title"><span class="icon">🔗</span> MEB Bağlantı Ayarları</div>
++
++            <label style="font-weight: 600; margin-bottom: 6px; display: block; color: #475569;">MEB Sonuç Sayfası URL:</label>
++            <input type="text" class="url-input" id="mebUrl" value="https://sonuc.meb.gov.tr/" placeholder="https://sonuc.meb.gov.tr/">
++
++            <div class="alert alert-warning">
++                Farklı sınavlar için URL değişebilir. Doğru URL'yi kullandığınızdan emin olun.
++            </div>
++
++            <button class="btn-primary" onclick="checkMebConnection()" id="btnCheckConnection">
++                Bağlantıyı Kontrol Et
++            </button>
++
++            <div id="connectionResult" style="display:none; margin-top: 16px;"></div>
++        </div>
++
++        <div class="card" id="modeSelectionCard" style="display:none;">
++            <div class="card-title"><span class="icon">⚙️</span> Çekme Modu</div>
++
++            <div class="mode-selector">
++                <div class="mode-card" id="modeAuto" onclick="selectMode('auto')">
++                    <div class="mode-icon">🚀</div>
++                    <div class="mode-title">Otomatik (Kodsuz)</div>
++                    <div class="mode-desc">Güvenlik kodu olmadan toplu çekim. Sonuçların ilk yayınlandığı saatlerde çalışır.</div>
++                </div>
++                <div class="mode-card" id="modeManual" onclick="selectMode('manual')">
++                    <div class="mode-icon">🔐</div>
++                    <div class="mode-title">Güvenlik Kodlu</div>
++                    <div class="mode-desc">Her öğrenci için güvenlik kodunu elle girersiniz. Her zaman çalışır.</div>
++                </div>
++            </div>
++
++            <div style="text-align: right;">
++                <button class="btn-primary" onclick="goToStep(3)" id="btnGoStep3" disabled>Sonuç Çekmeye Başla &rarr;</button>
++            </div>
++        </div>
++    </div>
++
++    <!-- STEP 3: Sonuç Çekme -->
++    <div class="step-content" id="step3">
++        <div class="card">
++            <div class="card-title"><span class="icon">⏳</span> Sonuç Çekme İşlemi</div>
++
++            <div class="stats-row" id="fetchStats">
++                <div class="stat-card">
++                    <div class="stat-value" id="statTotal">0</div>
++                    <div class="stat-label">Toplam</div>
++                </div>
++                <div class="stat-card">
++                    <div class="stat-value" id="statSuccess" style="color: #10b981;">0</div>
++                    <div class="stat-label">Başarılı</div>
++                </div>
++                <div class="stat-card">
++                    <div class="stat-value" id="statError" style="color: #ef4444;">0</div>
++                    <div class="stat-label">Hatalı</div>
++                </div>
++                <div class="stat-card">
++                    <div class="stat-value" id="statRemaining" style="color: #f59e0b;">0</div>
++                    <div class="stat-label">Kalan</div>
++                </div>
++            </div>
++
++            <div class="progress-bar-container">
++                <div class="progress-bar-fill" id="progressBar" style="width: 0%"></div>
++            </div>
++            <div style="text-align: center; font-size: 0.85rem; color: #64748b;" id="progressText">Henüz başlamadı</div>
++
++            <!-- Captcha bölümü (güvenlik kodlu mod) -->
++            <div id="captchaContainer" style="display: none;">
++                <div class="captcha-section">
++                    <div>
++                        <strong>Güvenlik Kodu:</strong><br>
++                        <img id="captchaImage" src="" alt="Güvenlik Kodu" style="margin-top: 6px;">
++                    </div>
++                    <div>
++                        <input type="text" class="captcha-input" id="captchaInput" placeholder="Kodu girin" maxlength="10" autocomplete="off">
++                    </div>
++                    <div>
++                        <button class="btn-outline" onclick="refreshCaptcha()" style="padding: 8px 16px; font-size: 0.85rem;">Yenile</button>
++                    </div>
++                    <div>
++                        <button class="btn-primary" onclick="submitWithCaptcha()" id="btnSubmitCaptcha">Gönder</button>
++                    </div>
++                </div>
++                <div style="margin-top: 8px; font-size: 0.85rem; color: #64748b;">
++                    Şu an çekilen: <strong id="currentStudentInfo">-</strong>
++                </div>
++            </div>
++
++            <div class="inline-flex" style="margin-top: 16px;">
++                <button class="btn-primary" onclick="startFetching()" id="btnStartFetch">Çekmeye Başla</button>
++                <button class="btn-danger" onclick="stopFetching()" id="btnStopFetch" style="display:none;">Durdur</button>
++            </div>
++
++            <div class="log-area" id="logArea">LGS Sonuç Çekme Sistemi hazır...\n</div>
++        </div>
++    </div>
++
++    <!-- STEP 4: Sonuçlar -->
++    <div class="step-content" id="step4">
++        <div class="card">
++            <div class="card-title">
++                <span class="icon">📊</span> LGS Sonuçları
++                <div style="margin-left: auto; display: flex; gap: 8px;">
++                    <select class="year-select" id="filterYear" onchange="loadResults()">
++                        <option value="">Tüm Yıllar</option>
++                        <option value="2025">2025</option>
++                        <option value="2024">2024</option>
++                        <option value="2023">2023</option>
++                    </select>
++                    <button class="btn-success" onclick="exportResults()">Excel İndir</button>
++                    <button class="btn-outline" onclick="loadResults()">Yenile</button>
++                </div>
++            </div>
++
++            <div id="resultStats" class="stats-row"></div>
++
++            <div class="table-scroll" style="max-height: 600px;">
++                <table class="student-table" id="resultsTable">
++                    <thead>
++                        <tr>
++                            <th>#</th>
++                            <th>Ad Soyad</th>
++                            <th>Sınıf</th>
++                            <th>Puan</th>
++                            <th>Genel %</th>
++                            <th>İl %</th>
++                            <th>Türkçe</th>
++                            <th>Mat</th>
++                            <th>Fen</th>
++                            <th>İnk</th>
++                            <th>Din</th>
++                            <th>Yab</th>
++                            <th>Yerleştiği Okul</th>
++                            <th>İşlem</th>
++                        </tr>
++                    </thead>
++                    <tbody id="resultsTableBody"></tbody>
++                </table>
++            </div>
++        </div>
++    </div>
++</div>
++{% endblock %}
++
++{% block extra_js %}
++<script>
++let students = [];
++let currentMode = null;
++let hasCaptcha = false;
++let fetchRunning = false;
++let currentFetchIndex = 0;
++let successCount = 0;
++let errorCount = 0;
++
++function goToStep(step) {
++    document.querySelectorAll('.step-content').forEach(s => s.classList.remove('active'));
++    document.querySelectorAll('.step-tab').forEach(t => t.classList.remove('active'));
++    document.getElementById('step' + step).classList.add('active');
++    document.getElementById('stepTab' + step).classList.add('active');
++
++    if (step === 4) loadResults();
++}
++
++function handleFileUpload(input) {
++    const file = input.files[0];
++    if (!file) return;
++
++    const formData = new FormData();
++    formData.append('file', file);
++
++    document.getElementById('uploadResult').style.display = 'block';
++    document.getElementById('uploadResult').innerHTML = '<div class="alert alert-info">Dosya yükleniyor...</div>';
++
++    fetch('/admin/lgs-results/upload-excel', { method: 'POST', body: formData })
++    .then(r => r.json())
++    .then(data => {
++        if (data.error) {
++            document.getElementById('uploadResult').innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
++            return;
++        }
++
++        students = data.students;
++        document.getElementById('uploadResult').innerHTML =
++            `<div class="alert alert-success">${data.count} öğrenci başarıyla yüklendi!</div>`;
++
++        renderStudentTable();
++        document.getElementById('studentListSection').style.display = 'block';
++        document.getElementById('studentCount').textContent = students.length;
++        document.getElementById('stepTab1').classList.add('completed');
++    })
++    .catch(err => {
++        document.getElementById('uploadResult').innerHTML =
++            `<div class="alert alert-danger">Yükleme hatası: ${err.message}</div>`;
++    });
++}
++
++function renderStudentTable() {
++    const tbody = document.getElementById('studentTableBody');
++    tbody.innerHTML = '';
++    students.forEach((s, i) => {
++        const tr = document.createElement('tr');
++        tr.id = 'studentRow_' + i;
++        tr.innerHTML = `
++            <td>${i + 1}</td>
++            <td>${maskTC(s.tc)}</td>
++            <td>${s.okul_no}</td>
++            <td>${s.dogum_tarihi}</td>
++            <td>${s.sinif}</td>
++            <td class="status-waiting" id="status_${i}">Bekliyor</td>
++        `;
++        tbody.appendChild(tr);
++    });
++}
++
++function maskTC(tc) {
++    if (tc.length >= 7) return tc.substring(0, 3) + '****' + tc.substring(tc.length - 4);
++    return tc;
++}
++
++const uploadZone = document.getElementById('uploadZone');
++uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
++uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
++uploadZone.addEventListener('drop', e => {
++    e.preventDefault();
++    uploadZone.classList.remove('dragover');
++    const files = e.dataTransfer.files;
++    if (files.length > 0) {
++        document.getElementById('excelFile').files = files;
++        handleFileUpload(document.getElementById('excelFile'));
++    }
++});
++
++function checkMebConnection() {
++    const url = document.getElementById('mebUrl').value.trim();
++    if (!url) { alert('URL giriniz'); return; }
++
++    const btn = document.getElementById('btnCheckConnection');
++    btn.disabled = true;
++    btn.textContent = 'Bağlanıyor...';
++
++    document.getElementById('connectionResult').style.display = 'block';
++    document.getElementById('connectionResult').innerHTML = '<div class="alert alert-info">MEB sunucusuna bağlanılıyor...</div>';
++
++    fetch('/admin/lgs-results/get-captcha', {
++        method: 'POST',
++        headers: { 'Content-Type': 'application/json' },
++        body: JSON.stringify({ sinav_url: url })
++    })
++    .then(r => r.json())
++    .then(data => {
++        btn.disabled = false;
++        btn.textContent = 'Bağlantıyı Kontrol Et';
++
++        if (data.error) {
++            document.getElementById('connectionResult').innerHTML =
++                `<div class="alert alert-danger">${data.error}</div>`;
++            return;
++        }
++
++        hasCaptcha = data.has_captcha;
++        let statusMsg = '';
++        if (hasCaptcha) {
++            statusMsg = `<div class="alert alert-warning">
++                Bağlantı başarılı! Güvenlik kodu <strong>aktif</strong>.
++                Her öğrenci için güvenlik kodu girmeniz gerekecek.
++            </div>`;
++        } else {
++            statusMsg = `<div class="alert alert-success">
++                Bağlantı başarılı! Güvenlik kodu <strong>yok</strong>.
++                Toplu otomatik çekim yapabilirsiniz!
++            </div>`;
++        }
++
++        document.getElementById('connectionResult').innerHTML = statusMsg;
++        document.getElementById('modeSelectionCard').style.display = 'block';
++        document.getElementById('stepTab2').classList.add('completed');
++
++        if (hasCaptcha) {
++            selectMode('manual');
++            document.getElementById('modeAuto').style.opacity = '0.5';
++            document.getElementById('modeAuto').style.pointerEvents = 'none';
++        } else {
++            selectMode('auto');
++        }
++    })
++    .catch(err => {
++        btn.disabled = false;
++        btn.textContent = 'Bağlantıyı Kontrol Et';
++        document.getElementById('connectionResult').innerHTML =
++            `<div class="alert alert-danger">Bağlantı hatası: ${err.message}</div>`;
++    });
++}
++
++function selectMode(mode) {
++    currentMode = mode;
++    document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('active'));
++    document.getElementById(mode === 'auto' ? 'modeAuto' : 'modeManual').classList.add('active');
++    document.getElementById('btnGoStep3').disabled = false;
++}
++
++function startFetching() {
++    if (students.length === 0) {
++        alert('Önce öğrenci listesi yükleyin!');
++        return;
++    }
++
++    fetchRunning = true;
++    currentFetchIndex = 0;
++    successCount = 0;
++    errorCount = 0;
++
++    document.getElementById('statTotal').textContent = students.length;
++    document.getElementById('statRemaining').textContent = students.length;
++    document.getElementById('btnStartFetch').style.display = 'none';
++    document.getElementById('btnStopFetch').style.display = 'inline-block';
++
++    appendLog('Sonuç çekme başlatıldı... Mod: ' + (currentMode === 'auto' ? 'Otomatik' : 'Güvenlik Kodlu'));
++
++    if (currentMode === 'auto') {
++        fetchBatchAuto();
++    } else {
++        showNextCaptcha();
++    }
++}
++
++function stopFetching() {
++    fetchRunning = false;
++    document.getElementById('btnStartFetch').style.display = 'inline-block';
++    document.getElementById('btnStopFetch').style.display = 'none';
++    appendLog('Çekme işlemi durduruldu.');
++}
++
++function fetchBatchAuto() {
++    const examYear = document.getElementById('examYear').value;
++
++    appendLog('Toplu otomatik çekim başlıyor...');
++
++    fetch('/admin/lgs-results/fetch-batch', {
++        method: 'POST',
++        headers: { 'Content-Type': 'application/json' },
++        body: JSON.stringify({
++            students: students,
++            exam_year: parseInt(examYear)
++        })
++    })
++    .then(r => r.json())
++    .then(data => {
++        if (data.captcha_required) {
++            appendLog('Güvenlik kodu gerekli! Güvenlik kodlu moda geçiliyor...');
++            currentMode = 'manual';
++            currentFetchIndex = data.processed || 0;
++            successCount = data.results ? data.results.length : 0;
++
++            if (data.results) {
++                data.results.forEach((r, i) => {
++                    updateStudentStatus(i, 'success', r.ad_soyad + ' - ' + (r.sinav_puan || ''));
++                });
++            }
++            if (data.errors) {
++                data.errors.forEach(e => {
++                    const idx = students.findIndex(s => s.tc === e.tc);
++                    if (idx >= 0) updateStudentStatus(idx, 'error', e.error);
++                    errorCount++;
++                });
++            }
++
++            updateProgress();
++            showNextCaptcha();
++            return;
++        }
++
++        if (data.error) {
++            appendLog('HATA: ' + data.error);
++            stopFetching();
++            return;
++        }
++
++        successCount = data.success_count || 0;
++        errorCount = data.error_count || 0;
++
++        if (data.results) {
++            data.results.forEach(r => {
++                const idx = students.findIndex(s => s.tc === r.tc);
++                if (idx >= 0) updateStudentStatus(idx, 'success', r.ad_soyad + ' - ' + (r.sinav_puan || ''));
++            });
++        }
++        if (data.errors) {
++            data.errors.forEach(e => {
++                const idx = students.findIndex(s => s.tc === e.tc);
++                if (idx >= 0) updateStudentStatus(idx, 'error', e.error);
++            });
++        }
++
++        currentFetchIndex = students.length;
++        updateProgress();
++        appendLog(`Tamamlandı! ${successCount} başarılı, ${errorCount} hatalı.`);
++        stopFetching();
++    })
++    .catch(err => {
++        appendLog('HATA: ' + err.message);
++        stopFetching();
++    });
++}
++
++function showNextCaptcha() {
++    if (!fetchRunning || currentFetchIndex >= students.length) {
++        if (currentFetchIndex >= students.length) {
++            appendLog(`İşlem tamamlandı! ${successCount} başarılı, ${errorCount} hatalı.`);
++            stopFetching();
++        }
++        return;
++    }
++
++    const student = students[currentFetchIndex];
++    document.getElementById('captchaContainer').style.display = 'block';
++    document.getElementById('currentStudentInfo').textContent =
++        `#${currentFetchIndex + 1} - TC: ${maskTC(student.tc)} - ${student.sinif}`;
++    document.getElementById('captchaInput').value = '';
++    document.getElementById('captchaInput').focus();
++
++    updateStudentStatus(currentFetchIndex, 'processing', 'İşleniyor...');
++
++    refreshCaptcha();
++}
++
++function refreshCaptcha() {
++    fetch('/admin/lgs-results/refresh-captcha', { method: 'POST' })
++    .then(r => r.json())
++    .then(data => {
++        if (data.captcha_image) {
++            document.getElementById('captchaImage').src = 'data:image/png;base64,' + data.captcha_image;
++        }
++    })
++    .catch(err => appendLog('Captcha yenileme hatası: ' + err.message));
++}
++
++function submitWithCaptcha() {
++    const captchaCode = document.getElementById('captchaInput').value.trim();
++    if (!captchaCode) { alert('Güvenlik kodunu girin'); return; }
++
++    const student = students[currentFetchIndex];
++    const parts = student.dogum_tarihi.split('.');
++    if (parts.length !== 3) {
++        appendLog(`#${currentFetchIndex + 1} - Geçersiz doğum tarihi formatı`);
++        updateStudentStatus(currentFetchIndex, 'error', 'Geçersiz tarih');
++        errorCount++;
++        currentFetchIndex++;
++        updateProgress();
++        showNextCaptcha();
++        return;
++    }
++
++    const examYear = document.getElementById('examYear').value;
++
++    document.getElementById('btnSubmitCaptcha').disabled = true;
++    document.getElementById('btnSubmitCaptcha').textContent = 'Çekiliyor...';
++
++    fetch('/admin/lgs-results/fetch-single', {
++        method: 'POST',
++        headers: { 'Content-Type': 'application/json' },
++        body: JSON.stringify({
++            tc: student.tc,
++            okul_no: student.okul_no,
++            gun: parts[0],
++            ay: parts[1],
++            yil: parts[2],
++            captcha_code: captchaCode,
++            sinif: student.sinif,
++            exam_year: parseInt(examYear)
++        })
++    })
++    .then(r => r.json())
++    .then(data => {
++        document.getElementById('btnSubmitCaptcha').disabled = false;
++        document.getElementById('btnSubmitCaptcha').textContent = 'Gönder';
++
++        if (data.error) {
++            appendLog(`#${currentFetchIndex + 1} HATA: ${data.error}`);
++            if (data.error.includes('Güvenlik kodu hatalı')) {
++                appendLog('Güvenlik kodu hatalı, tekrar deneyin...');
++                refreshCaptcha();
++                document.getElementById('captchaInput').value = '';
++                document.getElementById('captchaInput').focus();
++                return;
++            }
++            updateStudentStatus(currentFetchIndex, 'error', data.error);
++            errorCount++;
++        } else {
++            const r = data.result;
++            appendLog(`#${currentFetchIndex + 1} OK: ${r.ad_soyad} - Puan: ${r.sinav_puan}`);
++            updateStudentStatus(currentFetchIndex, 'success', `${r.ad_soyad} - ${r.sinav_puan}`);
++            successCount++;
++        }
++
++        currentFetchIndex++;
++        updateProgress();
++        showNextCaptcha();
++    })
++    .catch(err => {
++        document.getElementById('btnSubmitCaptcha').disabled = false;
++        document.getElementById('btnSubmitCaptcha').textContent = 'Gönder';
++        appendLog(`#${currentFetchIndex + 1} HATA: ${err.message}`);
++        updateStudentStatus(currentFetchIndex, 'error', err.message);
++        errorCount++;
++        currentFetchIndex++;
++        updateProgress();
++        showNextCaptcha();
++    });
++}
++
++document.getElementById('captchaInput').addEventListener('keypress', function(e) {
++    if (e.key === 'Enter') submitWithCaptcha();
++});
++
++function updateStudentStatus(idx, status, text) {
++    const el = document.getElementById('status_' + idx);
++    if (!el) return;
++    el.className = 'status-' + status;
++    el.textContent = text || status;
++}
++
++function updateProgress() {
++    document.getElementById('statSuccess').textContent = successCount;
++    document.getElementById('statError').textContent = errorCount;
++    document.getElementById('statRemaining').textContent = Math.max(0, students.length - currentFetchIndex);
++
++    const pct = students.length > 0 ? Math.round((currentFetchIndex / students.length) * 100) : 0;
++    document.getElementById('progressBar').style.width = pct + '%';
++    document.getElementById('progressText').textContent = `${currentFetchIndex} / ${students.length} (${pct}%)`;
++}
++
++function appendLog(msg) {
++    const log = document.getElementById('logArea');
++    const time = new Date().toLocaleTimeString('tr-TR');
++    log.textContent += `[${time}] ${msg}\n`;
++    log.scrollTop = log.scrollHeight;
++}
++
++function loadResults() {
++    const year = document.getElementById('filterYear').value;
++    const url = '/admin/lgs-results/list' + (year ? '?year=' + year : '');
++
++    fetch(url)
++    .then(r => r.json())
++    .then(data => {
++        if (data.error) { alert(data.error); return; }
++
++        const results = data.results || [];
++        const tbody = document.getElementById('resultsTableBody');
++        tbody.innerHTML = '';
++
++        if (results.length === 0) {
++            tbody.innerHTML = '<tr><td colspan="14" style="padding: 40px; color: #94a3b8;">Henüz sonuç bulunmuyor</td></tr>';
++            document.getElementById('resultStats').innerHTML = '';
++            return;
++        }
++
++        let totalPuan = 0, maxPuan = 0, minPuan = 999;
++        results.forEach((r, i) => {
++            const puan = parseFloat(r.sinav_puan) || 0;
++            totalPuan += puan;
++            if (puan > maxPuan) maxPuan = puan;
++            if (puan < minPuan && puan > 0) minPuan = puan;
++
++            const tr = document.createElement('tr');
++            tr.innerHTML = `
++                <td>${i + 1}</td>
++                <td style="text-align:left; font-weight:600;">${r.student_name || '-'}</td>
++                <td>${r.sinif || '-'}</td>
++                <td style="font-weight:700; color: #1e40af;">${puan.toFixed(2)}</td>
++                <td>${r.genel_yuzdelik || '-'}</td>
++                <td>${r.il_yuzdelik || '-'}</td>
++                <td><span style="color:#10b981">${r.turkce_dogru}</span>/<span style="color:#ef4444">${r.turkce_yanlis}</span>/<span style="color:#94a3b8">${r.turkce_bos}</span></td>
++                <td><span style="color:#10b981">${r.matematik_dogru}</span>/<span style="color:#ef4444">${r.matematik_yanlis}</span>/<span style="color:#94a3b8">${r.matematik_bos}</span></td>
++                <td><span style="color:#10b981">${r.fen_dogru}</span>/<span style="color:#ef4444">${r.fen_yanlis}</span>/<span style="color:#94a3b8">${r.fen_bos}</span></td>
++                <td><span style="color:#10b981">${r.inkilap_dogru}</span>/<span style="color:#ef4444">${r.inkilap_yanlis}</span>/<span style="color:#94a3b8">${r.inkilap_bos}</span></td>
++                <td><span style="color:#10b981">${r.din_dogru}</span>/<span style="color:#ef4444">${r.din_yanlis}</span>/<span style="color:#94a3b8">${r.din_bos}</span></td>
++                <td><span style="color:#10b981">${r.yabanci_dil_dogru}</span>/<span style="color:#ef4444">${r.yabanci_dil_yanlis}</span>/<span style="color:#94a3b8">${r.yabanci_dil_bos}</span></td>
++                <td style="text-align:left; font-size:0.8rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${r.yerlestigi_okul || ''}">${r.yerlestigi_okul || '-'}</td>
++                <td><button class="btn-danger" onclick="deleteResult(${r.id})">Sil</button></td>
++            `;
++            tbody.appendChild(tr);
++        });
++
++        const avg = results.length > 0 ? (totalPuan / results.length).toFixed(2) : 0;
++        document.getElementById('resultStats').innerHTML = `
++            <div class="stat-card">
++                <div class="stat-value">${results.length}</div>
++                <div class="stat-label">Öğrenci</div>
++            </div>
++            <div class="stat-card">
++                <div class="stat-value" style="color: #10b981;">${maxPuan.toFixed(2)}</div>
++                <div class="stat-label">En Yüksek</div>
++            </div>
++            <div class="stat-card">
++                <div class="stat-value">${avg}</div>
++                <div class="stat-label">Ortalama</div>
++            </div>
++            <div class="stat-card">
++                <div class="stat-value" style="color: #ef4444;">${minPuan < 999 ? minPuan.toFixed(2) : '-'}</div>
++                <div class="stat-label">En Düşük</div>
++            </div>
++        `;
++    })
++    .catch(err => alert('Sonuçlar yüklenemedi: ' + err.message));
++}
++
++function deleteResult(id) {
++    if (!confirm('Bu sonucu silmek istediğinize emin misiniz?')) return;
++
++    fetch('/admin/lgs-results/delete/' + id, { method: 'DELETE' })
++    .then(r => r.json())
++    .then(data => {
++        if (data.success) loadResults();
++        else alert(data.error);
++    });
++}
++
++function exportResults() {
++    const year = document.getElementById('filterYear').value;
++    window.location.href = '/admin/lgs-results/export' + (year ? '?year=' + year : '');
++}
++</script>
++{% endblock %}
+diff --git a/templates/base_dashboard.html b/templates/base_dashboard.html
+index 87874bc..1b956b1 100644
+--- a/templates/base_dashboard.html
++++ b/templates/base_dashboard.html
+@@ -1192,6 +1192,7 @@
+                     <li class="sidebar-menu-item"><a href="/admin/announcements" class="sidebar-menu-link" data-tooltip="Duyurular"><span class="sidebar-menu-icon">📢</span><span class="sidebar-menu-text">Duyurular</span></a></li>
+                     <li class="sidebar-menu-item"><a href="/admin/user-activity" class="sidebar-menu-link" data-tooltip="Aktivite Takibi"><span class="sidebar-menu-icon">📊</span><span class="sidebar-menu-text">Aktivite Takibi</span></a></li>
+                     <li class="sidebar-menu-item"><a href="/admin/surveys" class="sidebar-menu-link" data-tooltip="Anket Yönetimi"><span class="sidebar-menu-icon">📋</span><span class="sidebar-menu-text">Anket Yönetimi</span></a></li>
++                    <li class="sidebar-menu-item"><a href="/admin/lgs-results" class="sidebar-menu-link" data-tooltip="LGS Sonuç Çekme"><span class="sidebar-menu-icon">🎓</span><span class="sidebar-menu-text">LGS Sonuç Çekme</span></a></li>
+                     <li class="sidebar-menu-item"><a href="/admin/settings" class="sidebar-menu-link" data-tooltip="Sistem Ayarları"><span class="sidebar-menu-icon">⚙️</span><span class="sidebar-menu-text">Sistem Ayarları</span></a></li>
+                 </ul>
+             </div>
+diff --git a/uv.lock b/uv.lock
+index 05df1b8..811d578 100644
+--- a/uv.lock
++++ b/uv.lock
+@@ -51,6 +51,19 @@ wheels = [
+     { url = "https://files.pythonhosted.org/packages/38/0e/27be9fdef66e72d64c0cdc3cc2823101b80585f8119b5c112c2e8f5f7dab/anyio-4.12.1-py3-none-any.whl", hash = "sha256:d405828884fc140aa80a3c667b8beed277f1dfedec42ba031bd6ac3db606ab6c", size = 113592, upload-time = "2026-01-06T11:45:19.497Z" },
+ ]
+ 
++[[package]]
++name = "beautifulsoup4"
++version = "4.14.3"
++source = { registry = "https://pypi.org/simple" }
++dependencies = [
++    { name = "soupsieve" },
++    { name = "typing-extensions" },
++]
++sdist = { url = "https://files.pythonhosted.org/packages/c3/b0/1c6a16426d389813b48d95e26898aff79abbde42ad353958ad95cc8c9b21/beautifulsoup4-4.14.3.tar.gz", hash = "sha256:6292b1c5186d356bba669ef9f7f051757099565ad9ada5dd630bd9de5fa7fb86", size = 627737, upload-time = "2025-11-30T15:08:26.084Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/1a/39/47f9197bdd44df24d67ac8893641e16f386c984a0619ef2ee4c51fbbc019/beautifulsoup4-4.14.3-py3-none-any.whl", hash = "sha256:0918bfe44902e6ad8d57732ba310582e98da931428d231a5ecb9e7c703a735bb", size = 107721, upload-time = "2025-11-30T15:08:24.087Z" },
++]
++
+ [[package]]
+ name = "blinker"
+ version = "1.9.0"
+@@ -1528,12 +1541,14 @@ wheels = [
+ name = "pymupdf"
+ version = "1.27.1"
+ source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/1b/0c/40dda0cc4bd2220a2ef75f8c53dd7d8ed1e29681fcb3df75db6ee9677a7e/pymupdf-1.27.1.tar.gz", hash = "sha256:4afbde0769c336717a149ab0de3330dcb75378f795c1a8c5af55c1a628b17d55", size = 85303479, upload-time = "2026-02-12T08:29:17.682Z" }
+ wheels = [
+     { url = "https://files.pythonhosted.org/packages/13/19/fde6ea4712a904b65e8f41124a0e4233879b87a770fe6a8ce857964de6d5/pymupdf-1.27.1-cp310-abi3-macosx_10_9_x86_64.whl", hash = "sha256:bee9f95512f9556dbf2cacfd1413c61b29a55baa07fa7f8fc83d221d8419888a", size = 23986707, upload-time = "2026-02-11T15:03:24.025Z" },
+     { url = "https://files.pythonhosted.org/packages/75/c2/070dff91ad3f1bc16fd6c6ceff23495601fcce4c92d28be534417596418a/pymupdf-1.27.1-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:3de95a0889395b0966fafd11b94980b7543a816e89dd1c218597a08543ac3415", size = 23263493, upload-time = "2026-02-11T15:03:45.528Z" },
+     { url = "https://files.pythonhosted.org/packages/8e/db/937377f4b3e0fbf6273c17436a49f7db17df1a46b1be9e26653b6fafc0e1/pymupdf-1.27.1-cp310-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:2c9d9353b840040cbc724341f4095fb7e2cc1a12a9147d0ec1a0a79f5d773147", size = 24317651, upload-time = "2026-02-11T22:33:38.967Z" },
+     { url = "https://files.pythonhosted.org/packages/72/d5/c701cf2d0cdd6e5d6bca3ca9188d7f5d7ce3ae67dd1368d658cd4bae2707/pymupdf-1.27.1-cp310-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:aeaed76e72cbc061149a825ab0811c5f4752970c56591c2938c5042ec06b26e1", size = 24945742, upload-time = "2026-02-11T15:04:06.21Z" },
+     { url = "https://files.pythonhosted.org/packages/2b/29/690202b38b93cf77b73a29c25a63a2b6f3fcb36b1f75006e50b8dee7c108/pymupdf-1.27.1-cp310-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:4f1837554134fb45d390a44de8844b2ca9b6c901c82ccc90b340e3b7f3b126ca", size = 25167965, upload-time = "2026-02-11T22:36:35.478Z" },
++    { url = "https://files.pythonhosted.org/packages/8a/81/f937e6aa606fd263c3a45d0ff0f0bbdbf3fb779933091fc0f6179513cc93/pymupdf-1.27.1-cp310-abi3-win32.whl", hash = "sha256:fa33b512d82c6c4852edadf57f22d5f27d16243bb33dac0fbe4eb0f281c5b17e", size = 18006253, upload-time = "2026-02-12T13:48:07.129Z" },
+     { url = "https://files.pythonhosted.org/packages/3e/99/fe4a7752990bf65277718fffbead4478de9afd1c7288d7a6d643f79a6fa7/pymupdf-1.27.1-cp310-abi3-win_amd64.whl", hash = "sha256:4b6268dff3a9d713034eba5c2ffce0da37c62443578941ac5df433adcde57b2f", size = 19236703, upload-time = "2026-02-11T15:04:19.607Z" },
+ ]
+ 
+@@ -1665,6 +1680,7 @@ name = "repl-nix-workspace"
+ version = "0.1.0"
+ source = { virtual = "." }
+ dependencies = [
++    { name = "beautifulsoup4" },
+     { name = "flask" },
+     { name = "flask-cors" },
+     { name = "flask-login" },
+@@ -1690,6 +1706,7 @@ dependencies = [
+ 
+ [package.metadata]
+ requires-dist = [
++    { name = "beautifulsoup4", specifier = ">=4.14.3" },
+     { name = "flask", specifier = ">=3.1.2" },
+     { name = "flask-cors", specifier = ">=6.0.1" },
+     { name = "flask-login", specifier = ">=0.6.3" },
+@@ -1822,6 +1839,15 @@ wheels = [
+     { url = "https://files.pythonhosted.org/packages/e9/44/75a9c9421471a6c4805dbf2356f7c181a29c1879239abab1ea2cc8f38b40/sniffio-1.3.1-py3-none-any.whl", hash = "sha256:2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2", size = 10235, upload-time = "2024-02-25T23:20:01.196Z" },
+ ]
+ 
++[[package]]
++name = "soupsieve"
++version = "2.8.3"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/7b/ae/2d9c981590ed9999a0d91755b47fc74f74de286b0f5cee14c9269041e6c4/soupsieve-2.8.3.tar.gz", hash = "sha256:3267f1eeea4251fb42728b6dfb746edc9acaffc4a45b27e19450b676586e8349", size = 118627, upload-time = "2026-01-20T04:27:02.457Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/46/2c/1462b1d0a634697ae9e55b3cecdcb64788e8b7d63f54d923fcd0bb140aed/soupsieve-2.8.3-py3-none-any.whl", hash = "sha256:ed64f2ba4eebeab06cc4962affce381647455978ffc1e36bb79a545b91f45a95", size = 37016, upload-time = "2026-01-20T04:27:01.012Z" },
++]
++
+ [[package]]
+ name = "tenacity"
+ version = "9.1.2"
