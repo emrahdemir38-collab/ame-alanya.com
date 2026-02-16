@@ -217,18 +217,52 @@
     <div id="outcomeResult" class="result-section">
         <button class="close-btn" onclick="closeResult('outcomeResult')">&times;</button>
         <h2 class="section-title">🎯 Kazanım Analizi</h2>
+        <div style="margin-bottom: 12px;">
+            <label style="font-weight: 600; margin-right: 8px;">Ders:</label>
+            <select id="stuOutcomeSubjectFilter" class="filter-select" style="width: auto; min-width: 200px; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px;" onchange="filterStudentSubjectBlocks('outcomeContent', 'stuOutcomeSubjectFilter')">
+                <option value="">Tüm Dersler</option>
+            </select>
+        </div>
         <div id="outcomeContent"></div>
     </div>
     
     <div id="errorResult" class="result-section">
         <button class="close-btn" onclick="closeResult('errorResult')">&times;</button>
         <h2 class="section-title">❌ Hata Karnesi</h2>
+        <div style="margin-bottom: 12px;">
+            <label style="font-weight: 600; margin-right: 8px;">Ders:</label>
+            <select id="stuErrorSubjectFilter" class="filter-select" style="width: auto; min-width: 200px; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px;" onchange="filterStudentSubjectBlocks('errorContent', 'stuErrorSubjectFilter')">
+                <option value="">Tüm Dersler</option>
+            </select>
+        </div>
         <div id="errorContent"></div>
     </div>
 </div>
 
 <script>
 let myExams = [];
+const ALL_SUBJECTS = ['Türkçe', 'Matematik', 'Fen Bilimleri', 'Sosyal Bilgiler', 'İngilizce', 'Din Kültürü', 'İnkılap Tarihi'];
+
+function getKazanimDurum(rate) {
+    if (rate >= 85) return {label: 'Çok İyi', color: '#166534', bg: '#dcfce7'};
+    if (rate >= 70) return {label: 'İyi', color: '#15803d', bg: '#f0fdf4'};
+    if (rate >= 50) return {label: 'Geliştirilebilir', color: '#a16207', bg: '#fefce8'};
+    if (rate >= 25) return {label: 'Tekrar Edilmeli', color: '#c2410c', bg: '#fff7ed'};
+    return {label: 'Acil Önlem', color: '#dc2626', bg: '#fef2f2'};
+}
+
+function filterStudentSubjectBlocks(containerId, selectId) {
+    const selectedSubject = document.getElementById(selectId).value.toLowerCase();
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    const blocks = container.querySelectorAll('.subject-block');
+    blocks.forEach(block => {
+        const title = block.querySelector('.subject-title');
+        if (!title) return;
+        const text = title.textContent.replace(/📚|📕/g, '').trim().toLowerCase();
+        block.style.display = (!selectedSubject || text.includes(selectedSubject)) ? '' : 'none';
+    });
+}
 
 document.addEventListener('DOMContentLoaded', loadMyExams);
 
@@ -276,6 +310,7 @@ async function loadMyExams() {
                         <div class="stat-label">Net</div>
                     </div>
                 </div>
+                
             </div>
         `).join('');
         
@@ -316,18 +351,20 @@ async function showOutcome(resultId) {
             html += `<div class="subject-block">
                 <div class="subject-title">${subject}</div>
                 <table class="outcome-table">
-                    <thead><tr><th>Kazanım</th><th>D</th><th>Y</th><th>B</th><th>%</th></tr></thead>
+                    <thead><tr><th>Kazanım</th><th>D</th><th>Y</th><th>B</th><th>%</th><th>Durum</th></tr></thead>
                     <tbody>`;
             
             for (const [outcome, stats] of Object.entries(outcomes)) {
                 const successRate = stats.success_rate || 0;
                 const rateClass = successRate >= 80 ? 'correct' : (successRate >= 50 ? '' : 'wrong');
+                const durum = getKazanimDurum(successRate);
                 html += `<tr>
                     <td>${outcome}</td>
                     <td class="correct">${stats.correct}</td>
                     <td class="wrong">${stats.wrong}</td>
                     <td class="blank">${stats.blank}</td>
                     <td class="${rateClass}" style="font-weight: bold;">%${successRate}</td>
+                    <td style="font-weight:600; font-size:0.75rem; color:${durum.color}; background:${durum.bg}; border-radius:6px; text-align:center;">${durum.label}</td>
                 </tr>`;
             }
             
@@ -336,6 +373,9 @@ async function showOutcome(resultId) {
         
         html += '</div>';
         content.innerHTML = html;
+        const filterSel = document.getElementById('stuOutcomeSubjectFilter');
+        filterSel.innerHTML = '<option value="">Tüm Dersler</option>' + ALL_SUBJECTS.map(s => '<option value="' + s + '">' + s + '</option>').join('');
+        filterStudentSubjectBlocks('outcomeContent', 'stuOutcomeSubjectFilter');
         
     } catch (error) {
         content.innerHTML = '<p style="color: #dc2626;">Yüklenirken hata oluştu</p>';
@@ -389,6 +429,9 @@ async function showErrors(resultId) {
         
         html += '</div>';
         content.innerHTML = html;
+        const filterSel = document.getElementById('stuErrorSubjectFilter');
+        filterSel.innerHTML = '<option value="">Tüm Dersler</option>' + ALL_SUBJECTS.map(s => '<option value="' + s + '">' + s + '</option>').join('');
+        filterStudentSubjectBlocks('errorContent', 'stuErrorSubjectFilter');
         
     } catch (error) {
         content.innerHTML = '<p style="color: #dc2626;">Yüklenirken hata oluştu</p>';
@@ -396,11 +439,17 @@ async function showErrors(resultId) {
 }
 
 function downloadErrorPdf(resultId) {
-    window.open(`/admin/report-cards/api/student-error-pdf/${resultId}`, '_blank');
+    const subj = document.getElementById('stuErrorSubjectFilter')?.value;
+    let url = `/admin/report-cards/api/student-error-pdf/${resultId}`;
+    if (subj) url += `?subject=${encodeURIComponent(subj)}`;
+    window.open(url, '_blank');
 }
 
 function downloadOutcomePdf(resultId) {
-    window.open(`/admin/report-cards/api/student-outcome-pdf/${resultId}`, '_blank');
+    const subj = document.getElementById('stuOutcomeSubjectFilter')?.value;
+    let url = `/admin/report-cards/api/student-outcome-pdf/${resultId}`;
+    if (subj) url += `?subject=${encodeURIComponent(subj)}`;
+    window.open(url, '_blank');
 }
 
 function openMultiExamModal() {
@@ -431,6 +480,13 @@ function openMultiExamModal() {
                         </label>
                     `).join('')}
                 </div>
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="font-weight:600;margin-right:8px;">Ders:</label>
+                <select id="multiSubjectFilter" class="filter-select" style="width:auto;min-width:200px;padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;" onchange="filterStudentSubjectBlocks('multiResults','multiSubjectFilter')">
+                    <option value="">Tüm Dersler</option>
+                    ${ALL_SUBJECTS.map(s => '<option value="' + s + '">' + s + '</option>').join('')}
+                </select>
             </div>
             <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;">
                 <button class="action-btn btn-outcome" onclick="loadMultiOutcome()">🎯 Kazanım Analizi</button>
@@ -476,17 +532,19 @@ async function loadMultiOutcome() {
             html += `<div class="subject-block">
                 <div class="subject-title">${subject}</div>
                 <table class="outcome-table">
-                    <thead><tr><th>Kazanım</th><th>Doğru</th><th>Hatalı</th><th>Boş</th><th>%</th></tr></thead>
+                    <thead><tr><th>Kazanım</th><th>Doğru</th><th>Hatalı</th><th>Boş</th><th>%</th><th>Durum</th></tr></thead>
                     <tbody>`;
             for (const [outcome, stats] of Object.entries(outcomes)) {
                 const rate = stats.success_rate || 0;
                 const cls = rate >= 80 ? 'correct' : (rate >= 50 ? '' : 'wrong');
-                html += `<tr><td>${outcome}</td><td class="correct">${stats.correct}</td><td class="wrong">${stats.wrong}</td><td class="blank">${stats.blank}</td><td class="${cls}" style="font-weight:bold;">%${rate}</td></tr>`;
+                const durum = getKazanimDurum(rate);
+                html += `<tr><td>${outcome}</td><td class="correct">${stats.correct}</td><td class="wrong">${stats.wrong}</td><td class="blank">${stats.blank}</td><td class="${cls}" style="font-weight:bold;">%${rate}</td><td style="font-weight:600;font-size:0.75rem;color:${durum.color};background:${durum.bg};border-radius:6px;text-align:center;">${durum.label}</td></tr>`;
             }
             html += '</tbody></table></div>';
         }
         html += '</div>';
         resultsDiv.innerHTML = html;
+        filterStudentSubjectBlocks('multiResults', 'multiSubjectFilter');
         document.getElementById('multiOutcomePdfBtn').style.display = 'inline-flex';
     } catch (error) {
         resultsDiv.innerHTML = '<p style="color:#dc2626;">Yüklenirken hata oluştu</p>';
@@ -538,6 +596,7 @@ async function loadMultiError() {
         }
         html += '</div>';
         resultsDiv.innerHTML = html;
+        filterStudentSubjectBlocks('multiResults', 'multiSubjectFilter');
         document.getElementById('multiErrorPdfBtn').style.display = 'inline-flex';
     } catch (error) {
         resultsDiv.innerHTML = '<p style="color:#dc2626;">Yüklenirken hata oluştu</p>';
@@ -547,13 +606,19 @@ async function loadMultiError() {
 function downloadMultiOutcomePdf() {
     const selected = Array.from(document.querySelectorAll('.multi-exam-cb:checked')).map(cb => cb.value);
     if (selected.length === 0) { alert('Lütfen en az bir sınav seçin'); return; }
-    window.open(`/admin/report-cards/api/my-multi-outcome-pdf?result_ids=${selected.join(',')}`, '_blank');
+    let url = `/admin/report-cards/api/my-multi-outcome-pdf?result_ids=${selected.join(',')}`;
+    const subj = document.getElementById('multiSubjectFilter')?.value;
+    if (subj) url += `&subject=${encodeURIComponent(subj)}`;
+    window.open(url, '_blank');
 }
 
 function downloadMultiErrorPdf() {
     const selected = Array.from(document.querySelectorAll('.multi-exam-cb:checked')).map(cb => cb.value);
     if (selected.length === 0) { alert('Lütfen en az bir sınav seçin'); return; }
-    window.open(`/admin/report-cards/api/my-multi-error-pdf?result_ids=${selected.join(',')}`, '_blank');
+    let url = `/admin/report-cards/api/my-multi-error-pdf?result_ids=${selected.join(',')}`;
+    const subj = document.getElementById('multiSubjectFilter')?.value;
+    if (subj) url += `&subject=${encodeURIComponent(subj)}`;
+    window.open(url, '_blank');
 }
 
 function openProgressModal() {
@@ -657,5 +722,7 @@ async function loadProgressData() {
         content.innerHTML = '<p style="color:#dc2626;">Yüklenirken hata oluştu</p>';
     }
 }
+
+
 </script>
 {% endblock %}

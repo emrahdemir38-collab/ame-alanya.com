@@ -372,6 +372,12 @@
                 <button class="modal-close" onclick="closeModal('outcomeModal')">&times;</button>
             </div>
         </div>
+        <div style="margin-bottom: 12px;">
+            <label style="font-weight: 600; margin-right: 8px;">Ders:</label>
+            <select id="singleOutcomeSubjectFilter" class="filter-select" style="width: auto; min-width: 200px;" onchange="filterSubjectBlocks('outcomeContent', 'singleOutcomeSubjectFilter')">
+                <option value="">Tum Dersler</option>
+            </select>
+        </div>
         <div id="outcomeContent"></div>
     </div>
 </div>
@@ -385,6 +391,12 @@
                 <button class="modal-close" onclick="closeModal('errorModal')">&times;</button>
             </div>
         </div>
+        <div style="margin-bottom: 12px;">
+            <label style="font-weight: 600; margin-right: 8px;">Ders:</label>
+            <select id="singleErrorSubjectFilter" class="filter-select" style="width: auto; min-width: 200px;" onchange="filterSubjectBlocks('errorContent', 'singleErrorSubjectFilter')">
+                <option value="">Tum Dersler</option>
+            </select>
+        </div>
         <div id="errorContent"></div>
     </div>
 </div>
@@ -393,6 +405,38 @@
 let exams = [];
 let classes = [];
 const userRole = '{{ current_user.role }}';
+const ALL_SUBJECTS = ['Türkçe', 'Matematik', 'Fen Bilimleri', 'Sosyal Bilgiler', 'İngilizce', 'Din Kültürü', 'İnkılap Tarihi'];
+
+function getKazanimDurum(rate) {
+    if (rate >= 85) return {label: 'Çok İyi', color: '#166534', bg: '#dcfce7'};
+    if (rate >= 70) return {label: 'İyi', color: '#15803d', bg: '#f0fdf4'};
+    if (rate >= 50) return {label: 'Geliştirilebilir', color: '#a16207', bg: '#fefce8'};
+    if (rate >= 25) return {label: 'Tekrar Edilmeli', color: '#c2410c', bg: '#fff7ed'};
+    return {label: 'Acil Önlem', color: '#dc2626', bg: '#fef2f2'};
+}
+
+function subjectFilterHtml(selectId) {
+    return `<div>
+        <label style="font-weight: 600; display: block; margin-bottom: 8px;">Ders Filtresi:</label>
+        <select id="${selectId}" class="filter-select" style="width: 100%;">
+            <option value="">Tum Dersler</option>
+            ${ALL_SUBJECTS.map(s => '<option value="' + s + '">' + s + '</option>').join('')}
+        </select>
+    </div>`;
+}
+
+function filterSubjectBlocks(containerId, selectId) {
+    const selectedSubject = document.getElementById(selectId).value.toLowerCase();
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    const blocks = container.querySelectorAll('.subject-block');
+    blocks.forEach(block => {
+        const title = block.querySelector('.subject-title');
+        if (!title) return;
+        const text = title.textContent.replace(/📚|📕/g, '').trim().toLowerCase();
+        block.style.display = (!selectedSubject || text.includes(selectedSubject)) ? '' : 'none';
+    });
+}
 
 document.addEventListener('DOMContentLoaded', loadData);
 
@@ -523,6 +567,7 @@ async function viewExamStudents(examId, examName) {
                         <button class="btn-small btn-warning" onclick="showOutcome(${s.id}, '${s.student_name}')">🎯 Kazanim</button>
                         <button class="btn-small btn-danger" onclick="showError(${s.id}, '${s.student_name}')">❌ Hata</button>
                         <button class="btn-small btn-purple" onclick="openStudentMultiExamModal('${s.student_no}', '${s.student_name}', '${s.class_name}')">📊 Coklu</button>
+                        <button class="btn-small" style="background:#7c3aed;color:white;" onclick="downloadWrongQuestionsPdf(${s.id})">📝 Tekrar Coz</button>
                     </td>
                 </tr>
             `;
@@ -545,7 +590,15 @@ async function showOutcome(resultId, studentName) {
     
     const pdfBtn = document.getElementById('outcomePdfBtn');
     pdfBtn.style.display = 'inline-block';
-    pdfBtn.onclick = () => window.open(`/admin/report-cards/api/student-outcome-pdf/${resultId}`, '_blank');
+    pdfBtn.onclick = () => {
+        const subj = document.getElementById('singleOutcomeSubjectFilter').value;
+        let url = `/admin/report-cards/api/student-outcome-pdf/${resultId}`;
+        if (subj) url += `?subject=${encodeURIComponent(subj)}`;
+        window.open(url, '_blank');
+    };
+    
+    const filterSelect = document.getElementById('singleOutcomeSubjectFilter');
+    filterSelect.innerHTML = '<option value="">Tum Dersler</option>' + ALL_SUBJECTS.map(s => '<option value="' + s + '">' + s + '</option>').join('');
     
     try {
         const response = await fetch(`/admin/report-cards/api/student-outcome-analysis/${resultId}`);
@@ -553,6 +606,7 @@ async function showOutcome(resultId, studentName) {
         
         const data = await response.json();
         renderOutcomeAnalysis(data, content);
+        filterSubjectBlocks('outcomeContent', 'singleOutcomeSubjectFilter');
     } catch (error) {
         content.innerHTML = `<div class="empty-state"><p>Hata: ${error.message}</p></div>`;
     }
@@ -578,6 +632,7 @@ function renderOutcomeAnalysis(data, container) {
                             <th>Dogru</th>
                             <th>Hatali</th>
                             <th>Basari</th>
+                            <th>Durum</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -586,12 +641,14 @@ function renderOutcomeAnalysis(data, container) {
         for (const [outcomeName, stats] of Object.entries(outcomes)) {
             const successRate = stats.success_rate || 0;
             const successClass = successRate >= 70 ? 'correct' : (successRate >= 50 ? 'blank' : 'wrong');
+            const durum = getKazanimDurum(successRate);
             html += `
                 <tr>
                     <td style="font-size: 0.85rem;">${outcomeName}</td>
                     <td class="correct">${stats.correct || 0}</td>
                     <td class="wrong">${stats.wrong || 0}</td>
                     <td class="${successClass}">${successRate}%</td>
+                    <td style="font-weight:600; font-size:0.8rem; color:${durum.color}; background:${durum.bg}; border-radius:6px; text-align:center;">${durum.label}</td>
                 </tr>
             `;
         }
@@ -612,7 +669,15 @@ async function showError(resultId, studentName) {
     
     const pdfBtn = document.getElementById('errorPdfBtn');
     pdfBtn.style.display = 'inline-block';
-    pdfBtn.onclick = () => window.open(`/admin/report-cards/api/student-error-pdf/${resultId}`, '_blank');
+    pdfBtn.onclick = () => {
+        const subj = document.getElementById('singleErrorSubjectFilter').value;
+        let url = `/admin/report-cards/api/student-error-pdf/${resultId}`;
+        if (subj) url += `?subject=${encodeURIComponent(subj)}`;
+        window.open(url, '_blank');
+    };
+    
+    const filterSelect = document.getElementById('singleErrorSubjectFilter');
+    filterSelect.innerHTML = '<option value="">Tum Dersler</option>' + ALL_SUBJECTS.map(s => '<option value="' + s + '">' + s + '</option>').join('');
     
     try {
         const response = await fetch(`/admin/report-cards/api/student-error-report/${resultId}`);
@@ -620,6 +685,7 @@ async function showError(resultId, studentName) {
         
         const data = await response.json();
         renderErrorReport(data, content);
+        filterSubjectBlocks('errorContent', 'singleErrorSubjectFilter');
     } catch (error) {
         content.innerHTML = `<div class="empty-state"><p>Hata: ${error.message}</p></div>`;
     }
@@ -790,11 +856,14 @@ function openClassOutcomeModal() {
                     ${classes.map(c => '<option value="' + c + '">' + c + '</option>').join('')}
                 </select>
             </div>
-            <div style="margin-bottom: 20px;">
-                <label style="font-weight: 600; display: block; margin-bottom: 8px;">Sinavlar (birden fazla secilebilir):</label>
-                <div id="classOutcomeExamCheckboxes" style="max-height: 200px; overflow-y: auto; border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; background: #f9fafb;">
-                    <p style="color: #6b7280; text-align: center;">Önce sinif secin</p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+                <div>
+                    <label style="font-weight: 600; display: block; margin-bottom: 8px;">Sinavlar (birden fazla secilebilir):</label>
+                    <div id="classOutcomeExamCheckboxes" style="max-height: 200px; overflow-y: auto; border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; background: #f9fafb;">
+                        <p style="color: #6b7280; text-align: center;">Önce sinif secin</p>
+                    </div>
                 </div>
+                ${subjectFilterHtml('classOutcomeSubjectFilter')}
             </div>
             <div style="margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap;">
                 <button class="action-btn btn-purple" onclick="loadClassOutcome()">
@@ -901,6 +970,8 @@ async function loadClassOutcome() {
         
         html += '</div>';
         resultsDiv.innerHTML = html;
+        filterSubjectBlocks('classOutcomeResults', 'classOutcomeSubjectFilter');
+        document.getElementById('classOutcomeSubjectFilter').onchange = () => filterSubjectBlocks('classOutcomeResults', 'classOutcomeSubjectFilter');
         
         document.getElementById('classOutcomePdfBtn').style.display = 'inline-flex';
         
@@ -917,6 +988,8 @@ function downloadClassOutcomePdf() {
     
     let url = `/admin/report-cards/api/class-outcome-pdf?exam_ids=${selectedExams.join(',')}`;
     if (className) url += `&class_name=${encodeURIComponent(className)}`;
+    const subj = document.getElementById('classOutcomeSubjectFilter')?.value;
+    if (subj) url += `&subject=${encodeURIComponent(subj)}`;
     window.open(url, '_blank');
 }
 
@@ -941,11 +1014,14 @@ function openClassErrorModal() {
                     ${classes.map(c => '<option value="' + c + '">' + c + '</option>').join('')}
                 </select>
             </div>
-            <div style="margin-bottom: 20px;">
-                <label style="font-weight: 600; display: block; margin-bottom: 8px;">Sinavlar (birden fazla secilebilir):</label>
-                <div id="classErrorExamCheckboxes" style="max-height: 200px; overflow-y: auto; border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; background: #f9fafb;">
-                    <p style="color: #6b7280; text-align: center;">Önce sinif secin</p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+                <div>
+                    <label style="font-weight: 600; display: block; margin-bottom: 8px;">Sinavlar (birden fazla secilebilir):</label>
+                    <div id="classErrorExamCheckboxes" style="max-height: 200px; overflow-y: auto; border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; background: #f9fafb;">
+                        <p style="color: #6b7280; text-align: center;">Önce sinif secin</p>
+                    </div>
                 </div>
+                ${subjectFilterHtml('classErrorSubjectFilter')}
             </div>
             <div style="margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap;">
                 <button class="action-btn btn-danger" onclick="loadClassError()">
@@ -1067,6 +1143,8 @@ async function loadClassError() {
         
         html += '</div>';
         resultsDiv.innerHTML = html;
+        filterSubjectBlocks('classErrorResults', 'classErrorSubjectFilter');
+        document.getElementById('classErrorSubjectFilter').onchange = () => filterSubjectBlocks('classErrorResults', 'classErrorSubjectFilter');
         
         document.getElementById('classErrorPdfBtn').style.display = 'inline-flex';
         
@@ -1083,6 +1161,8 @@ function downloadClassErrorPdf() {
     
     let url = `/admin/report-cards/api/class-error-pdf?exam_ids=${selectedExams.join(',')}`;
     if (className) url += `&class_name=${encodeURIComponent(className)}`;
+    const subj = document.getElementById('classErrorSubjectFilter')?.value;
+    if (subj) url += `&subject=${encodeURIComponent(subj)}`;
     window.open(url, '_blank');
 }
 
@@ -1114,7 +1194,7 @@ function openStudentOutcomeModal() {
                 <h2 class="modal-title">🎯 Ogrenci Kazanim Analizi</h2>
                 <button class="modal-close" onclick="closeModal('studentOutcomeModal')">&times;</button>
             </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; margin-bottom: 20px;">
                 <div>
                     <label style="font-weight: 600; display: block; margin-bottom: 8px;">1. Sinif Sec:</label>
                     <select id="stuOutcomeClassSelect" class="filter-select" style="width: 100%;" onchange="filterStudentOutcomeExams()">
@@ -1136,6 +1216,7 @@ function openStudentOutcomeModal() {
                         <option value="">-- Sinif ve sinav secin --</option>
                     </select>
                 </div>
+                ${subjectFilterHtml('stuOutcomeSubjectFilter')}
             </div>
             <div style="display: flex; gap: 12px; margin-bottom: 20px;">
                 <button class="action-btn btn-warning" onclick="loadStudentOutcomeAnalysis()">📊 Analizi Getir</button>
@@ -1233,27 +1314,31 @@ async function loadStudentOutcomeAnalysis() {
         
         let html = `<h3 style="margin-bottom: 16px; color: #1f2937;">${data.student_name} - Kazanim Analizi</h3>`;
         
-        for (const [subject, outcomes] of Object.entries(data.outcomes || {})) {
-            html += `<div style="margin-bottom: 16px;">
-                <h4 style="color: #6366f1; margin-bottom: 8px;">${subject}</h4>
+        for (const [subject, outcomes] of Object.entries(data.outcome_data || {})) {
+            html += `<div class="subject-block" style="margin-bottom: 16px;">
+                <h4 class="subject-title" style="color: #6366f1; margin-bottom: 8px;">📚 ${subject}</h4>
                 <table class="exams-table"><thead><tr>
-                    <th>Kazanim</th><th>Dogru</th><th>Hatali</th><th>Bos</th><th>Basari %</th>
+                    <th>Kazanim</th><th>Dogru</th><th>Hatali</th><th>Bos</th><th>Basari %</th><th>Durum</th>
                 </tr></thead><tbody>`;
             
             for (const [outcome, stats] of Object.entries(outcomes)) {
                 const total = stats.total || 1;
                 const success = Math.round((stats.correct / total) * 100);
                 const color = success >= 70 ? '#22c55e' : success >= 50 ? '#f59e0b' : '#ef4444';
+                const durum = getKazanimDurum(success);
                 html += `<tr>
                     <td style="max-width: 300px; word-wrap: break-word;">${outcome}</td>
                     <td>${stats.correct}</td><td>${stats.wrong}</td><td>${stats.blank}</td>
                     <td style="color: ${color}; font-weight: 600;">%${success}</td>
+                    <td style="font-weight:600; font-size:0.8rem; color:${durum.color}; background:${durum.bg}; border-radius:6px; text-align:center; white-space:nowrap;">${durum.label}</td>
                 </tr>`;
             }
             html += '</tbody></table></div>';
         }
         
         resultsDiv.innerHTML = html;
+        filterSubjectBlocks('stuOutcomeResults', 'stuOutcomeSubjectFilter');
+        document.getElementById('stuOutcomeSubjectFilter').onchange = () => filterSubjectBlocks('stuOutcomeResults', 'stuOutcomeSubjectFilter');
         document.getElementById('stuOutcomePdfBtn').style.display = 'inline-flex';
         
     } catch (error) {
@@ -1266,7 +1351,10 @@ function downloadStudentOutcomePdf() {
     const studentNo = document.getElementById('stuOutcomeStudentSelect').value;
     const selectedExams = Array.from(document.querySelectorAll('.stu-outcome-exam-cb:checked')).map(cb => cb.value);
     if (!studentNo || selectedExams.length === 0) { alert('Ogrenci ve sinav secin'); return; }
-    window.open(`/admin/report-cards/api/student-multi-outcome-pdf?student_no=${studentNo}&exam_ids=${selectedExams.join(',')}`, '_blank');
+    let url = `/admin/report-cards/api/student-multi-outcome-pdf?student_no=${studentNo}&exam_ids=${selectedExams.join(',')}`;
+    const subj = document.getElementById('stuOutcomeSubjectFilter')?.value;
+    if (subj) url += `&subject=${encodeURIComponent(subj)}`;
+    window.open(url, '_blank');
 }
 
 // ==================== ÖĞRENCİ HATA KARNESİ (ÇOKLU SINAV) ====================
@@ -1284,7 +1372,7 @@ function openStudentErrorModal() {
                 <h2 class="modal-title">❌ Ogrenci Hata Karnesi</h2>
                 <button class="modal-close" onclick="closeModal('studentErrorModal')">&times;</button>
             </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; margin-bottom: 20px;">
                 <div>
                     <label style="font-weight: 600; display: block; margin-bottom: 8px;">1. Sinif Sec:</label>
                     <select id="stuErrorClassSelect" class="filter-select" style="width: 100%;" onchange="filterStudentErrorExams()">
@@ -1306,6 +1394,7 @@ function openStudentErrorModal() {
                         <option value="">-- Sinif ve sinav secin --</option>
                     </select>
                 </div>
+                ${subjectFilterHtml('stuErrorSubjectFilter')}
             </div>
             <div style="display: flex; gap: 12px; margin-bottom: 20px;">
                 <button class="action-btn btn-danger" onclick="loadStudentErrorAnalysis()">📊 Analizi Getir</button>
@@ -1402,11 +1491,12 @@ async function loadStudentErrorAnalysis() {
         if (data.error) throw new Error(data.error);
         
         let html = `<h3 style="margin-bottom: 16px; color: #1f2937;">${data.student_name} - Hata Karnesi</h3>`;
-        html += `<p style="margin-bottom: 12px; color: #6b7280;">Toplam: ${data.summary?.correct || 0} Dogru / ${data.summary?.wrong || 0} Hatali / ${data.summary?.blank || 0} Bos</p>`;
+        html += `<p style="margin-bottom: 12px; color: #6b7280;">Toplam: ${data.totals?.correct || 0} Dogru / ${data.totals?.wrong || 0} Hatali / ${data.totals?.blank || 0} Bos</p>`;
         
-        for (const [subject, errors] of Object.entries(data.errors || {})) {
-            html += `<div style="margin-bottom: 16px;">
-                <h4 style="color: #dc2626; margin-bottom: 8px;">${subject} (${errors.length} hata)</h4>
+        for (const [subject, subjectData] of Object.entries(data.errors_by_subject || {})) {
+            const errors = subjectData.errors || [];
+            html += `<div class="subject-block" style="margin-bottom: 16px;">
+                <h4 class="subject-title" style="color: #dc2626; margin-bottom: 8px;">📕 ${subject} (${errors.length} hata)</h4>
                 <table class="exams-table"><thead><tr>
                     <th>Sinav</th><th>Soru</th><th>Durum</th><th>Kazanim</th><th>Cevap</th>
                 </tr></thead><tbody>`;
@@ -1426,6 +1516,8 @@ async function loadStudentErrorAnalysis() {
         }
         
         resultsDiv.innerHTML = html;
+        filterSubjectBlocks('stuErrorResults', 'stuErrorSubjectFilter');
+        document.getElementById('stuErrorSubjectFilter').onchange = () => filterSubjectBlocks('stuErrorResults', 'stuErrorSubjectFilter');
         document.getElementById('stuErrorPdfBtn').style.display = 'inline-flex';
         
     } catch (error) {
@@ -1438,7 +1530,10 @@ function downloadStudentErrorPdf() {
     const studentNo = document.getElementById('stuErrorStudentSelect').value;
     const selectedExams = Array.from(document.querySelectorAll('.stu-error-exam-cb:checked')).map(cb => cb.value);
     if (!studentNo || selectedExams.length === 0) { alert('Ogrenci ve sinav secin'); return; }
-    window.open(`/admin/report-cards/api/student-multi-error-pdf?student_no=${studentNo}&exam_ids=${selectedExams.join(',')}`, '_blank');
+    let url = `/admin/report-cards/api/student-multi-error-pdf?student_no=${studentNo}&exam_ids=${selectedExams.join(',')}`;
+    const subj = document.getElementById('stuErrorSubjectFilter')?.value;
+    if (subj) url += `&subject=${encodeURIComponent(subj)}`;
+    window.open(url, '_blank');
 }
 
 function openStudentMultiExamModal(studentNo, studentName, className) {
@@ -1455,15 +1550,19 @@ function openStudentMultiExamModal(studentNo, studentName, className) {
                 <h2 class="modal-title">📊 ${studentName} - Coklu Sinav Analizi</h2>
                 <button class="modal-close" onclick="closeModal('studentMultiExamModal')">&times;</button>
             </div>
-            <div style="margin-bottom: 20px;">
-                <label style="font-weight: 600; display: block; margin-bottom: 8px;">Sinavlar (birden fazla secilebilir):</label>
-                <div id="studentExamCheckboxes" style="max-height: 200px; overflow-y: auto; border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; background: #f9fafb;">
-                    <p style="text-align: center; color: #6b7280;">Yukleniyor...</p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+                <div>
+                    <label style="font-weight: 600; display: block; margin-bottom: 8px;">Sinavlar (birden fazla secilebilir):</label>
+                    <div id="studentExamCheckboxes" style="max-height: 200px; overflow-y: auto; border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; background: #f9fafb;">
+                        <p style="text-align: center; color: #6b7280;">Yukleniyor...</p>
+                    </div>
                 </div>
+                ${subjectFilterHtml('studentMultiSubjectFilter')}
             </div>
             <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px;">
                 <button class="action-btn btn-warning" onclick="loadStudentMultiOutcome('${studentNo}', '${studentName}')">🎯 Kazanim Analizi</button>
                 <button class="action-btn btn-danger" onclick="loadStudentMultiError('${studentNo}', '${studentName}')">❌ Hata Karnesi</button>
+                <button class="action-btn" style="background:#7c3aed;color:white;" onclick="downloadMultiTekrarCozPdf('${studentName}')">📝 Toplu Tekrar Coz PDF</button>
             </div>
             <div id="studentMultiResults" style="background: #f9fafb; padding: 16px; border-radius: 8px;">
                 <p style="color: #6b7280; text-align: center;">Sinavlari secip analiz butonuna tiklayin</p>
@@ -1529,6 +1628,7 @@ async function loadStudentMultiOutcome(studentNo, studentName) {
                                 <th>Dogru</th>
                                 <th>Hatali</th>
                                 <th>Basari</th>
+                                <th>Durum</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1537,12 +1637,14 @@ async function loadStudentMultiOutcome(studentNo, studentName) {
             for (const [outcomeName, stats] of Object.entries(outcomes)) {
                 const successRate = stats.success_rate || 0;
                 const successClass = successRate >= 70 ? 'correct' : (successRate >= 50 ? 'blank' : 'wrong');
+                const durum = getKazanimDurum(successRate);
                 html += `
                     <tr>
                         <td style="font-size: 0.85rem;">${outcomeName}</td>
                         <td class="correct">${stats.correct || 0}</td>
                         <td class="wrong">${stats.wrong || 0}</td>
                         <td class="${successClass}">${successRate}%</td>
+                        <td style="font-weight:600; font-size:0.8rem; color:${durum.color}; background:${durum.bg}; border-radius:6px; text-align:center;">${durum.label}</td>
                     </tr>
                 `;
             }
@@ -1552,6 +1654,8 @@ async function loadStudentMultiOutcome(studentNo, studentName) {
         
         html += '</div>';
         resultsDiv.innerHTML = html;
+        filterSubjectBlocks('studentMultiResults', 'studentMultiSubjectFilter');
+        document.getElementById('studentMultiSubjectFilter').onchange = () => filterSubjectBlocks('studentMultiResults', 'studentMultiSubjectFilter');
         
     } catch (error) {
         resultsDiv.innerHTML = `<p style="color: #ef4444;">Hata: ${error.message}</p>`;
@@ -1628,6 +1732,8 @@ async function loadStudentMultiError(studentNo, studentName) {
         
         html += '</div>';
         resultsDiv.innerHTML = html;
+        filterSubjectBlocks('studentMultiResults', 'studentMultiSubjectFilter');
+        document.getElementById('studentMultiSubjectFilter').onchange = () => filterSubjectBlocks('studentMultiResults', 'studentMultiSubjectFilter');
         
     } catch (error) {
         resultsDiv.innerHTML = `<p style="color: #ef4444;">Hata: ${error.message}</p>`;
@@ -1707,6 +1813,107 @@ function downloadClassAnalysisPdf() {
     }
     
     window.open(`/admin/report-cards/api/class-analysis-pdf/${examId}`, '_blank');
+}
+
+function showPdfLoading() {
+    let overlay = document.getElementById('pdfLoadingOverlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'pdfLoadingOverlay';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;justify-content:center;align-items:center;z-index:2147483647;';
+        overlay.innerHTML = '<div style="background:white;border-radius:16px;padding:32px 48px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.3);"><div style="font-size:2.5rem;margin-bottom:12px;">📝</div><p style="font-size:1.1rem;font-weight:600;color:#1f2937;margin:0;">PDF Hazırlanıyor...</p><p style="color:#6b7280;margin-top:8px;font-size:0.9rem;">Lütfen bekleyin</p></div>';
+        document.body.appendChild(overlay);
+    }
+    overlay.style.display = 'flex';
+    return overlay;
+}
+
+function hidePdfLoading() {
+    const overlay = document.getElementById('pdfLoadingOverlay');
+    if (overlay) overlay.style.display = 'none';
+}
+
+async function downloadMultiTekrarCozPdf(studentName) {
+    const selectedResults = Array.from(document.querySelectorAll('.student-exam-checkbox:checked')).map(cb => parseInt(cb.value));
+    
+    if (selectedResults.length === 0) { alert('Lutfen en az bir sinav secin'); return; }
+    
+    const overlay = showPdfLoading();
+    
+    try {
+        const response = await fetch('/admin/report-cards/api/wrong-questions-pdf-multi', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({result_ids: selectedResults})
+        });
+        
+        if (!response.ok) {
+            const errData = await response.json();
+            hidePdfLoading();
+            alert(errData.error || 'PDF olusturulamadi');
+            return;
+        }
+        
+        const blob = await response.blob();
+        hidePdfLoading();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Tekrar_Coz_${studentName.replace(/ /g, '_')}_Toplu.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+    } catch (error) {
+        hidePdfLoading();
+        alert('PDF indirme hatasi: ' + error.message);
+    }
+}
+
+async function downloadWrongQuestionsPdf(resultId) {
+    const overlay = showPdfLoading();
+
+    try {
+        const response = await fetch(`/admin/report-cards/api/wrong-questions-pdf/${resultId}`);
+        
+        if (!response.ok) {
+            let errMsg = 'PDF oluşturulamadı';
+            try {
+                const text = await response.text();
+                try {
+                    const errData = JSON.parse(text);
+                    errMsg = errData.error || errMsg;
+                } catch(e) {
+                    errMsg = `Sunucu hatası (${response.status}): ${text.substring(0, 200)}`;
+                }
+            } catch(e) {
+                errMsg = `Bağlantı hatası (${response.status})`;
+            }
+            hidePdfLoading();
+            alert(errMsg);
+            return;
+        }
+        
+        const blob = await response.blob();
+        hidePdfLoading();
+        
+        const contentDisp = response.headers.get('Content-Disposition') || '';
+        let filename = 'Tekrar_Coz.pdf';
+        const match = contentDisp.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (match && match[1]) filename = match[1].replace(/['"]/g, '');
+        
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+    } catch (error) {
+        hidePdfLoading();
+        alert('PDF indirme hatası: ' + error.message);
+    }
 }
 
 window.onclick = function(event) {

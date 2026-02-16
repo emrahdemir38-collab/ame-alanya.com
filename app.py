@@ -252,9 +252,9 @@ def verify_pdf_token(token, max_age=300):
         return None
 
 # Session yapılandırması - GÜVENLİK AYARLARI
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Lax: iframe ve proxy uyumlu
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'  # None: iframe preview uyumlu
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SECURE'] = False  # Replit proxy için False
+app.config['SESSION_COOKIE_SECURE'] = True  # SameSite=None için Secure gerekli (Replit HTTPS kullanır)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)  # 30 dakika sonra oturum sona erer
 app.config['SESSION_REFRESH_EACH_REQUEST'] = True  # Her istekte cookie yenilenir
 app.config['SESSION_COOKIE_NAME'] = 'ameo_session'  # Özel session cookie adı
@@ -565,6 +565,111 @@ def admin_dashboard():
     if current_user.role != 'admin':
         return redirect('/')
     return render_template("admin_dashboard.html")
+
+@app.route("/api/admin/sync-db", methods=["POST"])
+@login_required
+def admin_sync_db():
+    if current_user.role != 'admin':
+        return jsonify({"success": False, "error": "Yetkisiz"}), 403
+
+    import psycopg2
+    import psycopg2.extras
+    import json as json_mod
+
+    prod_url = os.environ.get('PROD_DATABASE_URL')
+    dev_url = os.environ.get('DATABASE_URL')
+
+    if not prod_url:
+        return jsonify({"success": False, "error": "PROD_DATABASE_URL ayarlanmamis"})
+    if not dev_url:
+        return jsonify({"success": False, "error": "DATABASE_URL bulunamadi"})
+
+    if prod_url == dev_url:
+        return jsonify({"success": False, "error": "Production ve Development veritabanlari ayni! Bu islem yapilamaz."})
+
+    tables_to_sync = [
+        'users', 'classes', 'teacher_classes',
+        'report_card_exams', 'report_card_exam_pages',
+        'report_card_question_regions', 'report_card_results',
+        'book_entries',
+    ]
+    tables_to_truncate = [
+        'book_entries', 'report_card_results',
+        'report_card_question_regions', 'report_card_exam_pages',
+        'report_card_exams', 'teacher_classes', 'classes',
+        'user_sessions', 'users',
+    ]
+
+    try:
+        prod_conn = psycopg2.connect(prod_url, cursor_factory=psycopg2.extras.RealDictCursor)
+        prod_cur = prod_conn.cursor()
+        dev_conn = psycopg2.connect(dev_url)
+        dev_cur = dev_conn.cursor()
+
+        for table in tables_to_truncate:
+            try:
+                dev_cur.execute(f"TRUNCATE TABLE {table} CASCADE")
+            except:
+                dev_conn.rollback()
+        dev_conn.commit()
+
+        results = {}
+        for table in tables_to_sync:
+            prod_cur.execute(f"SELECT * FROM {table} ORDER BY id")
+            rows = prod_cur.fetchall()
+            if not rows:
+                results[table] = {"prod": 0, "dev": 0}
+                continue
+
+            columns = list(rows[0].keys())
+            json_columns = set()
+            prod_cur.execute("""
+                SELECT column_name FROM information_schema.columns 
+                WHERE table_name = %s AND data_type IN ('json', 'jsonb')
+            """, (table,))
+            for r in prod_cur.fetchall():
+                json_columns.add(r['column_name'])
+
+            placeholders = ['%s::json' if col in json_columns else '%s' for col in columns]
+            insert_sql = f"INSERT INTO {table} ({','.join(columns)}) VALUES ({','.join(placeholders)}) ON CONFLICT (id) DO NOTHING"
+
+            values_list = []
+            for row in rows:
+                values = []
+                for col in columns:
+                    val = row[col]
+                    if col in json_columns and val is not None:
+                        if isinstance(val, (dict, list)):
+                            values.append(json_mod.dumps(val, ensure_ascii=False))
+                        else:
+                            values.append(val if isinstance(val, str) else json_mod.dumps(val, ensure_ascii=False))
+                    else:
+                        values.append(val)
+                values_list.append(tuple(values))
+
+            psycopg2.extras.execute_batch(dev_cur, insert_sql, values_list, page_size=200)
+            dev_conn.commit()
+
+            try:
+                dev_cur.execute(f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), COALESCE((SELECT MAX(id) FROM {table}), 1))")
+                dev_conn.commit()
+            except:
+                dev_conn.rollback()
+
+            dev_cur.execute(f"SELECT COUNT(*) FROM {table}")
+            dev_count = dev_cur.fetchone()[0]
+            results[table] = {"prod": len(rows), "dev": dev_count}
+
+        prod_cur.close()
+        prod_conn.close()
+        dev_cur.close()
+        dev_conn.close()
+
+        return jsonify({"success": True, "results": results})
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
 
 @app.route("/admin/question-analysis")
 @login_required
@@ -2268,6 +2373,179 @@ def admin_delete_all_users():
         logger.error(f"Delete all users error: {str(e)}")
         return jsonify({"error": f"Toplu silme hatası: {str(e)}"}), 500
 
+@app.route("/api/admin/users/eokul-compare", methods=["POST"])
+@login_required
+def admin_eokul_compare():
+    if current_user.role != 'admin':
+        return jsonify({"error": "Yetkisiz erişim"}), 403
+
+    if "file" not in request.files:
+        return jsonify({"error": "Dosya bulunamadı"}), 400
+
+    file = request.files["file"]
+    if not file.filename:
+        return jsonify({"error": "Dosya seçilmedi"}), 400
+
+    try:
+        df = pd.read_excel(file)
+
+        def turkish_upper(text):
+            if not text:
+                return ''
+            text = text.replace('i', 'İ').replace('ı', 'I')
+            return text.upper().strip()
+
+        def normalize_name(text):
+            return ' '.join(turkish_upper(text).split())
+
+        col_map = {}
+        for col in df.columns:
+            col_lower = str(col).strip().lower().replace('İ', 'i').replace('I', 'ı')
+            if col_lower in ('sınıf', 'sınıfı', 'sinif', 'sinifi', 'sınıfı'):
+                col_map['class'] = col
+            elif col_lower in ('okul no', 'okul numarası', 'numara', 'öğrenci no', 'ogrenci no', 'okul numarasi'):
+                col_map['no'] = col
+            elif col_lower in ('ad soyad', 'adsoyad', 'ad-soyad', 'öğrenci adı soyadı'):
+                col_map['full_name'] = col
+            elif col_lower in ('adı', 'ad', 'adi', 'öğrenci adı', 'ogrenci adi', 'adı'):
+                col_map['first_name'] = col
+            elif col_lower in ('soyadı', 'soyad', 'soyadi', 'öğrenci soyadı', 'soyadı'):
+                col_map['last_name'] = col
+
+        col_names_str = ", ".join([str(c) for c in df.columns.tolist()])
+
+        if 'class' not in col_map or not ('full_name' in col_map or ('first_name' in col_map and 'last_name' in col_map)):
+            cols = df.columns.tolist()
+            if len(cols) >= 4:
+                col_map = {
+                    'class': cols[0],
+                    'no': cols[1],
+                    'first_name': cols[2],
+                    'last_name': cols[3]
+                }
+                logger.info(f"E-Okul: Sütunlar otomatik algılandı (pozisyona göre): Sınıf={cols[0]}, No={cols[1]}, Ad={cols[2]}, Soyad={cols[3]}")
+            elif 'class' not in col_map:
+                return jsonify({"error": "Excel'de Sınıf sütunu bulunamadı. Sütun adları: " + col_names_str}), 400
+            else:
+                return jsonify({"error": "Excel'de Ad Soyad veya Adı/Soyadı sütunları bulunamadı. Sütun adları: " + col_names_str}), 400
+
+        excel_students = []
+        skipped = 0
+        for _, row in df.iterrows():
+            class_name = str(row[col_map['class']]).strip()
+            if not class_name or class_name == 'nan':
+                skipped += 1
+                continue
+
+            class_name = turkish_upper(class_name).replace(' ', '')
+
+            if 'full_name' in col_map:
+                full_name = str(row[col_map['full_name']]).strip()
+            else:
+                first = str(row[col_map['first_name']]).strip()
+                last = str(row[col_map['last_name']]).strip()
+                if first == 'nan': first = ''
+                if last == 'nan': last = ''
+                full_name = f"{first} {last}"
+
+            if not full_name.strip() or full_name.strip() == 'nan':
+                skipped += 1
+                continue
+
+            student_no = ''
+            if 'no' in col_map:
+                student_no = str(row[col_map['no']]).strip()
+                if student_no == 'nan':
+                    student_no = ''
+                student_no = student_no.replace('.0', '')
+
+            excel_students.append({
+                'full_name': normalize_name(full_name),
+                'class_name': class_name,
+                'student_no': student_no
+            })
+
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT id, username, full_name, class_name, student_no FROM users WHERE role = 'student'")
+        db_students = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        db_lookup = {}
+        for s in db_students:
+            key = (normalize_name(s['full_name']), turkish_upper(s['class_name'] or '').replace(' ', ''))
+            if key not in db_lookup:
+                db_lookup[key] = []
+            db_lookup[key].append(s)
+
+        excel_lookup = set()
+        for s in excel_students:
+            excel_lookup.add((s['full_name'], s['class_name']))
+
+        new_students = []
+        for s in excel_students:
+            key = (s['full_name'], s['class_name'])
+            if key not in db_lookup:
+                new_students.append(s)
+
+        gone_students = []
+        for key, students in db_lookup.items():
+            if key not in excel_lookup:
+                for s in students:
+                    gone_students.append({
+                        'id': s['id'],
+                        'full_name': s['full_name'],
+                        'class_name': s['class_name'] or '',
+                        'student_no': s['student_no'] or '',
+                        'username': s['username']
+                    })
+
+        new_students.sort(key=lambda x: (x['class_name'], x['full_name']))
+        gone_students.sort(key=lambda x: (x['class_name'], x['full_name']))
+
+        return jsonify({
+            "success": True,
+            "excel_count": len(excel_students),
+            "db_count": len(db_students),
+            "new_students": new_students,
+            "gone_students": gone_students,
+            "new_count": len(new_students),
+            "gone_count": len(gone_students)
+        })
+
+    except Exception as e:
+        logger.error(f"E-okul comparison error: {str(e)}")
+        return jsonify({"error": f"Karşılaştırma hatası: {str(e)}"}), 400
+
+
+@app.route("/api/admin/users/eokul-delete", methods=["POST"])
+@login_required
+def admin_eokul_delete():
+    if current_user.role != 'admin':
+        return jsonify({"error": "Yetkisiz erişim"}), 403
+
+    data = request.get_json()
+    user_ids = data.get('user_ids', [])
+    if not user_ids:
+        return jsonify({"error": "Silinecek kullanıcı seçilmedi"}), 400
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        deleted = 0
+        for uid in user_ids:
+            cur.execute("DELETE FROM users WHERE id = %s AND role = 'student'", (uid,))
+            deleted += cur.rowcount
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"success": True, "deleted_count": deleted})
+    except Exception as e:
+        logger.error(f"E-okul delete error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/admin/users/upload-excel", methods=["POST"])
 @login_required
 def admin_upload_excel():
@@ -3671,6 +3949,7 @@ def init_database():
                 answer_key_a JSON,
                 answer_key_b JSON,
                 question_counts JSON,
+                image_booklet_type VARCHAR(1) DEFAULT 'A',
                 created_by INTEGER REFERENCES users(id),
                 created_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul')
             )
@@ -3692,6 +3971,35 @@ def init_database():
                 percentile FLOAT,
                 created_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul'),
                 UNIQUE(exam_id, student_id)
+            )
+        """)
+        
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS report_card_exam_pages (
+                id SERIAL PRIMARY KEY,
+                exam_id INTEGER REFERENCES report_card_exams(id) ON DELETE CASCADE,
+                page_number INTEGER NOT NULL,
+                image_key VARCHAR(500) NOT NULL,
+                width_px INTEGER,
+                height_px INTEGER,
+                created_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul'),
+                UNIQUE(exam_id, page_number)
+            )
+        """)
+        
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS report_card_question_regions (
+                id SERIAL PRIMARY KEY,
+                exam_id INTEGER REFERENCES report_card_exams(id) ON DELETE CASCADE,
+                page_id INTEGER REFERENCES report_card_exam_pages(id) ON DELETE CASCADE,
+                subject_key VARCHAR(50) NOT NULL,
+                question_number INTEGER NOT NULL,
+                y_start_norm FLOAT NOT NULL,
+                y_end_norm FLOAT NOT NULL,
+                x_start_norm FLOAT DEFAULT 0,
+                x_end_norm FLOAT DEFAULT 1,
+                created_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul'),
+                UNIQUE(exam_id, subject_key, question_number)
             )
         """)
         
@@ -3732,6 +4040,11 @@ def init_database():
             """)
         except Exception as e:
             logger.info(f"parent_id column already exists or error: {e}")
+        
+        try:
+            cur.execute("ALTER TABLE report_card_exams ADD COLUMN IF NOT EXISTS image_booklet_type VARCHAR(1) DEFAULT 'A'")
+        except Exception as e:
+            logger.info(f"image_booklet_type column: {e}")
         
         # Dashboard Widget System (Task #10)
         cur.execute("""
@@ -18897,6 +19210,8 @@ from routes.daily_tracking import daily_tracking_bp
 # from routes.exam_calendar import exam_calendar_bp  # Disabled - using app.py endpoints instead
 from routes.teacher_study_plan import teacher_study_plan_bp
 from routes.report_cards import report_cards_bp, init_object_storage
+from routes.kelebek import kelebek_bp, init_kelebek_tables
+from routes.lgs_results import lgs_results_bp, init_lgs_tables
 
 # Object Storage'ı report_cards modülüne aktar
 init_object_storage(object_storage)
@@ -18910,11 +19225,19 @@ app.register_blueprint(daily_tracking_bp)
 # app.register_blueprint(exam_calendar_bp)  # Disabled - using app.py endpoints instead
 app.register_blueprint(teacher_study_plan_bp)
 app.register_blueprint(report_cards_bp)
+app.register_blueprint(kelebek_bp)
+app.register_blueprint(lgs_results_bp)
 # ==================== MODÜLER BLUEPRINT'LER SONU ====================
 
 # Uygulama başlarken veritabanını initialize et
 with app.app_context():
     init_database()
+    conn_kb = get_db()
+    init_kelebek_tables(conn_kb)
+    conn_kb.close()
+    logger.info("✅ Kelebek tabloları kontrol edildi/oluşturuldu")
+    init_lgs_tables()
+    logger.info("✅ LGS sonuç tabloları kontrol edildi/oluşturuldu")
     
     init_admin_user()
     

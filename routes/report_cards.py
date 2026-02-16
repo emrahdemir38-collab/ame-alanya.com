@@ -4,7 +4,8 @@ Karne Yönetimi Routes - Admin PDF Karne Okuma Sistemi
 import os
 import json
 import logging
-from flask import Blueprint, request, jsonify, render_template, current_app, send_file
+import uuid
+from flask import Blueprint, request, jsonify, render_template, current_app, send_file, make_response
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 import psycopg2
@@ -13,6 +14,7 @@ from datetime import datetime
 import threading
 from queue import Queue
 from io import BytesIO
+from PIL import Image as PILImage
 from utils.fmt_parser import FMTReportCardParser
 from utils.image_report_parser import ImageReportParser
 from utils.csv_parser import CSVExcelParser
@@ -83,6 +85,17 @@ def register_turkish_fonts():
 PDF_FONT, PDF_FONT_BOLD = register_turkish_fonts()
 
 report_cards_bp = Blueprint('report_cards', __name__, url_prefix='/admin/report-cards')
+
+def get_kazanim_durum(rate):
+    if rate >= 85:
+        return {'label': 'Çok İyi', 'color': colors.HexColor('#166534'), 'bg': colors.HexColor('#dcfce7')}
+    if rate >= 70:
+        return {'label': 'İyi', 'color': colors.HexColor('#15803d'), 'bg': colors.HexColor('#f0fdf4')}
+    if rate >= 50:
+        return {'label': 'Geliştirilebilir', 'color': colors.HexColor('#a16207'), 'bg': colors.HexColor('#fefce8')}
+    if rate >= 25:
+        return {'label': 'Tekrar Edilmeli', 'color': colors.HexColor('#c2410c'), 'bg': colors.HexColor('#fff7ed')}
+    return {'label': 'Acil Önlem', 'color': colors.HexColor('#dc2626'), 'bg': colors.HexColor('#fef2f2')}
 
 def parse_outcome_code(outcome):
     """Kazanım kodunu sıralama için parse et. Örn: 7.1.3.2 -> (7, 1, 3, 2)"""
@@ -3498,39 +3511,55 @@ def student_outcome_analysis_pdf():
             
             if weak:
                 elements.append(Paragraph("Geliştirilmesi Gereken:", normal_style))
-                data = [['Kazanım', 'Başarı']]
+                data = [['Kazanım', 'Başarı', 'Durum']]
+                row_colors_w = []
                 for item in weak[:10]:
                     text = item['text'][:70] + '...' if len(item['text']) > 70 else item['text']
-                    data.append([Paragraph(text, normal_style), f"%{item['rate']}"])
+                    durum = get_kazanim_durum(item['rate'])
+                    data.append([Paragraph(text, normal_style), f"%{item['rate']}", durum['label']])
+                    row_colors_w.append(durum)
                 
-                table = Table(data, colWidths=[400, 60])
-                table.setStyle(TableStyle([
+                table = Table(data, colWidths=[330, 55, 80])
+                style_cmds = [
                     ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#fef2f2')),
                     ('FONTNAME', (0, 0), (-1, 0), PDF_FONT_BOLD),
                     ('FONTNAME', (0, 1), (-1, -1), PDF_FONT),
                     ('FONTSIZE', (0, 0), (-1, -1), 9),
                     ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ]))
+                    ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+                ]
+                for i, d in enumerate(row_colors_w):
+                    style_cmds.append(('BACKGROUND', (2, i+1), (2, i+1), d['bg']))
+                    style_cmds.append(('TEXTCOLOR', (2, i+1), (2, i+1), d['color']))
+                table.setStyle(TableStyle(style_cmds))
                 elements.append(table)
                 elements.append(Spacer(1, 10))
             
             if strong:
                 elements.append(Paragraph("Güçlü Alanlar:", normal_style))
-                data = [['Kazanım', 'Başarı']]
+                data = [['Kazanım', 'Başarı', 'Durum']]
+                row_colors_s = []
                 for item in strong[:10]:
                     text = item['text'][:70] + '...' if len(item['text']) > 70 else item['text']
-                    data.append([Paragraph(text, normal_style), f"%{item['rate']}"])
+                    durum = get_kazanim_durum(item['rate'])
+                    data.append([Paragraph(text, normal_style), f"%{item['rate']}", durum['label']])
+                    row_colors_s.append(durum)
                 
-                table = Table(data, colWidths=[400, 60])
-                table.setStyle(TableStyle([
+                table = Table(data, colWidths=[330, 55, 80])
+                style_cmds = [
                     ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f0fdf4')),
                     ('FONTNAME', (0, 0), (-1, 0), PDF_FONT_BOLD),
                     ('FONTNAME', (0, 1), (-1, -1), PDF_FONT),
                     ('FONTSIZE', (0, 0), (-1, -1), 9),
                     ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ]))
+                    ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+                ]
+                for i, d in enumerate(row_colors_s):
+                    style_cmds.append(('BACKGROUND', (2, i+1), (2, i+1), d['bg']))
+                    style_cmds.append(('TEXTCOLOR', (2, i+1), (2, i+1), d['color']))
+                table.setStyle(TableStyle(style_cmds))
                 elements.append(table)
             
             elements.append(Spacer(1, 15))
@@ -3848,20 +3877,28 @@ def get_student_outcome_pdf():
             
             if weak:
                 cell_style = ParagraphStyle('Cell', parent=styles['Normal'], fontName=PDF_FONT, fontSize=8, leading=10)
-                data = [['Geliştirilmesi Gereken Kazanımlar', 'Başarı']]
+                data = [['Geliştirilmesi Gereken Kazanımlar', 'Başarı', 'Durum']]
+                row_colors_w2 = []
                 for item in weak[:8]:
                     text = item['text'] or ''
-                    data.append([Paragraph(text, cell_style), f"%{item['rate']}"])
+                    durum = get_kazanim_durum(item['rate'])
+                    data.append([Paragraph(text, cell_style), f"%{item['rate']}", durum['label']])
+                    row_colors_w2.append(durum)
                 
-                table = Table(data, colWidths=[400, 60])
-                table.setStyle(TableStyle([
+                table = Table(data, colWidths=[330, 50, 80])
+                style_cmds = [
                     ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#fef2f2')),
                     ('FONTNAME', (0, 0), (-1, 0), PDF_FONT_BOLD),
                     ('FONTNAME', (0, 1), (-1, -1), PDF_FONT),
                     ('FONTSIZE', (0, 0), (-1, -1), 8),
                     ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ]))
+                    ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+                ]
+                for i, d in enumerate(row_colors_w2):
+                    style_cmds.append(('BACKGROUND', (2, i+1), (2, i+1), d['bg']))
+                    style_cmds.append(('TEXTCOLOR', (2, i+1), (2, i+1), d['color']))
+                table.setStyle(TableStyle(style_cmds))
                 elements.append(table)
             
             elements.append(Spacer(1, 10))
@@ -3980,6 +4017,7 @@ def get_class_outcome_pdf():
     
     exam_ids_str = request.args.get('exam_ids', '')
     class_name = request.args.get('class_name', '')
+    subject_filter = request.args.get('subject', '')
     
     if not exam_ids_str:
         return jsonify({"error": "Sınav ID'leri gerekli"}), 400
@@ -4021,6 +4059,8 @@ def get_class_outcome_pdf():
             
             for subj_key, subj_data in subjects.items():
                 subject_label = subj_data.get('subject_label', subj_key)
+                if subject_filter and subject_label != subject_filter:
+                    continue
                 if subject_label not in outcome_stats:
                     outcome_stats[subject_label] = {}
                 
@@ -4051,26 +4091,32 @@ def get_class_outcome_pdf():
         
         elements.append(Paragraph("SINIF KAZANIM ANALİZİ", title_style))
         elements.append(Paragraph(f"Sınıf: {class_name or 'Tüm Sınıflar'}", normal_style))
+        if subject_filter:
+            elements.append(Paragraph(f"Ders: {subject_filter}", normal_style))
         elements.append(Paragraph(f"Tarih: {datetime.now().strftime('%d.%m.%Y')}", normal_style))
         elements.append(Spacer(1, 15))
         
         for subject, outcomes in outcome_stats.items():
             elements.append(Paragraph(subject, subject_style))
             
-            table_data = [['Kazanım', 'Doğru', 'Yanlış', 'Boş', 'Başarı %']]
+            table_data = [['Kazanım', 'Doğru', 'Yanlış', 'Boş', 'Başarı %', 'Durum']]
+            row_colors = []
             for outcome, stats in outcomes.items():
                 total = stats['total']
                 success = round((stats['correct'] / total * 100), 1) if total > 0 else 0
+                durum = get_kazanim_durum(success)
                 table_data.append([
                     Paragraph(outcome, cell_style),
                     str(stats['correct']),
                     str(stats['wrong']),
                     str(stats['blank']),
-                    f"%{success}"
+                    f"%{success}",
+                    durum['label']
                 ])
+                row_colors.append(durum)
             
-            t = Table(table_data, colWidths=[300, 45, 45, 45, 50])
-            t.setStyle(TableStyle([
+            t = Table(table_data, colWidths=[240, 40, 40, 40, 45, 80])
+            style_cmds = [
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e0e7ff')),
                 ('FONTNAME', (0, 0), (-1, -1), PDF_FONT),
                 ('FONTSIZE', (0, 0), (-1, 0), 9),
@@ -4079,7 +4125,11 @@ def get_class_outcome_pdf():
                 ('VALIGN', (0, 0), (-1, -1), 'TOP'),
                 ('TOPPADDING', (0, 0), (-1, -1), 4),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-            ]))
+            ]
+            for i, d in enumerate(row_colors):
+                style_cmds.append(('BACKGROUND', (5, i+1), (5, i+1), d['bg']))
+                style_cmds.append(('TEXTCOLOR', (5, i+1), (5, i+1), d['color']))
+            t.setStyle(TableStyle(style_cmds))
             elements.append(t)
             elements.append(Spacer(1, 10))
         
@@ -5628,11 +5678,15 @@ def save_image_results():
                 user_id = None
                 if student_no:
                     cur.execute("""
-                        SELECT id FROM users WHERE role = 'student' AND username = %s
+                        SELECT id, full_name, class_name FROM users 
+                        WHERE role = 'student' AND CAST(student_no AS VARCHAR) = %s
+                        LIMIT 1
                     """, (student_no,))
                     user = cur.fetchone()
                     if user:
                         user_id = user['id']
+                        student_name = user['full_name']
+                        class_name = user['class_name'] or class_name
                 
                 totals = student.get('totals', {})
                 subjects = student.get('subjects', {})
@@ -6262,31 +6316,15 @@ def fetch_student_names_from_db(students):
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
         for student in students:
-            student_no = student.get('student_no', '')
-            csv_class = student.get('class_name', '')  # CSV'den gelen sınıf bilgisi
+            student_no = str(student.get('student_no', '')).lstrip('0') or '0'
             
-            if student_no:
-                result = None
-                
-                # Önce student_no + sınıf ile eşleştir (aynı numara farklı sınıflarda olabilir)
-                if csv_class:
-                    csv_class_normalized = csv_class.replace('/', '')  # "7/B" -> "7B"
-                    cur.execute("""
-                        SELECT full_name, class_name FROM users 
-                        WHERE role = 'student' AND student_no = %s
-                        AND (REPLACE(class_name, '/', '') = %s OR class_name = %s)
-                        LIMIT 1
-                    """, (student_no, csv_class_normalized, csv_class))
-                    result = cur.fetchone()
-                
-                # Sınıf eşleşmesi bulunamazsa sadece student_no ile ara
-                if not result:
-                    cur.execute("""
-                        SELECT full_name, class_name FROM users 
-                        WHERE role = 'student' AND student_no = %s
-                        LIMIT 1
-                    """, (student_no,))
-                    result = cur.fetchone()
+            if student_no and student_no != '0':
+                cur.execute("""
+                    SELECT full_name, class_name FROM users 
+                    WHERE role = 'student' AND CAST(student_no AS VARCHAR) = %s
+                    LIMIT 1
+                """, (student_no,))
+                result = cur.fetchone()
                 
                 if result:
                     student['name'] = result['full_name']
@@ -6303,6 +6341,58 @@ def fetch_student_names_from_db(students):
 
 
 # ==================== YENİ TABLO YAPISINA UYGUN ENDPOINT'LER ====================
+
+@report_cards_bp.route('/api/fix-student-names', methods=['POST'])
+@login_required
+def fix_student_names():
+    if current_user.role != 'admin':
+        return jsonify({"error": "Yetkisiz erişim"}), 403
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    try:
+        cur.execute("""
+            DELETE FROM report_card_results
+            WHERE id IN (
+                SELECT r.id FROM (
+                    SELECT id, ROW_NUMBER() OVER (PARTITION BY exam_id, student_no ORDER BY id) as rn
+                    FROM report_card_results
+                ) r WHERE r.rn > 1
+            )
+        """)
+        duplicates_removed = cur.rowcount
+
+        cur.execute("""
+            UPDATE report_card_results r
+            SET student_name = u.full_name,
+                class_name = u.class_name,
+                student_id = u.id
+            FROM users u
+            WHERE u.role = 'student'
+            AND CAST(u.student_no AS VARCHAR) = r.student_no
+        """)
+        updated = cur.rowcount
+        conn.commit()
+        
+        msg = f"{updated} kayıt güncellendi"
+        if duplicates_removed > 0:
+            msg += f", {duplicates_removed} çift kayıt silindi"
+        
+        return jsonify({
+            "success": True,
+            "updated_count": updated,
+            "duplicates_removed": duplicates_removed,
+            "message": msg
+        })
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"İsim düzeltme hatası: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
 
 @report_cards_bp.route('/api/exams-list', methods=['GET'])
 @login_required
@@ -6745,15 +6835,18 @@ def get_student_outcome_pdf_new(result_id):
                 else:
                     outcome_stats[outcome]['blank'] += 1
             
-            table_data = [['Kazanim', 'D', 'Y', 'B', '%']]
+            table_data = [['Kazanim', 'D', 'Y', 'B', '%', 'Durum']]
+            row_colors = []
             for outcome, stats in outcome_stats.items():
                 total = stats['correct'] + stats['wrong'] + stats['blank']
                 rate = round((stats['correct'] / total) * 100) if total > 0 else 0
-                table_data.append([outcome[:60], str(stats['correct']), str(stats['wrong']), str(stats['blank']), f'{rate}%'])
+                durum = get_kazanim_durum(rate)
+                table_data.append([outcome[:60], str(stats['correct']), str(stats['wrong']), str(stats['blank']), f'{rate}%', durum['label']])
+                row_colors.append(durum)
             
             if len(table_data) > 1:
-                t = Table(table_data, colWidths=[300, 40, 40, 40, 50])
-                t.setStyle(TableStyle([
+                t = Table(table_data, colWidths=[240, 35, 35, 35, 40, 80])
+                style_cmds = [
                     ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f3f4f6')),
                     ('FONTNAME', (0, 0), (-1, -1), PDF_FONT),
                     ('FONTSIZE', (0, 0), (-1, -1), 8),
@@ -6762,7 +6855,11 @@ def get_student_outcome_pdf_new(result_id):
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                     ('LEFTPADDING', (0, 0), (-1, -1), 4),
                     ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-                ]))
+                ]
+                for i, d in enumerate(row_colors):
+                    style_cmds.append(('BACKGROUND', (5, i+1), (5, i+1), d['bg']))
+                    style_cmds.append(('TEXTCOLOR', (5, i+1), (5, i+1), d['color']))
+                t.setStyle(TableStyle(style_cmds))
                 elements.append(t)
         
         doc.build(elements)
@@ -6853,15 +6950,18 @@ def get_class_outcome_pdf_new(exam_id):
         for subject_label, outcomes in outcome_totals.items():
             elements.append(Paragraph(subject_label, subject_style))
             
-            table_data = [['Kazanim', 'D', 'Y', 'B', '%']]
+            table_data = [['Kazanim', 'D', 'Y', 'B', '%', 'Durum']]
+            row_colors = []
             for outcome, stats in outcomes.items():
                 total = stats['correct'] + stats['wrong'] + stats['blank']
                 rate = round((stats['correct'] / total) * 100) if total > 0 else 0
-                table_data.append([outcome[:60], str(stats['correct']), str(stats['wrong']), str(stats['blank']), f'{rate}%'])
+                durum = get_kazanim_durum(rate)
+                table_data.append([outcome[:60], str(stats['correct']), str(stats['wrong']), str(stats['blank']), f'{rate}%', durum['label']])
+                row_colors.append(durum)
             
             if len(table_data) > 1:
-                t = Table(table_data, colWidths=[300, 40, 40, 40, 50])
-                t.setStyle(TableStyle([
+                t = Table(table_data, colWidths=[240, 35, 35, 35, 40, 80])
+                style_cmds = [
                     ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f3f4f6')),
                     ('FONTNAME', (0, 0), (-1, -1), PDF_FONT),
                     ('FONTSIZE', (0, 0), (-1, -1), 8),
@@ -6870,7 +6970,11 @@ def get_class_outcome_pdf_new(exam_id):
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                     ('LEFTPADDING', (0, 0), (-1, -1), 4),
                     ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-                ]))
+                ]
+                for i, d in enumerate(row_colors):
+                    style_cmds.append(('BACKGROUND', (5, i+1), (5, i+1), d['bg']))
+                    style_cmds.append(('TEXTCOLOR', (5, i+1), (5, i+1), d['color']))
+                t.setStyle(TableStyle(style_cmds))
                 elements.append(t)
         
         doc.build(elements)
@@ -7507,6 +7611,8 @@ def student_error_pdf_download(result_id):
             if result_class not in teacher_classes and result_class_normalized not in teacher_classes_normalized:
                 return jsonify({"error": "Bu sınıfa erişim yetkiniz yok"}), 403
         
+        subject_filter = request.args.get('subject', '')
+        
         subjects = result.get('subjects', {})
         if isinstance(subjects, str):
             subjects = json.loads(subjects)
@@ -7526,10 +7632,14 @@ def student_error_pdf_download(result_id):
         elements.append(Paragraph(f"Öğrenci: {result['student_name']}", normal_style))
         elements.append(Paragraph(f"Sınıf: {result['class_name']}", normal_style))
         elements.append(Paragraph(f"Sınav: {result['exam_name']}", normal_style))
+        if subject_filter:
+            elements.append(Paragraph(f"Ders: {subject_filter}", normal_style))
         elements.append(Spacer(1, 15))
         
         for subj_key, subj_data in subjects.items():
             subject_label = subj_data.get('subject_label', subj_key)
+            if subject_filter and subject_label != subject_filter:
+                continue
             errors = []
             
             for ans in subj_data.get('answers', []):
@@ -7638,6 +7748,8 @@ def student_outcome_pdf_download(result_id):
             if result_class not in teacher_classes and result_class_normalized not in teacher_classes_normalized:
                 return jsonify({"error": "Bu sınıfa erişim yetkiniz yok"}), 403
         
+        subject_filter = request.args.get('subject', '')
+        
         subjects = result.get('subjects', {})
         if isinstance(subjects, str):
             subjects = json.loads(subjects)
@@ -7657,10 +7769,14 @@ def student_outcome_pdf_download(result_id):
         elements.append(Paragraph(f"Öğrenci: {result['student_name']}", normal_style))
         elements.append(Paragraph(f"Sınıf: {result['class_name']}", normal_style))
         elements.append(Paragraph(f"Sınav: {result['exam_name']}", normal_style))
+        if subject_filter:
+            elements.append(Paragraph(f"Ders: {subject_filter}", normal_style))
         elements.append(Spacer(1, 15))
         
         for subj_key, subj_data in subjects.items():
             subject_label = subj_data.get('subject_label', subj_key)
+            if subject_filter and subject_label != subject_filter:
+                continue
             
             outcome_stats = {}
             for ans in subj_data.get('answers', []):
@@ -7680,14 +7796,17 @@ def student_outcome_pdf_download(result_id):
             if outcome_stats:
                 elements.append(Paragraph(subject_label, subject_style))
                 
-                table_data = [['Kazanım', 'D', 'Y', 'B', '%']]
+                table_data = [['Kazanım', 'D', 'Y', 'B', '%', 'Durum']]
+                row_colors = []
                 for outcome, stats in outcome_stats.items():
                     total = stats['total']
                     rate = round((stats['correct'] / total) * 100) if total > 0 else 0
-                    table_data.append([outcome[:60], str(stats['correct']), str(stats['wrong']), str(stats['blank']), f'%{rate}'])
+                    durum = get_kazanim_durum(rate)
+                    table_data.append([outcome[:60], str(stats['correct']), str(stats['wrong']), str(stats['blank']), f'%{rate}', durum['label']])
+                    row_colors.append(durum)
                 
-                t = Table(table_data, colWidths=[300, 40, 40, 40, 50])
-                t.setStyle(TableStyle([
+                t = Table(table_data, colWidths=[220, 35, 35, 35, 45, 80])
+                style_cmds = [
                     ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#dbeafe')),
                     ('FONTNAME', (0, 0), (-1, -1), PDF_FONT),
                     ('FONTSIZE', (0, 0), (-1, -1), 8),
@@ -7696,7 +7815,11 @@ def student_outcome_pdf_download(result_id):
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                     ('LEFTPADDING', (0, 0), (-1, -1), 4),
                     ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-                ]))
+                ]
+                for i, d in enumerate(row_colors):
+                    style_cmds.append(('BACKGROUND', (5, i+1), (5, i+1), d['bg']))
+                    style_cmds.append(('TEXTCOLOR', (5, i+1), (5, i+1), d['color']))
+                t.setStyle(TableStyle(style_cmds))
                 elements.append(t)
                 elements.append(Spacer(1, 10))
         
@@ -8037,33 +8160,43 @@ def student_multi_error():
 @report_cards_bp.route('/api/student-multi-outcome')
 @login_required
 def student_multi_outcome_by_no():
-    """Öğrenci çoklu sınav kazanım analizi (student_no ve exam_ids ile)"""
+    """Öğrenci çoklu sınav kazanım analizi (result_ids veya student_no+exam_ids ile)"""
     if current_user.role not in ['admin', 'teacher']:
         return jsonify({"error": "Yetkisiz erişim"}), 403
     
+    result_ids_str = request.args.get('result_ids', '')
     student_no = request.args.get('student_no', '')
     exam_ids_str = request.args.get('exam_ids', '')
-    
-    if not student_no:
-        return jsonify({"error": "Öğrenci numarası gerekli"}), 400
-    if not exam_ids_str:
-        return jsonify({"error": "Sınav ID'leri gerekli"}), 400
-    
-    exam_ids = [int(x) for x in exam_ids_str.split(',') if x.strip().isdigit()]
-    if not exam_ids:
-        return jsonify({"error": "Geçerli sınav ID'si yok"}), 400
     
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        placeholders = ','.join(['%s'] * len(exam_ids))
-        cur.execute(f"""
-            SELECT r.subjects, r.student_name, e.exam_name
-            FROM report_card_results r
-            JOIN report_card_exams e ON r.exam_id = e.id
-            WHERE r.student_no = %s AND r.exam_id IN ({placeholders})
-        """, [student_no] + exam_ids)
+        if result_ids_str:
+            result_ids = [int(x) for x in result_ids_str.split(',') if x.strip().isdigit()]
+            if not result_ids:
+                return jsonify({"error": "Geçerli sonuç ID'si yok"}), 400
+            placeholders = ','.join(['%s'] * len(result_ids))
+            cur.execute(f"""
+                SELECT r.subjects, r.student_name, e.exam_name
+                FROM report_card_results r
+                JOIN report_card_exams e ON r.exam_id = e.id
+                WHERE r.id IN ({placeholders})
+            """, result_ids)
+        elif student_no and exam_ids_str:
+            exam_ids = [int(x) for x in exam_ids_str.split(',') if x.strip().isdigit()]
+            if not exam_ids:
+                return jsonify({"error": "Geçerli sınav ID'si yok"}), 400
+            placeholders = ','.join(['%s'] * len(exam_ids))
+            cur.execute(f"""
+                SELECT r.subjects, r.student_name, e.exam_name
+                FROM report_card_results r
+                JOIN report_card_exams e ON r.exam_id = e.id
+                WHERE r.student_no = %s AND r.exam_id IN ({placeholders})
+            """, [student_no] + exam_ids)
+        else:
+            return jsonify({"error": "result_ids veya student_no+exam_ids gerekli"}), 400
+        
         results = cur.fetchall()
         
         if not results:
@@ -8099,7 +8232,7 @@ def student_multi_outcome_by_no():
         for subj, outcomes in outcome_data.items():
             sorted_outcome_data[subj] = dict(sorted(outcomes.items(), key=lambda x: parse_outcome_code(x[0])))
         
-        return jsonify({"student_name": student_name, "outcomes": sorted_outcome_data})
+        return jsonify({"student_name": student_name, "outcome_data": sorted_outcome_data})
         
     except Exception as e:
         logger.error(f"Öğrenci kazanım analizi hatası: {e}")
@@ -8112,33 +8245,43 @@ def student_multi_outcome_by_no():
 @report_cards_bp.route('/api/student-multi-error')
 @login_required
 def student_multi_error_by_no():
-    """Öğrenci çoklu sınav hata karnesi (student_no ve exam_ids ile)"""
+    """Öğrenci çoklu sınav hata karnesi (result_ids veya student_no+exam_ids ile)"""
     if current_user.role not in ['admin', 'teacher']:
         return jsonify({"error": "Yetkisiz erişim"}), 403
     
+    result_ids_str = request.args.get('result_ids', '')
     student_no = request.args.get('student_no', '')
     exam_ids_str = request.args.get('exam_ids', '')
-    
-    if not student_no:
-        return jsonify({"error": "Öğrenci numarası gerekli"}), 400
-    if not exam_ids_str:
-        return jsonify({"error": "Sınav ID'leri gerekli"}), 400
-    
-    exam_ids = [int(x) for x in exam_ids_str.split(',') if x.strip().isdigit()]
-    if not exam_ids:
-        return jsonify({"error": "Geçerli sınav ID'si yok"}), 400
     
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        placeholders = ','.join(['%s'] * len(exam_ids))
-        cur.execute(f"""
-            SELECT r.subjects, r.student_name, e.exam_name
-            FROM report_card_results r
-            JOIN report_card_exams e ON r.exam_id = e.id
-            WHERE r.student_no = %s AND r.exam_id IN ({placeholders})
-        """, [student_no] + exam_ids)
+        if result_ids_str:
+            result_ids = [int(x) for x in result_ids_str.split(',') if x.strip().isdigit()]
+            if not result_ids:
+                return jsonify({"error": "Geçerli sonuç ID'si yok"}), 400
+            placeholders = ','.join(['%s'] * len(result_ids))
+            cur.execute(f"""
+                SELECT r.subjects, r.student_name, e.exam_name
+                FROM report_card_results r
+                JOIN report_card_exams e ON r.exam_id = e.id
+                WHERE r.id IN ({placeholders})
+            """, result_ids)
+        elif student_no and exam_ids_str:
+            exam_ids = [int(x) for x in exam_ids_str.split(',') if x.strip().isdigit()]
+            if not exam_ids:
+                return jsonify({"error": "Geçerli sınav ID'si yok"}), 400
+            placeholders = ','.join(['%s'] * len(exam_ids))
+            cur.execute(f"""
+                SELECT r.subjects, r.student_name, e.exam_name
+                FROM report_card_results r
+                JOIN report_card_exams e ON r.exam_id = e.id
+                WHERE r.student_no = %s AND r.exam_id IN ({placeholders})
+            """, [student_no] + exam_ids)
+        else:
+            return jsonify({"error": "result_ids veya student_no+exam_ids gerekli"}), 400
+        
         results = cur.fetchall()
         
         if not results:
@@ -8194,10 +8337,25 @@ def student_multi_error_by_no():
         for subj in error_list.values():
             subj.sort(key=lambda x: parse_outcome_code(x.get('outcome', '')))
         
+        errors_by_subject = {}
+        for subj_label, errors in error_list.items():
+            errors_by_subject[subj_label] = {
+                'subject_label': subj_label,
+                'errors': errors
+            }
+        
+        total_questions = total_correct + total_wrong + total_blank
+        net = total_correct - (total_wrong / 3) if total_wrong > 0 else total_correct
+        
         return jsonify({
             "student_name": student_name,
-            "errors": error_list,
-            "summary": {"correct": total_correct, "wrong": total_wrong, "blank": total_blank}
+            "errors_by_subject": errors_by_subject,
+            "totals": {
+                "correct": total_correct,
+                "wrong": total_wrong,
+                "blank": total_blank,
+                "net": round(net, 2)
+            }
         })
         
     except Exception as e:
@@ -8241,6 +8399,7 @@ def student_multi_outcome_pdf():
         
         student_name = results[0].get('student_name', student_no)
         class_name = results[0].get('class_name', '')
+        subject_filter = request.args.get('subject', '')
         
         outcome_data = {}
         for result in results:
@@ -8250,6 +8409,8 @@ def student_multi_outcome_pdf():
             
             for subj_key, subj_data in subjects.items():
                 subject_label = subj_data.get('subject_label', subj_key)
+                if subject_filter and subject_label != subject_filter:
+                    continue
                 if subject_label not in outcome_data:
                     outcome_data[subject_label] = {}
                 
@@ -8284,33 +8445,43 @@ def student_multi_outcome_pdf():
         
         elements.append(Paragraph("ÖĞRENCİ KAZANIM ANALİZİ", title_style))
         elements.append(Paragraph(f"Öğrenci: {student_name} | Sınıf: {class_name}", normal_style))
+        if subject_filter:
+            elements.append(Paragraph(f"Ders: {subject_filter}", normal_style))
         elements.append(Paragraph(f"Tarih: {datetime.now().strftime('%d.%m.%Y')}", normal_style))
         elements.append(Spacer(1, 12))
         
         for subject, outcomes in sorted_outcome_data.items():
             elements.append(Paragraph(subject, subject_style))
             
-            table_data = [['Kazanım', 'Doğru', 'Yanlış', 'Boş', 'Başarı %']]
+            table_data = [['Kazanım', 'Doğru', 'Yanlış', 'Boş', 'Başarı %', 'Durum']]
+            row_colors = []
             for outcome, stats in outcomes.items():
                 total = stats['total'] or 1
                 success = round((stats['correct'] / total * 100), 1)
+                durum = get_kazanim_durum(success)
                 table_data.append([
                     Paragraph(outcome, cell_style),
                     str(stats['correct']),
                     str(stats['wrong']),
                     str(stats['blank']),
-                    f"%{success}"
+                    f"%{success}",
+                    durum['label']
                 ])
+                row_colors.append(durum)
             
-            t = Table(table_data, colWidths=[300, 40, 40, 40, 50])
-            t.setStyle(TableStyle([
+            t = Table(table_data, colWidths=[240, 35, 35, 35, 40, 80])
+            style_cmds = [
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e0e7ff')),
                 ('FONTNAME', (0, 0), (-1, -1), PDF_FONT),
                 ('FONTSIZE', (0, 0), (-1, -1), 8),
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
                 ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ]))
+            ]
+            for i, d in enumerate(row_colors):
+                style_cmds.append(('BACKGROUND', (5, i+1), (5, i+1), d['bg']))
+                style_cmds.append(('TEXTCOLOR', (5, i+1), (5, i+1), d['color']))
+            t.setStyle(TableStyle(style_cmds))
             elements.append(t)
             elements.append(Spacer(1, 8))
         
@@ -8337,6 +8508,7 @@ def student_multi_error_pdf():
     
     student_no = request.args.get('student_no', '')
     exam_ids_str = request.args.get('exam_ids', '')
+    subject_filter = request.args.get('subject', '')
     
     if not student_no or not exam_ids_str:
         return jsonify({"error": "Parametreler eksik"}), 400
@@ -8375,6 +8547,8 @@ def student_multi_error_pdf():
             
             for subj_key, subj_data in subjects.items():
                 subject_label = subj_data.get('subject_label', subj_key)
+                if subject_filter and subject_label != subject_filter:
+                    continue
                 if subject_label not in error_list:
                     error_list[subject_label] = []
                 
@@ -8421,6 +8595,8 @@ def student_multi_error_pdf():
         
         elements.append(Paragraph("HATA KARNESİ", title_style))
         elements.append(Paragraph(f"Öğrenci: {student_name} | Sınıf: {class_name}", normal_style))
+        if subject_filter:
+            elements.append(Paragraph(f"Ders: {subject_filter}", normal_style))
         elements.append(Paragraph(f"Toplam: {total_correct} Doğru / {total_wrong} Hatalı / {total_blank} Boş", normal_style))
         elements.append(Paragraph(f"Tarih: {datetime.now().strftime('%d.%m.%Y')}", normal_style))
         elements.append(Spacer(1, 12))
@@ -8605,6 +8781,7 @@ def class_error_pdf_multi():
     
     exam_ids_str = request.args.get('exam_ids', '')
     class_name = request.args.get('class_name', '')
+    subject_filter = request.args.get('subject', '')
     
     if not exam_ids_str:
         return jsonify({"error": "Sınav ID'leri gerekli"}), 400
@@ -8644,22 +8821,25 @@ def class_error_pdf_multi():
         student_count = len(results)
         
         for result in results:
+            exam_name = result.get('exam_name', '')
             subjects = result.get('subjects') or {}
             if isinstance(subjects, str):
                 subjects = json.loads(subjects)
             
             for subj_key, subj_data in subjects.items():
                 subject_label = subj_data.get('subject_label', subj_key)
+                if subject_filter and subject_label != subject_filter:
+                    continue
                 if subject_label not in error_stats:
                     error_stats[subject_label] = {}
                 
                 for ans in subj_data.get('answers', []):
                     q_no = ans.get('question_number', '-')
                     outcome = ans.get('outcome', '') or '-'
-                    key = f"{q_no}_{outcome}"
+                    key = f"{exam_name}|{q_no}_{outcome}"
                     
                     if key not in error_stats[subject_label]:
-                        error_stats[subject_label][key] = {'question_number': q_no, 'outcome': outcome, 'correct': 0, 'wrong': 0, 'blank': 0, 'total': 0}
+                        error_stats[subject_label][key] = {'exam_name': exam_name, 'question_number': q_no, 'outcome': outcome, 'correct': 0, 'wrong': 0, 'blank': 0, 'total': 0}
                     
                     error_stats[subject_label][key]['total'] += 1
                     if ans.get('status') == 'correct':
@@ -8686,6 +8866,8 @@ def class_error_pdf_multi():
         
         elements.append(Paragraph("SINIF HATA ANALİZİ", title_style))
         elements.append(Paragraph(f"Sınıf: {class_name or 'Tüm Sınıflar'} | Öğrenci: {student_count}", normal_style))
+        if subject_filter:
+            elements.append(Paragraph(f"Ders: {subject_filter}", normal_style))
         elements.append(Paragraph(f"Toplam: {total_correct} Doğru / {total_wrong} Yanlış / {total_blank} Boş", normal_style))
         elements.append(Paragraph(f"Tarih: {datetime.now().strftime('%d.%m.%Y')}", normal_style))
         elements.append(Spacer(1, 15))
@@ -8695,11 +8877,12 @@ def class_error_pdf_multi():
             
             sorted_questions = sorted(questions.values(), key=lambda x: x['wrong'] + x['blank'], reverse=True)
             
-            table_data = [['S.No', 'Kazanım', 'Yanlış', 'Boş', 'Hata %']]
+            table_data = [['Sınav', 'S.No', 'Kazanım', 'Yanlış', 'Boş', 'Hata %']]
             for q in sorted_questions[:20]:
                 total = q['total']
                 error_rate = round(((q['wrong'] + q['blank']) / total * 100), 1) if total > 0 else 0
                 table_data.append([
+                    Paragraph(q.get('exam_name', ''), cell_style),
                     str(q['question_number']),
                     Paragraph(q['outcome'], cell_style),
                     str(q['wrong']),
@@ -8707,14 +8890,14 @@ def class_error_pdf_multi():
                     f"%{error_rate}"
                 ])
             
-            t = Table(table_data, colWidths=[40, 305, 45, 45, 50])
+            t = Table(table_data, colWidths=[80, 30, 240, 40, 40, 50])
             t.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#fee2e2')),
                 ('FONTNAME', (0, 0), (-1, -1), PDF_FONT),
                 ('FONTSIZE', (0, 0), (-1, 0), 9),
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#fca5a5')),
-                ('ALIGN', (0, 0), (0, -1), 'CENTER'),
-                ('ALIGN', (2, 0), (-1, -1), 'CENTER'),
+                ('ALIGN', (1, 0), (1, -1), 'CENTER'),
+                ('ALIGN', (3, 0), (-1, -1), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, -1), 'TOP'),
                 ('TOPPADDING', (0, 0), (-1, -1), 4),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
@@ -8923,6 +9106,7 @@ def my_multi_outcome_pdf():
         return jsonify({"error": "Yetkisiz erişim"}), 403
     
     result_ids_str = request.args.get('result_ids', '')
+    subject_filter = request.args.get('subject', '')
     if not result_ids_str:
         return jsonify({"error": "Sonuç ID'leri gerekli"}), 400
     
@@ -8959,6 +9143,8 @@ def my_multi_outcome_pdf():
             
             for subj_key, subj_data in subjects.items():
                 subject_label = subj_data.get('subject_label', subj_key)
+                if subject_filter and subject_label != subject_filter:
+                    continue
                 if subject_label not in outcome_data:
                     outcome_data[subject_label] = {}
                 
@@ -8989,33 +9175,43 @@ def my_multi_outcome_pdf():
         
         elements.append(Paragraph("KAZANIM ANALİZİ", title_style))
         elements.append(Paragraph(f"Öğrenci: {student_name} | Sınıf: {class_name}", normal_style))
+        if subject_filter:
+            elements.append(Paragraph(f"Ders: {subject_filter}", normal_style))
         elements.append(Paragraph(f"Tarih: {datetime.now().strftime('%d.%m.%Y')}", normal_style))
         elements.append(Spacer(1, 12))
         
         for subject, outcomes in outcome_data.items():
             elements.append(Paragraph(subject, subject_style))
             
-            table_data = [['Kazanım', 'Doğru', 'Hatalı', 'Boş', 'Başarı %']]
+            table_data = [['Kazanım', 'Doğru', 'Hatalı', 'Boş', 'Başarı %', 'Durum']]
+            row_colors = []
             for outcome, stats in outcomes.items():
                 total = stats['total'] or 1
                 success = round((stats['correct'] / total * 100), 1)
+                durum = get_kazanim_durum(success)
                 table_data.append([
                     Paragraph(outcome, cell_style),
                     str(stats['correct']),
                     str(stats['wrong']),
                     str(stats['blank']),
-                    f"%{success}"
+                    f"%{success}",
+                    durum['label']
                 ])
+                row_colors.append(durum)
             
-            t = Table(table_data, colWidths=[300, 40, 40, 40, 50])
-            t.setStyle(TableStyle([
+            t = Table(table_data, colWidths=[220, 35, 35, 35, 45, 80])
+            style_cmds = [
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e0e7ff')),
                 ('FONTNAME', (0, 0), (-1, -1), PDF_FONT),
                 ('FONTSIZE', (0, 0), (-1, -1), 8),
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
                 ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ]))
+            ]
+            for i, d in enumerate(row_colors):
+                style_cmds.append(('BACKGROUND', (5, i+1), (5, i+1), d['bg']))
+                style_cmds.append(('TEXTCOLOR', (5, i+1), (5, i+1), d['color']))
+            t.setStyle(TableStyle(style_cmds))
             elements.append(t)
             elements.append(Spacer(1, 8))
         
@@ -9041,6 +9237,7 @@ def my_multi_error_pdf():
         return jsonify({"error": "Yetkisiz erişim"}), 403
     
     result_ids_str = request.args.get('result_ids', '')
+    subject_filter = request.args.get('subject', '')
     if not result_ids_str:
         return jsonify({"error": "Sonuç ID'leri gerekli"}), 400
     
@@ -9082,6 +9279,8 @@ def my_multi_error_pdf():
             
             for subj_key, subj_data in subjects.items():
                 subject_label = subj_data.get('subject_label', subj_key)
+                if subject_filter and subject_label != subject_filter:
+                    continue
                 if subject_label not in error_list:
                     error_list[subject_label] = []
                 
@@ -9128,6 +9327,8 @@ def my_multi_error_pdf():
         
         elements.append(Paragraph("HATA KARNESİ", title_style))
         elements.append(Paragraph(f"Öğrenci: {student_name} | Sınıf: {class_name}", normal_style))
+        if subject_filter:
+            elements.append(Paragraph(f"Ders: {subject_filter}", normal_style))
         elements.append(Paragraph(f"Toplam: {total_correct} Doğru / {total_wrong} Hatalı / {total_blank} Boş", normal_style))
         elements.append(Paragraph(f"Tarih: {datetime.now().strftime('%d.%m.%Y')}", normal_style))
         elements.append(Spacer(1, 12))
@@ -9222,6 +9423,1096 @@ def my_progress():
     except Exception as e:
         logger.error(f"Öğrenci gelişim raporu hatası: {e}")
         return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
+# ==================== SINAV GÖRSELLERİ YÖNETİMİ (ADMIN) ====================
+
+@report_cards_bp.route('/admin/exam-images')
+@login_required
+def admin_exam_images_page():
+    if current_user.role != 'admin':
+        return "Yetkisiz", 403
+    return render_template('admin_exam_images.html')
+
+@report_cards_bp.route('/api/exam-images/exams')
+@login_required
+def get_exams_for_images():
+    if current_user.role != 'admin':
+        return jsonify({"error": "Yetkisiz"}), 403
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT e.id, e.exam_name, e.grade_level, e.exam_date, e.image_booklet_type,
+                   (SELECT COUNT(*) FROM report_card_exam_pages p WHERE p.exam_id = e.id) as page_count,
+                   (SELECT COUNT(*) FROM report_card_question_regions q WHERE q.exam_id = e.id) as region_count
+            FROM report_card_exams e
+            ORDER BY e.created_at DESC
+        """)
+        exams = cur.fetchall()
+        for e in exams:
+            if e.get('exam_date'):
+                e['exam_date'] = e['exam_date'].isoformat()
+        return jsonify({"exams": exams})
+    except Exception as ex:
+        logger.error(f"Sınav listesi hatası: {ex}")
+        return jsonify({"error": str(ex)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@report_cards_bp.route('/api/exam-images/<int:exam_id>/upload', methods=['POST'])
+@login_required
+def upload_exam_images(exam_id):
+    if current_user.role != 'admin':
+        return jsonify({"error": "Yetkisiz"}), 403
+    
+    from app import object_storage
+    
+    files = request.files.getlist('files')
+    if not files:
+        return jsonify({"error": "Dosya seçilmedi"}), 400
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    try:
+        cur.execute("SELECT MAX(page_number) as max_page FROM report_card_exam_pages WHERE exam_id = %s", (exam_id,))
+        row = cur.fetchone()
+        next_page = (row['max_page'] or 0) + 1
+        
+        uploaded_pages = []
+        
+        for file in files:
+            filename = file.filename.lower()
+            file_bytes = file.read()
+            
+            if filename.endswith('.pdf'):
+                try:
+                    import fitz
+                    pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
+                    for page_idx in range(len(pdf_doc)):
+                        page = pdf_doc[page_idx]
+                        mat = fitz.Matrix(200/72, 200/72)
+                        pix = page.get_pixmap(matrix=mat)
+                        img_bytes = pix.tobytes("png")
+                        
+                        image_key = f"exam_pages/{exam_id}/{uuid.uuid4().hex}.png"
+                        buf = BytesIO(img_bytes)
+                        
+                        if object_storage.is_available():
+                            object_storage.upload_from_file(buf, image_key)
+                        
+                        cur.execute("""
+                            INSERT INTO report_card_exam_pages (exam_id, page_number, image_key, width_px, height_px)
+                            VALUES (%s, %s, %s, %s, %s) RETURNING id
+                        """, (exam_id, next_page, image_key, pix.width, pix.height))
+                        page_id = cur.fetchone()['id']
+                        uploaded_pages.append({'id': page_id, 'page_number': next_page, 'width': pix.width, 'height': pix.height})
+                        next_page += 1
+                    pdf_doc.close()
+                except Exception as pdf_err:
+                    logger.error(f"PDF dönüştürme hatası: {pdf_err}")
+                    return jsonify({"error": f"PDF işlenirken hata: {str(pdf_err)}"}), 500
+            
+            elif filename.endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                img = PILImage.open(BytesIO(file_bytes))
+                if img.mode == 'RGBA':
+                    img = img.convert('RGB')
+                
+                image_key = f"exam_pages/{exam_id}/{uuid.uuid4().hex}.png"
+                buf = BytesIO()
+                img.save(buf, format='PNG')
+                buf.seek(0)
+                
+                if object_storage.is_available():
+                    object_storage.upload_from_file(buf, image_key)
+                
+                cur.execute("""
+                    INSERT INTO report_card_exam_pages (exam_id, page_number, image_key, width_px, height_px)
+                    VALUES (%s, %s, %s, %s, %s) RETURNING id
+                """, (exam_id, next_page, image_key, img.width, img.height))
+                page_id = cur.fetchone()['id']
+                uploaded_pages.append({'id': page_id, 'page_number': next_page, 'width': img.width, 'height': img.height})
+                next_page += 1
+            else:
+                continue
+        
+        conn.commit()
+        return jsonify({"success": True, "pages": uploaded_pages, "message": f"{len(uploaded_pages)} sayfa yüklendi"})
+    
+    except Exception as ex:
+        conn.rollback()
+        logger.error(f"Görsel yükleme hatası: {ex}")
+        return jsonify({"error": str(ex)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@report_cards_bp.route('/api/exam-images/<int:exam_id>/pages')
+@login_required
+def get_exam_pages(exam_id):
+    if current_user.role != 'admin':
+        return jsonify({"error": "Yetkisiz"}), 403
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT id, page_number, image_key, width_px, height_px
+            FROM report_card_exam_pages
+            WHERE exam_id = %s ORDER BY page_number
+        """, (exam_id,))
+        pages = cur.fetchall()
+        
+        cur.execute("""
+            SELECT id, page_id, subject_key, question_number, y_start_norm, y_end_norm, x_start_norm, x_end_norm
+            FROM report_card_question_regions
+            WHERE exam_id = %s ORDER BY subject_key, question_number
+        """, (exam_id,))
+        regions = cur.fetchall()
+        
+        cur.execute("SELECT question_counts, answer_key_a, image_booklet_type FROM report_card_exams WHERE id = %s", (exam_id,))
+        exam = cur.fetchone()
+        
+        subject_questions = {}
+        subject_names = {
+            'turkce': 'Türkçe', 'matematik': 'Matematik', 'fen': 'Fen Bilimleri',
+            'inkilap': 'İnkılap Tarihi', 'din': 'Din Kültürü', 'ingilizce': 'İngilizce',
+            'sosyal': 'Sosyal Bilgiler'
+        }
+        if exam and exam.get('question_counts'):
+            qc = exam['question_counts']
+            if isinstance(qc, str):
+                qc = json.loads(qc)
+            for subj_key, count in qc.items():
+                if isinstance(count, (int, float)) and count > 0:
+                    subject_questions[subj_key] = {
+                        'label': subject_names.get(subj_key, subj_key),
+                        'count': int(count)
+                    }
+        
+        if not subject_questions:
+            cur.execute("""
+                SELECT subjects FROM report_card_results WHERE exam_id = %s LIMIT 1
+            """, (exam_id,))
+            sample = cur.fetchone()
+            if sample and sample.get('subjects'):
+                subjs = sample['subjects']
+                if isinstance(subjs, str):
+                    subjs = json.loads(subjs)
+                for subj_key, subj_data in subjs.items():
+                    qcount = subj_data.get('question_count', 0)
+                    if not qcount:
+                        qcount = len(subj_data.get('answers', []))
+                    if qcount > 0:
+                        label = subj_data.get('subject_label', subject_names.get(subj_key, subj_key))
+                        subject_questions[subj_key] = {
+                            'label': label,
+                            'count': int(qcount)
+                        }
+        
+        image_booklet = exam.get('image_booklet_type', 'A') if exam else 'A'
+        return jsonify({"pages": pages, "regions": regions, "subject_questions": subject_questions, "image_booklet_type": image_booklet})
+    except Exception as ex:
+        logger.error(f"Sayfa listesi hatası: {ex}")
+        return jsonify({"error": str(ex)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@report_cards_bp.route('/api/exam-images/<int:exam_id>/set-booklet', methods=['POST'])
+@login_required
+def set_image_booklet_type(exam_id):
+    if current_user.role != 'admin':
+        return jsonify({"error": "Yetkisiz"}), 403
+    data = request.get_json()
+    booklet = data.get('booklet_type', 'A').upper()
+    if booklet not in ('A', 'B'):
+        return jsonify({"error": "Geçersiz kitapçık tipi"}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("UPDATE report_card_exams SET image_booklet_type = %s WHERE id = %s", (booklet, exam_id))
+        conn.commit()
+        return jsonify({"success": True, "booklet_type": booklet})
+    except Exception as ex:
+        conn.rollback()
+        return jsonify({"error": str(ex)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@report_cards_bp.route('/api/exam-images/page-image/<int:page_id>')
+@login_required
+def get_page_image(page_id):
+    if current_user.role != 'admin':
+        return "Yetkisiz", 403
+    from app import object_storage
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT image_key FROM report_card_exam_pages WHERE id = %s", (page_id,))
+        page = cur.fetchone()
+        if not page:
+            return "Sayfa bulunamadı", 404
+        
+        if object_storage.is_available():
+            data, content_type = object_storage.download_as_bytes(page['image_key'])
+            return send_file(BytesIO(data), mimetype=content_type or 'image/png')
+        
+        return "Dosya bulunamadı", 404
+    except Exception as ex:
+        logger.error(f"Sayfa görseli hatası: {ex}")
+        return "Hata", 500
+    finally:
+        cur.close()
+        conn.close()
+
+@report_cards_bp.route('/api/exam-images/<int:exam_id>/regions', methods=['POST'])
+@login_required
+def save_question_regions(exam_id):
+    if current_user.role != 'admin':
+        return jsonify({"error": "Yetkisiz"}), 403
+    
+    data = request.get_json()
+    regions = data.get('regions', [])
+    
+    if not regions:
+        return jsonify({"error": "Bölge bilgisi gerekli"}), 400
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    try:
+        cur.execute("DELETE FROM report_card_question_regions WHERE exam_id = %s", (exam_id,))
+        
+        for r in regions:
+            cur.execute("""
+                INSERT INTO report_card_question_regions 
+                (exam_id, page_id, subject_key, question_number, y_start_norm, y_end_norm, x_start_norm, x_end_norm)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                exam_id, r['page_id'], r['subject_key'], r['question_number'],
+                r['y_start'], r['y_end'],
+                r.get('x_start', 0), r.get('x_end', 1)
+            ))
+        
+        conn.commit()
+        return jsonify({"success": True, "message": f"{len(regions)} soru bölgesi kaydedildi"})
+    except Exception as ex:
+        conn.rollback()
+        logger.error(f"Bölge kaydetme hatası: {ex}")
+        return jsonify({"error": str(ex)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@report_cards_bp.route('/api/exam-images/<int:exam_id>/delete-page/<int:page_id>', methods=['DELETE'])
+@login_required
+def delete_exam_page(exam_id, page_id):
+    if current_user.role != 'admin':
+        return jsonify({"error": "Yetkisiz"}), 403
+    
+    from app import object_storage
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT image_key FROM report_card_exam_pages WHERE id = %s AND exam_id = %s", (page_id, exam_id))
+        page = cur.fetchone()
+        if not page:
+            return jsonify({"error": "Sayfa bulunamadı"}), 404
+        
+        try:
+            if object_storage.is_available():
+                object_storage.client.delete(page['image_key'])
+        except:
+            pass
+        
+        cur.execute("DELETE FROM report_card_question_regions WHERE page_id = %s", (page_id,))
+        cur.execute("DELETE FROM report_card_exam_pages WHERE id = %s", (page_id,))
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as ex:
+        conn.rollback()
+        logger.error(f"Sayfa silme hatası: {ex}")
+        return jsonify({"error": str(ex)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
+# ==================== HATALI SORU PDF OLUŞTURMA ====================
+
+def build_booklet_question_mapping(cur, exam_id, from_booklet, to_booklet):
+    """Build a mapping from one booklet's question numbers to another's.
+    Returns dict: {subject_key: {from_q_num: to_q_num, ...}, ...}
+    
+    Strategy 1: Use kazanimlar from fmt_answer_keys (has soru/b_soru pairs) - most reliable
+    Strategy 2: Derive from student results by matching (outcome, correct_answer) pairs
+    """
+    if from_booklet == to_booklet:
+        return {}
+    
+    mapping = {}
+    
+    cur.execute("SELECT exam_name, grade_level FROM report_card_exams WHERE id = %s", (exam_id,))
+    exam_info = cur.fetchone()
+    if not exam_info:
+        return {}
+    
+    cur.execute("""
+        SELECT kazanimlar FROM fmt_answer_keys 
+        WHERE exam_name = %s AND kazanimlar IS NOT NULL
+        LIMIT 1
+    """, (exam_info['exam_name'],))
+    ak_row = cur.fetchone()
+    
+    if ak_row and ak_row.get('kazanimlar'):
+        kaz = ak_row['kazanimlar']
+        if isinstance(kaz, str):
+            kaz = json.loads(kaz)
+        for subj_key, questions in kaz.items():
+            subj_map = {}
+            for q in questions:
+                a_num = q.get('soru')
+                b_num = q.get('b_soru')
+                if a_num and b_num:
+                    if from_booklet == 'A' and to_booklet == 'B':
+                        subj_map[a_num] = b_num
+                    else:
+                        subj_map[b_num] = a_num
+            if subj_map:
+                mapping[subj_key] = subj_map
+        if mapping:
+            logger.info(f"Kitapçık eşleştirme (kazanımlar): {from_booklet}→{to_booklet}, {sum(len(v) for v in mapping.values())} soru eşleştirildi")
+            return mapping
+    
+    cur.execute("""
+        SELECT subjects FROM report_card_results 
+        WHERE exam_id = %s AND subjects::text LIKE %s 
+        LIMIT 1
+    """, (exam_id, f'%"booklet_type": "{from_booklet}"%'))
+    from_row = cur.fetchone()
+    
+    cur.execute("""
+        SELECT subjects FROM report_card_results 
+        WHERE exam_id = %s AND subjects::text LIKE %s 
+        LIMIT 1
+    """, (exam_id, f'%"booklet_type": "{to_booklet}"%'))
+    to_row = cur.fetchone()
+    
+    if from_row and to_row:
+        from_subjs = from_row['subjects']
+        to_subjs = to_row['subjects']
+        if isinstance(from_subjs, str):
+            from_subjs = json.loads(from_subjs)
+        if isinstance(to_subjs, str):
+            to_subjs = json.loads(to_subjs)
+        
+        for subj_key in from_subjs:
+            if subj_key not in to_subjs:
+                continue
+            from_answers = from_subjs[subj_key].get('answers', [])
+            to_answers = to_subjs[subj_key].get('answers', [])
+            
+            to_by_oca = {}
+            for ta in to_answers:
+                key = (ta.get('outcome', ''), ta.get('correct_answer', ''))
+                if key[0] and key[1]:
+                    if key not in to_by_oca:
+                        to_by_oca[key] = []
+                    to_by_oca[key].append(ta.get('question_number'))
+            
+            subj_map = {}
+            used_to_nums = set()
+            for fa in from_answers:
+                key = (fa.get('outcome', ''), fa.get('correct_answer', ''))
+                if not key[0] or not key[1]:
+                    continue
+                candidates = to_by_oca.get(key, [])
+                for c in candidates:
+                    if c not in used_to_nums:
+                        subj_map[fa.get('question_number')] = c
+                        used_to_nums.add(c)
+                        break
+            if subj_map:
+                mapping[subj_key] = subj_map
+        
+        if mapping:
+            total = sum(len(v) for v in mapping.values())
+            logger.info(f"Kitapçık eşleştirme (sonuçlardan): {from_booklet}→{to_booklet}, {total} soru eşleştirildi")
+    else:
+        logger.warning(f"Kitapçık eşleştirme yapılamadı: exam_id={exam_id}, {from_booklet}→{to_booklet}, her iki kitapçıktan sonuç bulunamadı")
+    
+    return mapping
+
+
+def _build_tekrar_coz_pdf(student_name, sections):
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, KeepTogether
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.platypus import Image as RLImage
+    
+    pdf_buffer = BytesIO()
+    doc = SimpleDocTemplate(pdf_buffer, pagesize=A4, topMargin=25, bottomMargin=25, leftMargin=30, rightMargin=30)
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    page_width = A4[0] - 60
+    col_gap = 12
+    col_width = (page_width - col_gap) / 2
+    max_single_col_height = 200
+    
+    try:
+        title_style = ParagraphStyle('WTTitle', parent=styles['Title'], fontName='DejaVuSans', fontSize=13, spaceAfter=4)
+        subtitle_style = ParagraphStyle('WTSub', parent=styles['Normal'], fontName='DejaVuSans', fontSize=9, spaceAfter=8, textColor=colors.grey)
+        subject_style = ParagraphStyle('WTSubject', parent=styles['Heading2'], fontName='DejaVuSans-Bold', fontSize=11, spaceBefore=10, spaceAfter=4, textColor=colors.HexColor('#7c3aed'))
+        q_label_style = ParagraphStyle('WTQLabel', parent=styles['Normal'], fontName='DejaVuSans', fontSize=7, textColor=colors.HexColor('#4b5563'), spaceAfter=2)
+        warn_style = ParagraphStyle('WTWarn', parent=styles['Normal'], fontName='DejaVuSans', fontSize=7, textColor=colors.HexColor('#dc2626'), spaceAfter=6)
+        exam_header_style = ParagraphStyle('WTExamH', parent=styles['Heading2'], fontName='DejaVuSans-Bold', fontSize=11, spaceBefore=6, spaceAfter=4, textColor=colors.HexColor('#1e40af'))
+    except:
+        title_style = ParagraphStyle('WTTitle', parent=styles['Title'], fontSize=13, spaceAfter=4)
+        subtitle_style = ParagraphStyle('WTSub', parent=styles['Normal'], fontSize=9, spaceAfter=8, textColor=colors.grey)
+        subject_style = ParagraphStyle('WTSubject', parent=styles['Heading2'], fontSize=11, spaceBefore=10, spaceAfter=4, textColor=colors.HexColor('#7c3aed'))
+        q_label_style = ParagraphStyle('WTQLabel', parent=styles['Normal'], fontSize=7, textColor=colors.HexColor('#4b5563'), spaceAfter=2)
+        warn_style = ParagraphStyle('WTWarn', parent=styles['Normal'], fontSize=7, textColor=colors.HexColor('#dc2626'), spaceAfter=6)
+        exam_header_style = ParagraphStyle('WTExamH', parent=styles['Heading2'], fontSize=11, spaceBefore=6, spaceAfter=4, textColor=colors.HexColor('#1e40af'))
+    
+    total_questions = sum(len(s['items']) for s in sections)
+    exam_names = ', '.join(s['exam_name'] for s in sections)
+    elements.append(Paragraph(f"Tekrar Coz - {student_name}", title_style))
+    elements.append(Paragraph(f"{exam_names} | {total_questions} soru", subtitle_style))
+    elements.append(Spacer(1, 6))
+    
+    for sec_idx, section in enumerate(sections):
+        if sec_idx > 0:
+            elements.append(PageBreak())
+        
+        if len(sections) > 1:
+            elements.append(Paragraph(f"📝 {section['exam_name']}", exam_header_style))
+        
+        if section.get('warning'):
+            elements.append(Paragraph(f"Not: {section['warning']}", warn_style))
+        
+        items = section['items']
+        if not items:
+            continue
+        
+        current_subject = None
+        pending_pair = []
+        
+        def flush_pair():
+            if not pending_pair:
+                return
+            if len(pending_pair) == 1:
+                q = pending_pair[0]
+                q['image_buf'].seek(0)
+                iw, ih = q['width'], q['height']
+                if ih > max_single_col_height or iw > col_width:
+                    scale = min(page_width / iw, 1.0)
+                    dw = iw * scale
+                    dh = ih * scale
+                    max_h = A4[1] * 0.5
+                    if dh > max_h:
+                        s2 = max_h / dh
+                        dw *= s2
+                        dh *= s2
+                    block = [
+                        Paragraph(f"S{q['question_number']}", q_label_style),
+                        RLImage(q['image_buf'], width=dw, height=dh)
+                    ]
+                else:
+                    scale = min(col_width / iw, 1.0)
+                    dw = iw * scale
+                    dh = ih * scale
+                    block = [
+                        Paragraph(f"S{q['question_number']}", q_label_style),
+                        RLImage(q['image_buf'], width=dw, height=dh)
+                    ]
+                elements.append(KeepTogether(block))
+                elements.append(Spacer(1, 6))
+            else:
+                row_data = []
+                for q in pending_pair:
+                    q['image_buf'].seek(0)
+                    iw, ih = q['width'], q['height']
+                    scale = min(col_width / iw, 1.0)
+                    dw = iw * scale
+                    dh = ih * scale
+                    max_h = A4[1] * 0.4
+                    if dh > max_h:
+                        s2 = max_h / dh
+                        dw *= s2
+                        dh *= s2
+                    label = Paragraph(f"S{q['question_number']}", q_label_style)
+                    img = RLImage(q['image_buf'], width=dw, height=dh)
+                    row_data.append(KeepTogether([label, img]))
+                
+                while len(row_data) < 2:
+                    row_data.append(Paragraph('', q_label_style))
+                
+                tbl = Table([row_data], colWidths=[col_width, col_width], spaceBefore=2, spaceAfter=6)
+                tbl.setStyle(TableStyle([
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+                    ('TOPPADDING', (0, 0), (-1, -1), 0),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+                ]))
+                elements.append(tbl)
+            pending_pair.clear()
+        
+        for item in items:
+            if item['subject_label'] != current_subject:
+                flush_pair()
+                current_subject = item['subject_label']
+                elements.append(Paragraph(f"{current_subject}", subject_style))
+            
+            iw, ih = item['width'], item['height']
+            is_tall = ih > max_single_col_height or (ih / max(iw, 1)) > 2.5
+            is_wide = iw > col_width * 1.2
+            
+            if is_tall or is_wide:
+                flush_pair()
+                pending_pair.append(item)
+                flush_pair()
+            else:
+                pending_pair.append(item)
+                if len(pending_pair) >= 2:
+                    flush_pair()
+        
+        flush_pair()
+    
+    try:
+        doc.build(elements)
+    except Exception as build_err:
+        logger.error(f"PDF build error (retrying without KeepTogether): {build_err}")
+        pdf_buffer = BytesIO()
+        doc2 = SimpleDocTemplate(pdf_buffer, pagesize=A4, topMargin=25, bottomMargin=25, leftMargin=30, rightMargin=30)
+        flat_elements = []
+        for el in elements:
+            if isinstance(el, KeepTogether):
+                flat_elements.extend(el._content if hasattr(el, '_content') else [el])
+            else:
+                flat_elements.append(el)
+        doc2.build(flat_elements)
+    
+    pdf_buffer.seek(0)
+    return pdf_buffer
+
+
+@report_cards_bp.route('/api/wrong-questions-pdf-check/<int:result_id>')
+@login_required
+def check_wrong_questions_pdf(result_id):
+    if current_user.role not in ['admin', 'teacher']:
+        return jsonify({"available": False, "error": "Yetkisiz erişim"}), 403
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT r.id, r.subjects, r.exam_id
+            FROM report_card_results r
+            WHERE r.id = %s
+        """, (result_id,))
+        result = cur.fetchone()
+        if not result:
+            return jsonify({"available": False, "error": "Sonuç bulunamadı"})
+        
+        cur.execute("SELECT COUNT(*) as cnt FROM report_card_question_regions WHERE exam_id = %s", (result['exam_id'],))
+        if cur.fetchone()['cnt'] == 0:
+            return jsonify({"available": False, "error": "Bu sınav için soru görselleri henüz işaretlenmemiş"})
+        
+        subjects = result.get('subjects') or {}
+        if isinstance(subjects, str):
+            subjects = json.loads(subjects)
+        
+        has_wrong = False
+        for subj_data in subjects.values():
+            for ans in subj_data.get('answers', []):
+                if ans.get('status') in ('wrong', 'blank'):
+                    has_wrong = True
+                    break
+            if has_wrong:
+                break
+        
+        if not has_wrong:
+            return jsonify({"available": False, "error": "Bu öğrencinin hatalı sorusu bulunmuyor"})
+        
+        return jsonify({"available": True})
+    finally:
+        cur.close()
+        conn.close()
+
+
+@report_cards_bp.route('/api/wrong-questions-pdf/<int:result_id>')
+@login_required
+def generate_wrong_questions_pdf(result_id):
+    if current_user.role not in ['admin', 'teacher']:
+        return jsonify({"error": "Yetkisiz erişim"}), 403
+    from app import object_storage
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    try:
+        cur.execute("""
+            SELECT r.*, e.exam_name, e.id as exam_id, e.image_booklet_type
+            FROM report_card_results r
+            JOIN report_card_exams e ON r.exam_id = e.id
+            WHERE r.id = %s
+        """, (result_id,))
+        result = cur.fetchone()
+        
+        if not result:
+            return jsonify({"error": "Sonuç bulunamadı"}), 404
+        
+        if current_user.role == 'student':
+            if current_user.student_no != result.get('student_no'):
+                return jsonify({"error": "Yetkisiz erişim"}), 403
+        elif current_user.role == 'teacher':
+            cur.execute("SELECT class_name FROM teacher_classes WHERE teacher_id = %s", (current_user.id,))
+            allowed = [row['class_name'] for row in cur.fetchall()]
+            allowed_norm = [c.replace('/', '') for c in allowed]
+            result_class = result.get('class_name', '')
+            if result_class not in allowed and result_class.replace('/', '') not in allowed_norm:
+                return jsonify({"error": "Yetkisiz erişim"}), 403
+        elif current_user.role != 'admin':
+            return jsonify({"error": "Yetkisiz erişim"}), 403
+        
+        exam_id = result['exam_id']
+        
+        cur.execute("""
+            SELECT COUNT(*) as cnt FROM report_card_question_regions WHERE exam_id = %s
+        """, (exam_id,))
+        if cur.fetchone()['cnt'] == 0:
+            return jsonify({"error": "Bu sınav için soru görselleri henüz işaretlenmemiş"}), 404
+        
+        subjects = result.get('subjects') or {}
+        if isinstance(subjects, str):
+            subjects = json.loads(subjects)
+        
+        wrong_questions = []
+        for subj_key, subj_data in subjects.items():
+            for ans in subj_data.get('answers', []):
+                if ans.get('status') in ('wrong', 'blank'):
+                    wrong_questions.append({
+                        'subject_key': subj_key,
+                        'question_number': ans.get('question_number'),
+                        'subject_label': subj_data.get('subject_label', subj_key),
+                        'outcome': ans.get('outcome', ''),
+                        'status': ans.get('status'),
+                        'student_answer': ans.get('student_answer', '-'),
+                        'correct_answer': ans.get('correct_answer', '-')
+                    })
+        
+        if not wrong_questions:
+            return jsonify({"error": "Hatalı soru bulunamadı"}), 404
+        
+        image_booklet = result.get('image_booklet_type', 'A') or 'A'
+        
+        student_booklet = result.get('booklet_type', '') or ''
+        if not student_booklet:
+            first_subj = next(iter(subjects.values()), {})
+            student_booklet = first_subj.get('booklet_type', 'A') or 'A'
+        student_booklet = student_booklet.upper()
+        
+        q_mapping = {}
+        if student_booklet != image_booklet:
+            q_mapping = build_booklet_question_mapping(cur, exam_id, student_booklet, image_booklet)
+            logger.info(f"Kitapçık dönüşümü: öğrenci={student_booklet} → görsel={image_booklet}, mapping dersleri: {list(q_mapping.keys())}")
+        
+        cur.execute("""
+            SELECT qr.*, ep.image_key, ep.width_px, ep.height_px
+            FROM report_card_question_regions qr
+            JOIN report_card_exam_pages ep ON qr.page_id = ep.id
+            WHERE qr.exam_id = %s
+        """, (exam_id,))
+        regions = cur.fetchall()
+        
+        region_map = {}
+        for r in regions:
+            key = f"{r['subject_key']}_{r['question_number']}"
+            region_map[key] = r
+        
+        page_images_cache = {}
+        
+        marked_subjects = set()
+        for rk in region_map:
+            subj = rk.rsplit('_', 1)[0]
+            marked_subjects.add(subj)
+        
+        cropped_items = []
+        no_region_count = 0
+        no_mapping_count = 0
+        for wq in wrong_questions:
+            lookup_q_num = wq['question_number']
+            mapping_failed = False
+            if q_mapping and wq['subject_key'] in q_mapping:
+                mapped = q_mapping[wq['subject_key']].get(lookup_q_num)
+                if mapped:
+                    lookup_q_num = mapped
+                else:
+                    mapping_failed = True
+            elif student_booklet != image_booklet and wq['subject_key'] not in (q_mapping or {}):
+                mapping_failed = True
+            
+            key = f"{wq['subject_key']}_{lookup_q_num}"
+            region = region_map.get(key)
+            if not region:
+                if mapping_failed:
+                    no_mapping_count += 1
+                    logger.debug(f"Eşleştirme başarısız: {wq['subject_key']} S{wq['question_number']} (A→B mapping yok)")
+                elif wq['subject_key'] not in marked_subjects:
+                    no_region_count += 1
+                    logger.debug(f"Bölge yok: {wq['subject_key']} S{lookup_q_num} (ders için görsel işaretlenmemiş)")
+                else:
+                    no_region_count += 1
+                    logger.debug(f"Bölge yok: {wq['subject_key']} S{lookup_q_num} (soru işaretlenmemiş)")
+                continue
+            
+            image_key = region['image_key']
+            if image_key not in page_images_cache:
+                if object_storage.is_available():
+                    data, _ = object_storage.download_as_bytes(image_key)
+                    page_images_cache[image_key] = PILImage.open(BytesIO(data))
+                else:
+                    continue
+            
+            page_img = page_images_cache[image_key]
+            w, h = page_img.size
+            
+            x1 = int(region['x_start_norm'] * w)
+            y1 = int(region['y_start_norm'] * h)
+            x2 = int(region['x_end_norm'] * w)
+            y2 = int(region['y_end_norm'] * h)
+            
+            cropped = page_img.crop((x1, y1, x2, y2))
+            
+            max_dim = 800
+            cw, ch = cropped.size
+            if cw > max_dim or ch > max_dim:
+                scale = min(max_dim / cw, max_dim / ch)
+                new_w = int(cw * scale)
+                new_h = int(ch * scale)
+                cropped = cropped.resize((new_w, new_h), PILImage.LANCZOS)
+            
+            crop_buf = BytesIO()
+            if cropped.mode == 'RGBA':
+                cropped = cropped.convert('RGB')
+            cropped.save(crop_buf, format='JPEG', quality=80, optimize=True)
+            crop_buf.seek(0)
+            
+            cropped_items.append({
+                'image_buf': crop_buf,
+                'width': cropped.width,
+                'height': cropped.height,
+                'subject_label': wq['subject_label'],
+                'question_number': wq['question_number'],
+                'outcome': wq['outcome'],
+                'status': wq['status'],
+                'student_answer': wq['student_answer'],
+                'correct_answer': wq['correct_answer']
+            })
+        
+        missing_total = len(wrong_questions) - len(cropped_items)
+        
+        logger.info(f"Tekrar Çöz PDF: {len(wrong_questions)} hatalı soru, {len(cropped_items)} görsel bulundu, {no_region_count} bölge yok, {no_mapping_count} eşleştirme başarısız")
+        
+        if not cropped_items:
+            if no_region_count > 0 and no_mapping_count == 0:
+                return jsonify({"error": "Soru gorselleri henuz isaretlenmemis. Admin panelinden soru bolgelerini isaretleyin."}), 404
+            if student_booklet != image_booklet and not q_mapping:
+                return jsonify({"error": f"Kitapcik eslestirmesi yapilamadi. Ogrenci {student_booklet} kitapcigi, gorsel {image_booklet} kitapcigi. Lutfen kazanimli cevap anahtari yukleyin."}), 404
+            return jsonify({"error": "Eslesen soru gorseli bulunamadi"}), 404
+        
+        student_name = result.get('student_name', '')
+        exam_name = result.get('exam_name', '')
+        
+        warning_text = None
+        if missing_total > 0:
+            warnings = []
+            if no_region_count > 0:
+                warnings.append(f"{no_region_count} sorunun gorseli henuz isaretlenmemis")
+            if no_mapping_count > 0:
+                warnings.append(f"{no_mapping_count} soru kitapcik farkindan dolayi eslestirilemedi (Ogrenci: {student_booklet}, Gorsel: {image_booklet})")
+            if warnings:
+                warning_text = ' | '.join(warnings)
+        
+        sections = [{'exam_name': exam_name, 'items': cropped_items, 'warning': warning_text}]
+        
+        logger.info(f"Tekrar Çöz PDF oluşturuluyor: {student_name}, {len(cropped_items)} görsel")
+        pdf_buffer = _build_tekrar_coz_pdf(student_name, sections)
+        pdf_size = pdf_buffer.getbuffer().nbytes
+        logger.info(f"Tekrar Çöz PDF oluşturuldu: {pdf_size} bytes ({pdf_size/1024:.0f} KB)")
+        
+        safe_name = student_name.replace(' ', '_')
+        filename = f"Tekrar_Coz_{safe_name}_{exam_name.replace(' ', '_')}.pdf"
+        
+        response = make_response(pdf_buffer.getvalue())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        response.headers['Content-Length'] = pdf_size
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        return response
+    
+    except Exception as ex:
+        logger.error(f"Hatalı soru PDF hatası: {ex}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"PDF oluşturma hatası: {str(ex)}"}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+def _extract_wrong_question_images(result, cur, object_storage):
+    exam_id = result['exam_id']
+    
+    subjects = result.get('subjects') or {}
+    if isinstance(subjects, str):
+        subjects = json.loads(subjects)
+    
+    wrong_questions = []
+    for subj_key, subj_data in subjects.items():
+        for ans in subj_data.get('answers', []):
+            if ans.get('status') in ('wrong', 'blank'):
+                wrong_questions.append({
+                    'subject_key': subj_key,
+                    'question_number': ans.get('question_number'),
+                    'subject_label': subj_data.get('subject_label', subj_key),
+                    'outcome': ans.get('outcome', ''),
+                    'status': ans.get('status'),
+                    'student_answer': ans.get('student_answer', '-'),
+                    'correct_answer': ans.get('correct_answer', '-')
+                })
+    
+    if not wrong_questions:
+        return [], None
+    
+    image_booklet = result.get('image_booklet_type', 'A') or 'A'
+    student_booklet = result.get('booklet_type', '') or ''
+    if not student_booklet:
+        first_subj = next(iter(subjects.values()), {})
+        student_booklet = first_subj.get('booklet_type', 'A') or 'A'
+    student_booklet = student_booklet.upper()
+    
+    q_mapping = {}
+    if student_booklet != image_booklet:
+        q_mapping = build_booklet_question_mapping(cur, exam_id, student_booklet, image_booklet)
+    
+    cur.execute("""
+        SELECT qr.*, ep.image_key, ep.width_px, ep.height_px
+        FROM report_card_question_regions qr
+        JOIN report_card_exam_pages ep ON qr.page_id = ep.id
+        WHERE qr.exam_id = %s
+    """, (exam_id,))
+    regions = cur.fetchall()
+    
+    region_map = {}
+    for r in regions:
+        key = f"{r['subject_key']}_{r['question_number']}"
+        region_map[key] = r
+    
+    marked_subjects = set()
+    for rk in region_map:
+        subj = rk.rsplit('_', 1)[0]
+        marked_subjects.add(subj)
+    
+    page_images_cache = {}
+    cropped_items = []
+    no_region_count = 0
+    no_mapping_count = 0
+    download_fail_count = 0
+    
+    for wq in wrong_questions:
+        lookup_q_num = wq['question_number']
+        mapping_failed = False
+        if q_mapping and wq['subject_key'] in q_mapping:
+            mapped = q_mapping[wq['subject_key']].get(lookup_q_num)
+            if mapped:
+                lookup_q_num = mapped
+            else:
+                mapping_failed = True
+        elif student_booklet != image_booklet and wq['subject_key'] not in (q_mapping or {}):
+            mapping_failed = True
+        
+        key = f"{wq['subject_key']}_{lookup_q_num}"
+        region = region_map.get(key)
+        if not region:
+            if mapping_failed:
+                no_mapping_count += 1
+            else:
+                no_region_count += 1
+            continue
+        
+        image_key = region['image_key']
+        if image_key not in page_images_cache:
+            try:
+                if object_storage.is_available():
+                    data, _ = object_storage.download_as_bytes(image_key)
+                    from PIL import Image as PILImage
+                    page_images_cache[image_key] = PILImage.open(BytesIO(data))
+                else:
+                    download_fail_count += 1
+                    page_images_cache[image_key] = None
+            except Exception as dl_err:
+                logger.warning(f"Image download failed for {image_key}: {dl_err}")
+                download_fail_count += 1
+                page_images_cache[image_key] = None
+        
+        if page_images_cache.get(image_key) is None:
+            continue
+        
+        page_img = page_images_cache[image_key]
+        w, h = page_img.size
+        
+        x1 = int(region['x_start_norm'] * w)
+        y1 = int(region['y_start_norm'] * h)
+        x2 = int(region['x_end_norm'] * w)
+        y2 = int(region['y_end_norm'] * h)
+        
+        cropped = page_img.crop((x1, y1, x2, y2))
+        
+        max_dim = 800
+        cw, ch = cropped.size
+        if cw > max_dim or ch > max_dim:
+            scale = min(max_dim / cw, max_dim / ch)
+            new_w = int(cw * scale)
+            new_h = int(ch * scale)
+            cropped = cropped.resize((new_w, new_h), PILImage.LANCZOS)
+        
+        crop_buf = BytesIO()
+        if cropped.mode == 'RGBA':
+            cropped = cropped.convert('RGB')
+        cropped.save(crop_buf, format='JPEG', quality=80, optimize=True)
+        crop_buf.seek(0)
+        
+        cropped_items.append({
+            'image_buf': crop_buf,
+            'width': cropped.width,
+            'height': cropped.height,
+            'subject_label': wq['subject_label'],
+            'question_number': wq['question_number'],
+            'outcome': wq['outcome'],
+            'status': wq['status'],
+            'student_answer': wq['student_answer'],
+            'correct_answer': wq['correct_answer']
+        })
+    
+    warning_text = None
+    missing_total = len(wrong_questions) - len(cropped_items)
+    if missing_total > 0:
+        warnings = []
+        if no_region_count > 0:
+            warnings.append(f"{no_region_count} sorunun gorseli isaretlenmemis")
+        if no_mapping_count > 0:
+            warnings.append(f"{no_mapping_count} soru kitapcik farkindan eslestirilemedi")
+        if download_fail_count > 0:
+            warnings.append(f"{download_fail_count} gorsel indirilemedi")
+        if warnings:
+            warning_text = ' | '.join(warnings)
+    
+    return cropped_items, warning_text
+
+
+@report_cards_bp.route('/api/wrong-questions-pdf-multi', methods=['POST'])
+@login_required
+def generate_wrong_questions_pdf_multi():
+    if current_user.role not in ['admin', 'teacher']:
+        return jsonify({"error": "Yetkisiz erişim"}), 403
+    from app import object_storage
+    
+    data = request.get_json()
+    result_ids = data.get('result_ids', [])
+    
+    if not result_ids or len(result_ids) == 0:
+        return jsonify({"error": "Sinav seciniz"}), 400
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    try:
+        allowed_classes = None
+        if current_user.role == 'teacher':
+            cur.execute("SELECT class_name FROM teacher_classes WHERE teacher_id = %s", (current_user.id,))
+            allowed_classes = [row['class_name'] for row in cur.fetchall()]
+            allowed_classes_norm = [c.replace('/', '') for c in allowed_classes]
+        
+        sections = []
+        student_name = ''
+        
+        for result_id in result_ids:
+            cur.execute("""
+                SELECT r.*, e.exam_name, e.id as exam_id, e.image_booklet_type
+                FROM report_card_results r
+                JOIN report_card_exams e ON r.exam_id = e.id
+                WHERE r.id = %s
+            """, (result_id,))
+            result = cur.fetchone()
+            
+            if not result:
+                continue
+            
+            if allowed_classes is not None:
+                result_class = result.get('class_name', '')
+                if result_class not in allowed_classes and result_class.replace('/', '') not in allowed_classes_norm:
+                    continue
+            
+            if not student_name:
+                student_name = result.get('student_name', '')
+            
+            cur.execute("SELECT COUNT(*) as cnt FROM report_card_question_regions WHERE exam_id = %s", (result['exam_id'],))
+            if cur.fetchone()['cnt'] == 0:
+                continue
+            
+            cropped_items, warning_text = _extract_wrong_question_images(result, cur, object_storage)
+            
+            if cropped_items:
+                sections.append({
+                    'exam_name': result.get('exam_name', ''),
+                    'items': cropped_items,
+                    'warning': warning_text
+                })
+        
+        if not sections:
+            return jsonify({"error": "Secilen sinavlarda gorsel bulunamadi"}), 404
+        
+        pdf_buffer = _build_tekrar_coz_pdf(student_name, sections)
+        
+        safe_name = student_name.replace(' ', '_')
+        filename = f"Tekrar_Coz_{safe_name}_Toplu.pdf"
+        
+        return send_file(pdf_buffer, mimetype='application/pdf', as_attachment=True, download_name=filename)
+    
+    except Exception as ex:
+        logger.error(f"Toplu Tekrar Çöz PDF hatası: {ex}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(ex)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
+@report_cards_bp.route('/api/exam-images/<int:exam_id>/has-images')
+@login_required
+def check_exam_has_images(exam_id):
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT COUNT(*) as cnt FROM report_card_question_regions WHERE exam_id = %s", (exam_id,))
+        count = cur.fetchone()['cnt']
+        return jsonify({"has_images": count > 0})
+    except:
+        return jsonify({"has_images": False})
     finally:
         cur.close()
         conn.close()

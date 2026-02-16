@@ -39,6 +39,25 @@ The system is built on Python 3.11 with the Flask 3.1.2 framework. It uses a Pos
 - `student_questions`: Student inquiries to teachers
 - `practice_exams`: LGS practice exam records
 
+## Recent Changes (2026-02-15)
+- ✅ **Kelebek Sınav Düzeni Sistemi:** Deneme sınavları için otomatik oturma planı oluşturma
+  - Yeni Blueprint: `routes/kelebek.py` - Kelebek algoritması, Excel şablon, PDF çıktı
+  - Yeni Template: `templates/kelebek.html` - Plan oluşturma, öğrenci yükleme, sonuç görüntüleme
+  - Yeni Tablolar: `kelebek_plans`, `kelebek_rooms`, `kelebek_participants`, `kelebek_assignments`
+  - Kelebek kuralları: Aynı sınıf seviyesinden öğrenciler yan yana oturmaz
+  - Sınav sınıfı/ders sınıfı otomatik belirleme (öncelik kurallarıyla)
+  - Yedek Sınıf daima sınav sınıfı, 8D/7C daima ders sınıfı
+  - Excel ile sınava girecek öğrenci yükleme, PDF salon listeleri indirme
+- ✅ **Kazanım Durum Sütunu Düzeltmesi:** Tüm PDF endpoint'lerinde Durum sütunu (Türkçe karakterlerle)
+
+## Recent Changes (2026-02-11)
+- ✅ **Tekrar Çöz PDF Sistemi:** Sınav görselleri yükleme ve soru bölgesi işaretleme (admin), hatalı soruları otomatik kırpıp PDF oluşturma
+- ✅ **Yeni Tablolar:** report_card_exam_pages (sınav sayfa görselleri), report_card_question_regions (soru bölgeleri)
+- ✅ **Admin Sınav Görselleri Sayfası:** PDF/görsel yükleme, sayfa üzerinde tıklayarak soru başlangıç/bitiş noktası belirleme
+- ✅ **Tekrar Çöz PDF Butonu:** Öğretmen ve öğrenci karne analizinde her sınav sonucu için "Tekrar Çöz" PDF indirme
+- ✅ **Din Kültürü Filtre Düzeltmesi:** Karne analizi ders filtresinde "Din Kültürü ve Ahlak Bilgisi" → "Din Kültürü" olarak düzeltildi
+- ✅ **Öğrenci Çoklu Sınav API Düzeltmesi:** result_ids parametresi desteği eklendi, response format uyumsuzlukları giderildi
+
 ## Recent Changes (2025-12-25)
 - ✅ **Modal Uyarı Penceresi:** Toplu deneme yükleme sonuçları artık modal pencerede gösteriliyor, "Tamam" butonuna basılmadan kapanmıyor
 - ✅ **Okul Numarası Desteği:** users tablosuna student_no sütunu eklendi
@@ -80,6 +99,8 @@ The system is built on Python 3.11 with the Flask 3.1.2 framework. It uses a Pos
 - ✅ **PDF Report Stability:** Removed RotatedParagraph class that caused PDF corruption; using multi-line text instead
 - ✅ **APK Password Persistence Guide:** Created `APK_PASSWORD_PERSISTENCE.md` with TinyDB/SharedPreferences implementation steps for auto-login
 
+- ✅ **LGS Sonuç Çekme Sistemi:** Admin paneline MEB sonuç sayfasından toplu LGS sonucu çekme özelliği eklendi. Güvenlik kodlu ve kodsuz hibrit mod, Excel şablon indirme/yükleme, sonuç veritabanı kaydı ve Excel dışa aktarma desteği.
+
 ## Known Issues & Workarounds
 - **APK PDF Opening:** Resolved - Now returns PNG format instead of PDF
 - **APK Password Persistence:** Requires Kodular implementation using TinyDB component (see `APK_PASSWORD_PERSISTENCE.md`)
@@ -100,3 +121,5 @@ The system is built on Python 3.11 with the Flask 3.1.2 framework. It uses a Pos
 - **matplotlib:** Chart generation for Python analytics.
 - **google-cloud-storage:** Object storage integration.
 - **replit.object_storage:** Replit native object storage client.
+- **beautifulsoup4:** HTML parsing for MEB sonuç sayfası scraping.
+- **requests:** HTTP library for MEB API communication.

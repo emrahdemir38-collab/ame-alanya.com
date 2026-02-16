@@ -265,6 +265,13 @@
             <span class="action-card-arrow">→</span>
         </a>
         
+        <a href="/admin/kelebek/" class="action-card" style="background: linear-gradient(135deg, #7c3aed, #a855f7);">
+            <div class="action-card-icon">🦋</div>
+            <h3>Kelebek Sınav Düzeni</h3>
+            <p>Sınav oturma planı oluşturun</p>
+            <span class="action-card-arrow">→</span>
+        </a>
+        
         <a href="/admin/surveys" class="action-card bg-gradient-cyan">
             <div class="action-card-icon">📋</div>
             <h3>Anket Yönetimi</h3>
@@ -286,6 +293,39 @@
             <span class="action-card-arrow">→</span>
         </a>
         
+    </div>
+
+    <!-- DB Sync Section -->
+    <div style="margin-top: 32px;">
+        <div class="card-modern">
+            <div class="card-header">
+                <h3>🔄 Veritabanı Senkronizasyonu</h3>
+            </div>
+            <div class="card-body">
+                <p style="color: var(--gray-600); margin-bottom: 16px;">
+                    Production veritabanındaki verileri development ortamına kopyalar. Bu işlem mevcut development verilerini siler ve production'daki güncel verilerle değiştirir.
+                </p>
+                <button id="syncDbBtn" onclick="syncDatabase()" style="
+                    background: linear-gradient(135deg, #f59e0b, #d97706);
+                    color: white;
+                    border: none;
+                    padding: 12px 28px;
+                    border-radius: 12px;
+                    font-size: 0.95rem;
+                    font-weight: 600;
+                    cursor: pointer;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                    transition: all 0.3s;
+                    box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+                ">
+                    🔄 Senkronizasyonu Başlat
+                </button>
+                <div id="syncStatus" style="margin-top: 16px; display: none;"></div>
+                <div id="syncResults" style="margin-top: 16px; display: none;"></div>
+            </div>
+        </div>
     </div>
 
     <!-- Two Column Layout -->
@@ -479,5 +519,72 @@
     
     // Refresh every 30 seconds
     setInterval(loadStats, 30000);
+
+    async function syncDatabase() {
+        const btn = document.getElementById('syncDbBtn');
+        const statusDiv = document.getElementById('syncStatus');
+        const resultsDiv = document.getElementById('syncResults');
+
+        if (!confirm('Production veritabanindaki veriler development ortamina kopyalanacak. Mevcut development verileri silinecek. Devam etmek istiyor musunuz?')) {
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Senkronize ediliyor...';
+        btn.style.opacity = '0.7';
+        statusDiv.style.display = 'block';
+        statusDiv.innerHTML = '<div style="display:flex;align-items:center;gap:8px;color:var(--primary-600);"><div class="spinner" style="width:20px;height:20px;border:3px solid var(--gray-200);border-top:3px solid var(--primary-600);border-radius:50%;animation:spin 1s linear infinite;"></div> Veriler aktariliyor, lutfen bekleyin...</div>';
+        resultsDiv.style.display = 'none';
+
+        try {
+            const response = await fetch('/api/admin/sync-db', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                statusDiv.innerHTML = '<div style="color:var(--success-600);font-weight:600;">✅ Senkronizasyon basariyla tamamlandi!</div>';
+                
+                let tableHtml = '<table style="width:100%;border-collapse:collapse;margin-top:8px;">';
+                tableHtml += '<thead><tr style="background:var(--gray-50);"><th style="padding:8px 12px;text-align:left;font-size:0.85rem;color:var(--gray-600);border-bottom:2px solid var(--gray-200);">Tablo</th><th style="padding:8px 12px;text-align:center;font-size:0.85rem;color:var(--gray-600);border-bottom:2px solid var(--gray-200);">Production</th><th style="padding:8px 12px;text-align:center;font-size:0.85rem;color:var(--gray-600);border-bottom:2px solid var(--gray-200);">Development</th><th style="padding:8px 12px;text-align:center;font-size:0.85rem;color:var(--gray-600);border-bottom:2px solid var(--gray-200);">Durum</th></tr></thead><tbody>';
+
+                const tableNames = {
+                    'users': 'Kullanicilar',
+                    'classes': 'Siniflar',
+                    'teacher_classes': 'Ogretmen-Sinif',
+                    'report_card_exams': 'Karne Sinavlari',
+                    'report_card_exam_pages': 'Sinav Sayfalari',
+                    'report_card_question_regions': 'Soru Bolgeleri',
+                    'report_card_results': 'Sonuclar',
+                    'book_entries': 'Kitap Kayitlari'
+                };
+
+                for (const [table, counts] of Object.entries(data.results)) {
+                    const ok = counts.prod === counts.dev;
+                    tableHtml += `<tr style="border-bottom:1px solid var(--gray-100);">
+                        <td style="padding:8px 12px;font-weight:500;">${tableNames[table] || table}</td>
+                        <td style="padding:8px 12px;text-align:center;">${counts.prod}</td>
+                        <td style="padding:8px 12px;text-align:center;">${counts.dev}</td>
+                        <td style="padding:8px 12px;text-align:center;">${ok ? '✅' : '⚠️'}</td>
+                    </tr>`;
+                }
+                tableHtml += '</tbody></table>';
+                resultsDiv.innerHTML = tableHtml;
+                resultsDiv.style.display = 'block';
+            } else {
+                statusDiv.innerHTML = `<div style="color:var(--danger-600);font-weight:600;">❌ Hata: ${data.error}</div>`;
+            }
+        } catch (error) {
+            statusDiv.innerHTML = `<div style="color:var(--danger-600);font-weight:600;">❌ Baglanti hatasi: ${error.message}</div>`;
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '🔄 Senkronizasyonu Baslat';
+            btn.style.opacity = '1';
+        }
+    }
 </script>
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
 {% endblock %}

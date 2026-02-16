@@ -1,0 +1,898 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}LGS Sonuç Çekme{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/admin-modern.css">
+<style>
+    .lgs-container { padding: 24px; max-width: 1400px; margin: 0 auto; }
+
+    .lgs-header {
+        background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%);
+        border-radius: 16px; padding: 28px 32px; color: white; margin-bottom: 24px;
+        box-shadow: 0 8px 32px rgba(30, 64, 175, 0.3);
+    }
+    .lgs-header h1 { font-size: 1.6rem; font-weight: 800; margin-bottom: 6px; }
+    .lgs-header p { opacity: 0.85; font-size: 0.95rem; }
+
+    .card {
+        background: white; border-radius: 16px; padding: 24px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-bottom: 20px;
+        border: 1px solid #e5e7eb;
+    }
+    .card-title {
+        font-size: 1.15rem; font-weight: 700; color: #1e293b;
+        margin-bottom: 16px; display: flex; align-items: center; gap: 10px;
+    }
+    .card-title .icon { font-size: 1.4rem; }
+
+    .step-tabs {
+        display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;
+    }
+    .step-tab {
+        padding: 10px 20px; border-radius: 10px; border: 2px solid #e5e7eb;
+        background: white; font-weight: 600; cursor: pointer; transition: all 0.2s;
+        font-size: 0.9rem; display: flex; align-items: center; gap: 8px;
+    }
+    .step-tab.active { background: #1e40af; color: white; border-color: #1e40af; }
+    .step-tab.completed { background: #10b981; color: white; border-color: #10b981; }
+    .step-tab .step-num {
+        width: 24px; height: 24px; border-radius: 50%; background: rgba(0,0,0,0.1);
+        display: flex; align-items: center; justify-content: center; font-size: 0.8rem;
+    }
+    .step-tab.active .step-num { background: rgba(255,255,255,0.3); }
+
+    .step-content { display: none; }
+    .step-content.active { display: block; }
+
+    .upload-zone {
+        border: 2px dashed #cbd5e1; border-radius: 12px; padding: 40px;
+        text-align: center; cursor: pointer; transition: all 0.3s;
+        background: #f8fafc;
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+        border-color: #3b82f6; background: #eff6ff;
+    }
+    .upload-zone .icon { font-size: 3rem; margin-bottom: 12px; }
+    .upload-zone .text { font-size: 1rem; color: #64748b; }
+    .upload-zone .sub-text { font-size: 0.85rem; color: #94a3b8; margin-top: 6px; }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #1e40af, #3b82f6); color: white;
+        border: none; padding: 10px 24px; border-radius: 10px; font-weight: 600;
+        cursor: pointer; transition: all 0.2s; font-size: 0.9rem;
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(59,130,246,0.3); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .btn-success {
+        background: linear-gradient(135deg, #059669, #10b981); color: white;
+        border: none; padding: 10px 24px; border-radius: 10px; font-weight: 600;
+        cursor: pointer; transition: all 0.2s;
+    }
+
+    .btn-outline {
+        background: white; color: #1e40af; border: 2px solid #1e40af;
+        padding: 10px 24px; border-radius: 10px; font-weight: 600;
+        cursor: pointer; transition: all 0.2s;
+    }
+    .btn-outline:hover { background: #eff6ff; }
+
+    .btn-danger {
+        background: #ef4444; color: white; border: none;
+        padding: 6px 14px; border-radius: 8px; font-weight: 600;
+        cursor: pointer; font-size: 0.8rem;
+    }
+
+    .student-table {
+        width: 100%; border-collapse: separate; border-spacing: 0;
+        font-size: 0.85rem;
+    }
+    .student-table th {
+        background: #f1f5f9; padding: 10px 12px; text-align: center;
+        font-weight: 600; color: #475569; border-bottom: 2px solid #e2e8f0;
+        position: sticky; top: 0; z-index: 1;
+    }
+    .student-table td {
+        padding: 8px 12px; text-align: center; border-bottom: 1px solid #f1f5f9;
+    }
+    .student-table tr:hover td { background: #f8fafc; }
+    .student-table .status-waiting { color: #94a3b8; }
+    .student-table .status-success { color: #10b981; font-weight: 600; }
+    .student-table .status-error { color: #ef4444; font-weight: 600; }
+    .student-table .status-processing { color: #f59e0b; font-weight: 600; }
+
+    .mode-selector {
+        display: flex; gap: 12px; margin-bottom: 20px;
+    }
+    .mode-card {
+        flex: 1; padding: 20px; border-radius: 12px; border: 2px solid #e5e7eb;
+        cursor: pointer; transition: all 0.2s; text-align: center;
+    }
+    .mode-card:hover { border-color: #3b82f6; }
+    .mode-card.active { border-color: #1e40af; background: #eff6ff; }
+    .mode-card .mode-icon { font-size: 2rem; margin-bottom: 8px; }
+    .mode-card .mode-title { font-weight: 700; font-size: 1rem; color: #1e293b; }
+    .mode-card .mode-desc { font-size: 0.8rem; color: #64748b; margin-top: 4px; }
+
+    .captcha-section {
+        background: #fef3c7; border: 1px solid #fbbf24; border-radius: 12px;
+        padding: 16px; margin: 16px 0; display: flex; align-items: center; gap: 16px;
+        flex-wrap: wrap;
+    }
+    .captcha-section img { border-radius: 6px; border: 1px solid #d4d4d4; }
+    .captcha-input {
+        padding: 10px 16px; border: 2px solid #e5e7eb; border-radius: 8px;
+        font-size: 1.1rem; font-weight: 700; letter-spacing: 3px; width: 200px;
+    }
+
+    .progress-bar-container {
+        background: #e5e7eb; border-radius: 10px; height: 12px;
+        overflow: hidden; margin: 12px 0;
+    }
+    .progress-bar-fill {
+        height: 100%; border-radius: 10px; transition: width 0.3s;
+        background: linear-gradient(90deg, #3b82f6, #10b981);
+    }
+
+    .stats-row {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px; margin-bottom: 20px;
+    }
+    .stat-card {
+        text-align: center; padding: 16px; border-radius: 12px;
+        background: #f8fafc; border: 1px solid #e5e7eb;
+    }
+    .stat-card .stat-value { font-size: 1.5rem; font-weight: 800; color: #1e40af; }
+    .stat-card .stat-label { font-size: 0.8rem; color: #64748b; margin-top: 4px; }
+
+    .table-scroll { max-height: 500px; overflow-y: auto; border-radius: 12px; border: 1px solid #e5e7eb; }
+
+    .url-input {
+        width: 100%; padding: 10px 16px; border: 2px solid #e5e7eb; border-radius: 10px;
+        font-size: 0.9rem; margin-bottom: 12px;
+    }
+    .url-input:focus { border-color: #3b82f6; outline: none; }
+
+    .year-select {
+        padding: 8px 16px; border: 2px solid #e5e7eb; border-radius: 8px;
+        font-size: 0.9rem; font-weight: 600;
+    }
+
+    .inline-flex { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+    .alert {
+        padding: 12px 16px; border-radius: 10px; margin-bottom: 16px;
+        font-size: 0.9rem; display: flex; align-items: center; gap: 8px;
+    }
+    .alert-info { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+    .alert-warning { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+    .alert-success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+    .alert-danger { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+
+    .log-area {
+        background: #1e293b; color: #e2e8f0; padding: 16px; border-radius: 10px;
+        font-family: monospace; font-size: 0.8rem; max-height: 200px;
+        overflow-y: auto; margin-top: 12px; white-space: pre-wrap;
+    }
+
+    body.dark-mode .card { background: #1e293b; border-color: #334155; }
+    body.dark-mode .card-title { color: #e2e8f0; }
+    body.dark-mode .student-table th { background: #334155; color: #e2e8f0; }
+    body.dark-mode .student-table td { border-color: #334155; }
+    body.dark-mode .student-table tr:hover td { background: #2d3a4d; }
+    body.dark-mode .upload-zone { background: #0f172a; border-color: #334155; }
+    body.dark-mode .upload-zone .text { color: #94a3b8; }
+    body.dark-mode .mode-card { background: #0f172a; border-color: #334155; }
+    body.dark-mode .mode-card.active { background: #1e3a5f; border-color: #3b82f6; }
+    body.dark-mode .stat-card { background: #0f172a; border-color: #334155; }
+    body.dark-mode .url-input { background: #0f172a; color: #e2e8f0; border-color: #334155; }
+    body.dark-mode .captcha-input { background: #0f172a; color: #e2e8f0; border-color: #334155; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="lgs-container">
+    <div class="lgs-header">
+        <h1>LGS Sonuç Çekme Sistemi</h1>
+        <p>MEB sonuç sayfasından toplu LGS sonuçlarını çekin ve analiz edin</p>
+    </div>
+
+    <div class="step-tabs">
+        <div class="step-tab active" onclick="goToStep(1)" id="stepTab1">
+            <span class="step-num">1</span> Öğrenci Listesi
+        </div>
+        <div class="step-tab" onclick="goToStep(2)" id="stepTab2">
+            <span class="step-num">2</span> Bağlantı & Mod
+        </div>
+        <div class="step-tab" onclick="goToStep(3)" id="stepTab3">
+            <span class="step-num">3</span> Sonuç Çekme
+        </div>
+        <div class="step-tab" onclick="goToStep(4)" id="stepTab4">
+            <span class="step-num">4</span> Sonuçlar
+        </div>
+    </div>
+
+    <!-- STEP 1: Öğrenci Listesi -->
+    <div class="step-content active" id="step1">
+        <div class="card">
+            <div class="card-title"><span class="icon">📋</span> Öğrenci Listesini Yükle</div>
+
+            <div class="alert alert-info">
+                Excel dosyanızda TC Kimlik No, Okul No, Doğum Tarihi (GG.AA.YYYY) ve Sınıf sütunları olmalıdır.
+            </div>
+
+            <div class="inline-flex" style="margin-bottom: 16px;">
+                <a href="/admin/lgs-results/template" class="btn-outline" download>
+                    Örnek Şablon İndir
+                </a>
+                <select class="year-select" id="examYear">
+                    <option value="2025">2025</option>
+                    <option value="2024" selected>2024</option>
+                    <option value="2023">2023</option>
+                    <option value="2022">2022</option>
+                </select>
+                <span style="font-size: 0.85rem; color: #64748b;">Sınav Yılı</span>
+            </div>
+
+            <div class="upload-zone" id="uploadZone" onclick="document.getElementById('excelFile').click()">
+                <div class="icon">📥</div>
+                <div class="text">Excel dosyasını buraya sürükleyin veya tıklayın</div>
+                <div class="sub-text">.xlsx, .xls, .xlsm formatları desteklenir</div>
+            </div>
+            <input type="file" id="excelFile" accept=".xlsx,.xls,.xlsm" style="display:none" onchange="handleFileUpload(this)">
+
+            <div id="uploadResult" style="display:none; margin-top: 16px;"></div>
+
+            <div id="studentListSection" style="display:none; margin-top: 20px;">
+                <div class="card-title"><span class="icon">👥</span> Yüklenen Öğrenciler (<span id="studentCount">0</span>)</div>
+                <div class="table-scroll">
+                    <table class="student-table" id="studentTable">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>TC Kimlik No</th>
+                                <th>Okul No</th>
+                                <th>Doğum Tarihi</th>
+                                <th>Sınıf</th>
+                                <th>Durum</th>
+                            </tr>
+                        </thead>
+                        <tbody id="studentTableBody"></tbody>
+                    </table>
+                </div>
+                <div style="margin-top: 16px; text-align: right;">
+                    <button class="btn-primary" onclick="goToStep(2)">Devam Et &rarr;</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 2: Bağlantı & Mod -->
+    <div class="step-content" id="step2">
+        <div class="card">
+            <div class="card-title"><span class="icon">🔗</span> MEB Bağlantı Ayarları</div>
+
+            <label style="font-weight: 600; margin-bottom: 6px; display: block; color: #475569;">MEB Sonuç Sayfası URL:</label>
+            <input type="text" class="url-input" id="mebUrl" value="https://sonuc.meb.gov.tr/" placeholder="https://sonuc.meb.gov.tr/">
+
+            <div class="alert alert-warning">
+                Farklı sınavlar için URL değişebilir. Doğru URL'yi kullandığınızdan emin olun.
+            </div>
+
+            <button class="btn-primary" onclick="checkMebConnection()" id="btnCheckConnection">
+                Bağlantıyı Kontrol Et
+            </button>
+
+            <div id="connectionResult" style="display:none; margin-top: 16px;"></div>
+        </div>
+
+        <div class="card" id="modeSelectionCard" style="display:none;">
+            <div class="card-title"><span class="icon">⚙️</span> Çekme Modu</div>
+
+            <div class="mode-selector">
+                <div class="mode-card" id="modeAuto" onclick="selectMode('auto')">
+                    <div class="mode-icon">🚀</div>
+                    <div class="mode-title">Otomatik (Kodsuz)</div>
+                    <div class="mode-desc">Güvenlik kodu olmadan toplu çekim. Sonuçların ilk yayınlandığı saatlerde çalışır.</div>
+                </div>
+                <div class="mode-card" id="modeManual" onclick="selectMode('manual')">
+                    <div class="mode-icon">🔐</div>
+                    <div class="mode-title">Güvenlik Kodlu</div>
+                    <div class="mode-desc">Her öğrenci için güvenlik kodunu elle girersiniz. Her zaman çalışır.</div>
+                </div>
+            </div>
+
+            <div style="text-align: right;">
+                <button class="btn-primary" onclick="goToStep(3)" id="btnGoStep3" disabled>Sonuç Çekmeye Başla &rarr;</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 3: Sonuç Çekme -->
+    <div class="step-content" id="step3">
+        <div class="card">
+            <div class="card-title"><span class="icon">⏳</span> Sonuç Çekme İşlemi</div>
+
+            <div class="stats-row" id="fetchStats">
+                <div class="stat-card">
+                    <div class="stat-value" id="statTotal">0</div>
+                    <div class="stat-label">Toplam</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statSuccess" style="color: #10b981;">0</div>
+                    <div class="stat-label">Başarılı</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statError" style="color: #ef4444;">0</div>
+                    <div class="stat-label">Hatalı</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statRemaining" style="color: #f59e0b;">0</div>
+                    <div class="stat-label">Kalan</div>
+                </div>
+            </div>
+
+            <div class="progress-bar-container">
+                <div class="progress-bar-fill" id="progressBar" style="width: 0%"></div>
+            </div>
+            <div style="text-align: center; font-size: 0.85rem; color: #64748b;" id="progressText">Henüz başlamadı</div>
+
+            <!-- Captcha bölümü (güvenlik kodlu mod) -->
+            <div id="captchaContainer" style="display: none;">
+                <div class="captcha-section">
+                    <div>
+                        <strong>Güvenlik Kodu:</strong><br>
+                        <img id="captchaImage" src="" alt="Güvenlik Kodu" style="margin-top: 6px;">
+                    </div>
+                    <div>
+                        <input type="text" class="captcha-input" id="captchaInput" placeholder="Kodu girin" maxlength="10" autocomplete="off">
+                    </div>
+                    <div>
+                        <button class="btn-outline" onclick="refreshCaptcha()" style="padding: 8px 16px; font-size: 0.85rem;">Yenile</button>
+                    </div>
+                    <div>
+                        <button class="btn-primary" onclick="submitWithCaptcha()" id="btnSubmitCaptcha">Gönder</button>
+                    </div>
+                </div>
+                <div style="margin-top: 8px; font-size: 0.85rem; color: #64748b;">
+                    Şu an çekilen: <strong id="currentStudentInfo">-</strong>
+                </div>
+            </div>
+
+            <div class="inline-flex" style="margin-top: 16px;">
+                <button class="btn-primary" onclick="startFetching()" id="btnStartFetch">Çekmeye Başla</button>
+                <button class="btn-danger" onclick="stopFetching()" id="btnStopFetch" style="display:none;">Durdur</button>
+            </div>
+
+            <div class="log-area" id="logArea">LGS Sonuç Çekme Sistemi hazır...\n</div>
+        </div>
+    </div>
+
+    <!-- STEP 4: Sonuçlar -->
+    <div class="step-content" id="step4">
+        <div class="card">
+            <div class="card-title">
+                <span class="icon">📊</span> LGS Sonuçları
+                <div style="margin-left: auto; display: flex; gap: 8px;">
+                    <select class="year-select" id="filterYear" onchange="loadResults()">
+                        <option value="">Tüm Yıllar</option>
+                        <option value="2025">2025</option>
+                        <option value="2024">2024</option>
+                        <option value="2023">2023</option>
+                    </select>
+                    <button class="btn-success" onclick="exportResults()">Excel İndir</button>
+                    <button class="btn-outline" onclick="loadResults()">Yenile</button>
+                </div>
+            </div>
+
+            <div id="resultStats" class="stats-row"></div>
+
+            <div class="table-scroll" style="max-height: 600px;">
+                <table class="student-table" id="resultsTable">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Ad Soyad</th>
+                            <th>Sınıf</th>
+                            <th>Puan</th>
+                            <th>Genel %</th>
+                            <th>İl %</th>
+                            <th>Türkçe</th>
+                            <th>Mat</th>
+                            <th>Fen</th>
+                            <th>İnk</th>
+                            <th>Din</th>
+                            <th>Yab</th>
+                            <th>Yerleştiği Okul</th>
+                            <th>İşlem</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let students = [];
+let currentMode = null;
+let hasCaptcha = false;
+let fetchRunning = false;
+let currentFetchIndex = 0;
+let successCount = 0;
+let errorCount = 0;
+
+function goToStep(step) {
+    document.querySelectorAll('.step-content').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.step-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('step' + step).classList.add('active');
+    document.getElementById('stepTab' + step).classList.add('active');
+
+    if (step === 4) loadResults();
+}
+
+function handleFileUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    document.getElementById('uploadResult').style.display = 'block';
+    document.getElementById('uploadResult').innerHTML = '<div class="alert alert-info">Dosya yükleniyor...</div>';
+
+    fetch('/admin/lgs-results/upload-excel', { method: 'POST', body: formData })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            document.getElementById('uploadResult').innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+            return;
+        }
+
+        students = data.students;
+        document.getElementById('uploadResult').innerHTML =
+            `<div class="alert alert-success">${data.count} öğrenci başarıyla yüklendi!</div>`;
+
+        renderStudentTable();
+        document.getElementById('studentListSection').style.display = 'block';
+        document.getElementById('studentCount').textContent = students.length;
+        document.getElementById('stepTab1').classList.add('completed');
+    })
+    .catch(err => {
+        document.getElementById('uploadResult').innerHTML =
+            `<div class="alert alert-danger">Yükleme hatası: ${err.message}</div>`;
+    });
+}
+
+function renderStudentTable() {
+    const tbody = document.getElementById('studentTableBody');
+    tbody.innerHTML = '';
+    students.forEach((s, i) => {
+        const tr = document.createElement('tr');
+        tr.id = 'studentRow_' + i;
+        tr.innerHTML = `
+            <td>${i + 1}</td>
+            <td>${maskTC(s.tc)}</td>
+            <td>${s.okul_no}</td>
+            <td>${s.dogum_tarihi}</td>
+            <td>${s.sinif}</td>
+            <td class="status-waiting" id="status_${i}">Bekliyor</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function maskTC(tc) {
+    if (tc.length >= 7) return tc.substring(0, 3) + '****' + tc.substring(tc.length - 4);
+    return tc;
+}
+
+const uploadZone = document.getElementById('uploadZone');
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        document.getElementById('excelFile').files = files;
+        handleFileUpload(document.getElementById('excelFile'));
+    }
+});
+
+function checkMebConnection() {
+    const url = document.getElementById('mebUrl').value.trim();
+    if (!url) { alert('URL giriniz'); return; }
+
+    const btn = document.getElementById('btnCheckConnection');
+    btn.disabled = true;
+    btn.textContent = 'Bağlanıyor...';
+
+    document.getElementById('connectionResult').style.display = 'block';
+    document.getElementById('connectionResult').innerHTML = '<div class="alert alert-info">MEB sunucusuna bağlanılıyor...</div>';
+
+    fetch('/admin/lgs-results/get-captcha', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sinav_url: url })
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.textContent = 'Bağlantıyı Kontrol Et';
+
+        if (data.error) {
+            document.getElementById('connectionResult').innerHTML =
+                `<div class="alert alert-danger">${data.error}</div>`;
+            return;
+        }
+
+        hasCaptcha = data.has_captcha;
+        let statusMsg = '';
+        if (hasCaptcha) {
+            statusMsg = `<div class="alert alert-warning">
+                Bağlantı başarılı! Güvenlik kodu <strong>aktif</strong>.
+                Her öğrenci için güvenlik kodu girmeniz gerekecek.
+            </div>`;
+        } else {
+            statusMsg = `<div class="alert alert-success">
+                Bağlantı başarılı! Güvenlik kodu <strong>yok</strong>.
+                Toplu otomatik çekim yapabilirsiniz!
+            </div>`;
+        }
+
+        document.getElementById('connectionResult').innerHTML = statusMsg;
+        document.getElementById('modeSelectionCard').style.display = 'block';
+        document.getElementById('stepTab2').classList.add('completed');
+
+        if (hasCaptcha) {
+            selectMode('manual');
+            document.getElementById('modeAuto').style.opacity = '0.5';
+            document.getElementById('modeAuto').style.pointerEvents = 'none';
+        } else {
+            selectMode('auto');
+        }
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.textContent = 'Bağlantıyı Kontrol Et';
+        document.getElementById('connectionResult').innerHTML =
+            `<div class="alert alert-danger">Bağlantı hatası: ${err.message}</div>`;
+    });
+}
+
+function selectMode(mode) {
+    currentMode = mode;
+    document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('active'));
+    document.getElementById(mode === 'auto' ? 'modeAuto' : 'modeManual').classList.add('active');
+    document.getElementById('btnGoStep3').disabled = false;
+}
+
+function startFetching() {
+    if (students.length === 0) {
+        alert('Önce öğrenci listesi yükleyin!');
+        return;
+    }
+
+    fetchRunning = true;
+    currentFetchIndex = 0;
+    successCount = 0;
+    errorCount = 0;
+
+    document.getElementById('statTotal').textContent = students.length;
+    document.getElementById('statRemaining').textContent = students.length;
+    document.getElementById('btnStartFetch').style.display = 'none';
+    document.getElementById('btnStopFetch').style.display = 'inline-block';
+
+    appendLog('Sonuç çekme başlatıldı... Mod: ' + (currentMode === 'auto' ? 'Otomatik' : 'Güvenlik Kodlu'));
+
+    if (currentMode === 'auto') {
+        fetchBatchAuto();
+    } else {
+        showNextCaptcha();
+    }
+}
+
+function stopFetching() {
+    fetchRunning = false;
+    document.getElementById('btnStartFetch').style.display = 'inline-block';
+    document.getElementById('btnStopFetch').style.display = 'none';
+    appendLog('Çekme işlemi durduruldu.');
+}
+
+function fetchBatchAuto() {
+    const examYear = document.getElementById('examYear').value;
+
+    appendLog('Toplu otomatik çekim başlıyor...');
+
+    fetch('/admin/lgs-results/fetch-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            students: students,
+            exam_year: parseInt(examYear)
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.captcha_required) {
+            appendLog('Güvenlik kodu gerekli! Güvenlik kodlu moda geçiliyor...');
+            currentMode = 'manual';
+            currentFetchIndex = data.processed || 0;
+            successCount = data.results ? data.results.length : 0;
+
+            if (data.results) {
+                data.results.forEach((r, i) => {
+                    updateStudentStatus(i, 'success', r.ad_soyad + ' - ' + (r.sinav_puan || ''));
+                });
+            }
+            if (data.errors) {
+                data.errors.forEach(e => {
+                    const idx = students.findIndex(s => s.tc === e.tc);
+                    if (idx >= 0) updateStudentStatus(idx, 'error', e.error);
+                    errorCount++;
+                });
+            }
+
+            updateProgress();
+            showNextCaptcha();
+            return;
+        }
+
+        if (data.error) {
+            appendLog('HATA: ' + data.error);
+            stopFetching();
+            return;
+        }
+
+        successCount = data.success_count || 0;
+        errorCount = data.error_count || 0;
+
+        if (data.results) {
+            data.results.forEach(r => {
+                const idx = students.findIndex(s => s.tc === r.tc);
+                if (idx >= 0) updateStudentStatus(idx, 'success', r.ad_soyad + ' - ' + (r.sinav_puan || ''));
+            });
+        }
+        if (data.errors) {
+            data.errors.forEach(e => {
+                const idx = students.findIndex(s => s.tc === e.tc);
+                if (idx >= 0) updateStudentStatus(idx, 'error', e.error);
+            });
+        }
+
+        currentFetchIndex = students.length;
+        updateProgress();
+        appendLog(`Tamamlandı! ${successCount} başarılı, ${errorCount} hatalı.`);
+        stopFetching();
+    })
+    .catch(err => {
+        appendLog('HATA: ' + err.message);
+        stopFetching();
+    });
+}
+
+function showNextCaptcha() {
+    if (!fetchRunning || currentFetchIndex >= students.length) {
+        if (currentFetchIndex >= students.length) {
+            appendLog(`İşlem tamamlandı! ${successCount} başarılı, ${errorCount} hatalı.`);
+            stopFetching();
+        }
+        return;
+    }
+
+    const student = students[currentFetchIndex];
+    document.getElementById('captchaContainer').style.display = 'block';
+    document.getElementById('currentStudentInfo').textContent =
+        `#${currentFetchIndex + 1} - TC: ${maskTC(student.tc)} - ${student.sinif}`;
+    document.getElementById('captchaInput').value = '';
+    document.getElementById('captchaInput').focus();
+
+    updateStudentStatus(currentFetchIndex, 'processing', 'İşleniyor...');
+
+    refreshCaptcha();
+}
+
+function refreshCaptcha() {
+    fetch('/admin/lgs-results/refresh-captcha', { method: 'POST' })
+    .then(r => r.json())
+    .then(data => {
+        if (data.captcha_image) {
+            document.getElementById('captchaImage').src = 'data:image/png;base64,' + data.captcha_image;
+        }
+    })
+    .catch(err => appendLog('Captcha yenileme hatası: ' + err.message));
+}
+
+function submitWithCaptcha() {
+    const captchaCode = document.getElementById('captchaInput').value.trim();
+    if (!captchaCode) { alert('Güvenlik kodunu girin'); return; }
+
+    const student = students[currentFetchIndex];
+    const parts = student.dogum_tarihi.split('.');
+    if (parts.length !== 3) {
+        appendLog(`#${currentFetchIndex + 1} - Geçersiz doğum tarihi formatı`);
+        updateStudentStatus(currentFetchIndex, 'error', 'Geçersiz tarih');
+        errorCount++;
+        currentFetchIndex++;
+        updateProgress();
+        showNextCaptcha();
+        return;
+    }
+
+    const examYear = document.getElementById('examYear').value;
+
+    document.getElementById('btnSubmitCaptcha').disabled = true;
+    document.getElementById('btnSubmitCaptcha').textContent = 'Çekiliyor...';
+
+    fetch('/admin/lgs-results/fetch-single', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            tc: student.tc,
+            okul_no: student.okul_no,
+            gun: parts[0],
+            ay: parts[1],
+            yil: parts[2],
+            captcha_code: captchaCode,
+            sinif: student.sinif,
+            exam_year: parseInt(examYear)
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        document.getElementById('btnSubmitCaptcha').disabled = false;
+        document.getElementById('btnSubmitCaptcha').textContent = 'Gönder';
+
+        if (data.error) {
+            appendLog(`#${currentFetchIndex + 1} HATA: ${data.error}`);
+            if (data.error.includes('Güvenlik kodu hatalı')) {
+                appendLog('Güvenlik kodu hatalı, tekrar deneyin...');
+                refreshCaptcha();
+                document.getElementById('captchaInput').value = '';
+                document.getElementById('captchaInput').focus();
+                return;
+            }
+            updateStudentStatus(currentFetchIndex, 'error', data.error);
+            errorCount++;
+        } else {
+            const r = data.result;
+            appendLog(`#${currentFetchIndex + 1} OK: ${r.ad_soyad} - Puan: ${r.sinav_puan}`);
+            updateStudentStatus(currentFetchIndex, 'success', `${r.ad_soyad} - ${r.sinav_puan}`);
+            successCount++;
+        }
+
+        currentFetchIndex++;
+        updateProgress();
+        showNextCaptcha();
+    })
+    .catch(err => {
+        document.getElementById('btnSubmitCaptcha').disabled = false;
+        document.getElementById('btnSubmitCaptcha').textContent = 'Gönder';
+        appendLog(`#${currentFetchIndex + 1} HATA: ${err.message}`);
+        updateStudentStatus(currentFetchIndex, 'error', err.message);
+        errorCount++;
+        currentFetchIndex++;
+        updateProgress();
+        showNextCaptcha();
+    });
+}
+
+document.getElementById('captchaInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') submitWithCaptcha();
+});
+
+function updateStudentStatus(idx, status, text) {
+    const el = document.getElementById('status_' + idx);
+    if (!el) return;
+    el.className = 'status-' + status;
+    el.textContent = text || status;
+}
+
+function updateProgress() {
+    document.getElementById('statSuccess').textContent = successCount;
+    document.getElementById('statError').textContent = errorCount;
+    document.getElementById('statRemaining').textContent = Math.max(0, students.length - currentFetchIndex);
+
+    const pct = students.length > 0 ? Math.round((currentFetchIndex / students.length) * 100) : 0;
+    document.getElementById('progressBar').style.width = pct + '%';
+    document.getElementById('progressText').textContent = `${currentFetchIndex} / ${students.length} (${pct}%)`;
+}
+
+function appendLog(msg) {
+    const log = document.getElementById('logArea');
+    const time = new Date().toLocaleTimeString('tr-TR');
+    log.textContent += `[${time}] ${msg}\n`;
+    log.scrollTop = log.scrollHeight;
+}
+
+function loadResults() {
+    const year = document.getElementById('filterYear').value;
+    const url = '/admin/lgs-results/list' + (year ? '?year=' + year : '');
+
+    fetch(url)
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) { alert(data.error); return; }
+
+        const results = data.results || [];
+        const tbody = document.getElementById('resultsTableBody');
+        tbody.innerHTML = '';
+
+        if (results.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="14" style="padding: 40px; color: #94a3b8;">Henüz sonuç bulunmuyor</td></tr>';
+            document.getElementById('resultStats').innerHTML = '';
+            return;
+        }
+
+        let totalPuan = 0, maxPuan = 0, minPuan = 999;
+        results.forEach((r, i) => {
+            const puan = parseFloat(r.sinav_puan) || 0;
+            totalPuan += puan;
+            if (puan > maxPuan) maxPuan = puan;
+            if (puan < minPuan && puan > 0) minPuan = puan;
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${i + 1}</td>
+                <td style="text-align:left; font-weight:600;">${r.student_name || '-'}</td>
+                <td>${r.sinif || '-'}</td>
+                <td style="font-weight:700; color: #1e40af;">${puan.toFixed(2)}</td>
+                <td>${r.genel_yuzdelik || '-'}</td>
+                <td>${r.il_yuzdelik || '-'}</td>
+                <td><span style="color:#10b981">${r.turkce_dogru}</span>/<span style="color:#ef4444">${r.turkce_yanlis}</span>/<span style="color:#94a3b8">${r.turkce_bos}</span></td>
+                <td><span style="color:#10b981">${r.matematik_dogru}</span>/<span style="color:#ef4444">${r.matematik_yanlis}</span>/<span style="color:#94a3b8">${r.matematik_bos}</span></td>
+                <td><span style="color:#10b981">${r.fen_dogru}</span>/<span style="color:#ef4444">${r.fen_yanlis}</span>/<span style="color:#94a3b8">${r.fen_bos}</span></td>
+                <td><span style="color:#10b981">${r.inkilap_dogru}</span>/<span style="color:#ef4444">${r.inkilap_yanlis}</span>/<span style="color:#94a3b8">${r.inkilap_bos}</span></td>
+                <td><span style="color:#10b981">${r.din_dogru}</span>/<span style="color:#ef4444">${r.din_yanlis}</span>/<span style="color:#94a3b8">${r.din_bos}</span></td>
+                <td><span style="color:#10b981">${r.yabanci_dil_dogru}</span>/<span style="color:#ef4444">${r.yabanci_dil_yanlis}</span>/<span style="color:#94a3b8">${r.yabanci_dil_bos}</span></td>
+                <td style="text-align:left; font-size:0.8rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${r.yerlestigi_okul || ''}">${r.yerlestigi_okul || '-'}</td>
+                <td><button class="btn-danger" onclick="deleteResult(${r.id})">Sil</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        const avg = results.length > 0 ? (totalPuan / results.length).toFixed(2) : 0;
+        document.getElementById('resultStats').innerHTML = `
+            <div class="stat-card">
+                <div class="stat-value">${results.length}</div>
+                <div class="stat-label">Öğrenci</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" style="color: #10b981;">${maxPuan.toFixed(2)}</div>
+                <div class="stat-label">En Yüksek</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${avg}</div>
+                <div class="stat-label">Ortalama</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" style="color: #ef4444;">${minPuan < 999 ? minPuan.toFixed(2) : '-'}</div>
+                <div class="stat-label">En Düşük</div>
+            </div>
+        `;
+    })
+    .catch(err => alert('Sonuçlar yüklenemedi: ' + err.message));
+}
+
+function deleteResult(id) {
+    if (!confirm('Bu sonucu silmek istediğinize emin misiniz?')) return;
+
+    fetch('/admin/lgs-results/delete/' + id, { method: 'DELETE' })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) loadResults();
+        else alert(data.error);
+    });
+}
+
+function exportResults() {
+    const year = document.getElementById('filterYear').value;
+    window.location.href = '/admin/lgs-results/export' + (year ? '?year=' + year : '');
+}
+</script>
+{% endblock %}
