@@ -1874,17 +1874,35 @@ async function downloadWrongQuestionsPdf(resultId) {
     const overlay = showPdfLoading();
 
     try {
-        const response = await fetch(`/admin/report-cards/api/wrong-questions-pdf-check/${resultId}`);
-        const data = await response.json();
+        const response = await fetch(`/admin/report-cards/api/wrong-questions-pdf/${resultId}`);
         
-        if (!data.available) {
+        if (!response.ok) {
+            let errMsg = 'PDF oluşturulamadı';
+            try {
+                const errData = await response.json();
+                errMsg = errData.error || errMsg;
+            } catch(e) {}
             hidePdfLoading();
-            alert(data.error || 'PDF oluşturulamadı');
+            alert(errMsg);
             return;
         }
         
+        const blob = await response.blob();
         hidePdfLoading();
-        window.location.href = `/admin/report-cards/api/wrong-questions-pdf/${resultId}`;
+        
+        const contentDisp = response.headers.get('Content-Disposition') || '';
+        let filename = 'Tekrar_Coz.pdf';
+        const match = contentDisp.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (match && match[1]) filename = match[1].replace(/['"]/g, '');
+        
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
     } catch (error) {
         hidePdfLoading();
         alert('PDF indirme hatası: ' + error.message);
