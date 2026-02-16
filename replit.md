@@ -39,17 +39,6 @@ The system is built on Python 3.11 with the Flask 3.1.2 framework. It uses a Pos
 - `student_questions`: Student inquiries to teachers
 - `practice_exams`: LGS practice exam records
 
-## Recent Changes (2026-02-15)
-- ✅ **Kelebek Sınav Düzeni Sistemi:** Deneme sınavları için otomatik oturma planı oluşturma
-  - Yeni Blueprint: `routes/kelebek.py` - Kelebek algoritması, Excel şablon, PDF çıktı
-  - Yeni Template: `templates/kelebek.html` - Plan oluşturma, öğrenci yükleme, sonuç görüntüleme
-  - Yeni Tablolar: `kelebek_plans`, `kelebek_rooms`, `kelebek_participants`, `kelebek_assignments`
-  - Kelebek kuralları: Aynı sınıf seviyesinden öğrenciler yan yana oturmaz
-  - Sınav sınıfı/ders sınıfı otomatik belirleme (öncelik kurallarıyla)
-  - Yedek Sınıf daima sınav sınıfı, 8D/7C daima ders sınıfı
-  - Excel ile sınava girecek öğrenci yükleme, PDF salon listeleri indirme
-- ✅ **Kazanım Durum Sütunu Düzeltmesi:** Tüm PDF endpoint'lerinde Durum sütunu (Türkçe karakterlerle)
-
 ## Recent Changes (2026-02-11)
 - ✅ **Tekrar Çöz PDF Sistemi:** Sınav görselleri yükleme ve soru bölgesi işaretleme (admin), hatalı soruları otomatik kırpıp PDF oluşturma
 - ✅ **Yeni Tablolar:** report_card_exam_pages (sınav sayfa görselleri), report_card_question_regions (soru bölgeleri)

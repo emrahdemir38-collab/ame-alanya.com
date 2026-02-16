@@ -7796,17 +7796,14 @@ def student_outcome_pdf_download(result_id):
             if outcome_stats:
                 elements.append(Paragraph(subject_label, subject_style))
                 
-                table_data = [['Kazanım', 'D', 'Y', 'B', '%', 'Durum']]
-                row_colors = []
+                table_data = [['Kazanım', 'D', 'Y', 'B', '%']]
                 for outcome, stats in outcome_stats.items():
                     total = stats['total']
                     rate = round((stats['correct'] / total) * 100) if total > 0 else 0
-                    durum = get_kazanim_durum(rate)
-                    table_data.append([outcome[:60], str(stats['correct']), str(stats['wrong']), str(stats['blank']), f'%{rate}', durum['label']])
-                    row_colors.append(durum)
+                    table_data.append([outcome[:60], str(stats['correct']), str(stats['wrong']), str(stats['blank']), f'%{rate}'])
                 
-                t = Table(table_data, colWidths=[220, 35, 35, 35, 45, 80])
-                style_cmds = [
+                t = Table(table_data, colWidths=[300, 40, 40, 40, 50])
+                t.setStyle(TableStyle([
                     ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#dbeafe')),
                     ('FONTNAME', (0, 0), (-1, -1), PDF_FONT),
                     ('FONTSIZE', (0, 0), (-1, -1), 8),
@@ -7815,11 +7812,7 @@ def student_outcome_pdf_download(result_id):
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                     ('LEFTPADDING', (0, 0), (-1, -1), 4),
                     ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-                ]
-                for i, d in enumerate(row_colors):
-                    style_cmds.append(('BACKGROUND', (5, i+1), (5, i+1), d['bg']))
-                    style_cmds.append(('TEXTCOLOR', (5, i+1), (5, i+1), d['color']))
-                t.setStyle(TableStyle(style_cmds))
+                ]))
                 elements.append(t)
                 elements.append(Spacer(1, 10))
         
@@ -9183,35 +9176,27 @@ def my_multi_outcome_pdf():
         for subject, outcomes in outcome_data.items():
             elements.append(Paragraph(subject, subject_style))
             
-            table_data = [['Kazanım', 'Doğru', 'Hatalı', 'Boş', 'Başarı %', 'Durum']]
-            row_colors = []
+            table_data = [['Kazanım', 'Doğru', 'Hatalı', 'Boş', 'Başarı %']]
             for outcome, stats in outcomes.items():
                 total = stats['total'] or 1
                 success = round((stats['correct'] / total * 100), 1)
-                durum = get_kazanim_durum(success)
                 table_data.append([
                     Paragraph(outcome, cell_style),
                     str(stats['correct']),
                     str(stats['wrong']),
                     str(stats['blank']),
-                    f"%{success}",
-                    durum['label']
+                    f"%{success}"
                 ])
-                row_colors.append(durum)
             
-            t = Table(table_data, colWidths=[220, 35, 35, 35, 45, 80])
-            style_cmds = [
+            t = Table(table_data, colWidths=[300, 40, 40, 40, 50])
+            t.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e0e7ff')),
                 ('FONTNAME', (0, 0), (-1, -1), PDF_FONT),
                 ('FONTSIZE', (0, 0), (-1, -1), 8),
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
                 ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ]
-            for i, d in enumerate(row_colors):
-                style_cmds.append(('BACKGROUND', (5, i+1), (5, i+1), d['bg']))
-                style_cmds.append(('TEXTCOLOR', (5, i+1), (5, i+1), d['color']))
-            t.setStyle(TableStyle(style_cmds))
+            ]))
             elements.append(t)
             elements.append(Spacer(1, 8))
         
