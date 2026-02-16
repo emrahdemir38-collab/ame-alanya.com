@@ -5,7 +5,7 @@ import os
 import json
 import logging
 import uuid
-from flask import Blueprint, request, jsonify, render_template, current_app, send_file
+from flask import Blueprint, request, jsonify, render_template, current_app, send_file, make_response
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 import psycopg2
@@ -10197,8 +10197,18 @@ def generate_wrong_questions_pdf(result_id):
             
             cropped = page_img.crop((x1, y1, x2, y2))
             
+            max_dim = 800
+            cw, ch = cropped.size
+            if cw > max_dim or ch > max_dim:
+                scale = min(max_dim / cw, max_dim / ch)
+                new_w = int(cw * scale)
+                new_h = int(ch * scale)
+                cropped = cropped.resize((new_w, new_h), PILImage.LANCZOS)
+            
             crop_buf = BytesIO()
-            cropped.save(crop_buf, format='PNG')
+            if cropped.mode == 'RGBA':
+                cropped = cropped.convert('RGB')
+            cropped.save(crop_buf, format='JPEG', quality=80, optimize=True)
             crop_buf.seek(0)
             
             cropped_items.append({
@@ -10239,18 +10249,26 @@ def generate_wrong_questions_pdf(result_id):
         
         sections = [{'exam_name': exam_name, 'items': cropped_items, 'warning': warning_text}]
         
+        logger.info(f"Tekrar Çöz PDF oluşturuluyor: {student_name}, {len(cropped_items)} görsel")
         pdf_buffer = _build_tekrar_coz_pdf(student_name, sections)
+        pdf_size = pdf_buffer.getbuffer().nbytes
+        logger.info(f"Tekrar Çöz PDF oluşturuldu: {pdf_size} bytes ({pdf_size/1024:.0f} KB)")
         
         safe_name = student_name.replace(' ', '_')
         filename = f"Tekrar_Coz_{safe_name}_{exam_name.replace(' ', '_')}.pdf"
         
-        return send_file(pdf_buffer, mimetype='application/pdf', as_attachment=True, download_name=filename)
+        response = make_response(pdf_buffer.getvalue())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        response.headers['Content-Length'] = pdf_size
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        return response
     
     except Exception as ex:
         logger.error(f"Hatalı soru PDF hatası: {ex}")
         import traceback
         traceback.print_exc()
-        return jsonify({"error": str(ex)}), 500
+        return jsonify({"error": f"PDF oluşturma hatası: {str(ex)}"}), 500
     finally:
         cur.close()
         conn.close()
@@ -10363,8 +10381,18 @@ def _extract_wrong_question_images(result, cur, object_storage):
         
         cropped = page_img.crop((x1, y1, x2, y2))
         
+        max_dim = 800
+        cw, ch = cropped.size
+        if cw > max_dim or ch > max_dim:
+            scale = min(max_dim / cw, max_dim / ch)
+            new_w = int(cw * scale)
+            new_h = int(ch * scale)
+            cropped = cropped.resize((new_w, new_h), PILImage.LANCZOS)
+        
         crop_buf = BytesIO()
-        cropped.save(crop_buf, format='PNG')
+        if cropped.mode == 'RGBA':
+            cropped = cropped.convert('RGB')
+        cropped.save(crop_buf, format='JPEG', quality=80, optimize=True)
         crop_buf.seek(0)
         
         cropped_items.append({

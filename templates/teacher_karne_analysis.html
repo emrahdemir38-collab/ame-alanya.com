@@ -1879,9 +1879,16 @@ async function downloadWrongQuestionsPdf(resultId) {
         if (!response.ok) {
             let errMsg = 'PDF oluşturulamadı';
             try {
-                const errData = await response.json();
-                errMsg = errData.error || errMsg;
-            } catch(e) {}
+                const text = await response.text();
+                try {
+                    const errData = JSON.parse(text);
+                    errMsg = errData.error || errMsg;
+                } catch(e) {
+                    errMsg = `Sunucu hatası (${response.status}): ${text.substring(0, 200)}`;
+                }
+            } catch(e) {
+                errMsg = `Bağlantı hatası (${response.status})`;
+            }
             hidePdfLoading();
             alert(errMsg);
             return;
