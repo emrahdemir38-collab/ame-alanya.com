@@ -566,111 +566,6 @@ def admin_dashboard():
         return redirect('/')
     return render_template("admin_dashboard.html")
 
-@app.route("/api/admin/sync-db", methods=["POST"])
-@login_required
-def admin_sync_db():
-    if current_user.role != 'admin':
-        return jsonify({"success": False, "error": "Yetkisiz"}), 403
-
-    import psycopg2
-    import psycopg2.extras
-    import json as json_mod
-
-    prod_url = os.environ.get('PROD_DATABASE_URL')
-    dev_url = os.environ.get('DATABASE_URL')
-
-    if not prod_url:
-        return jsonify({"success": False, "error": "PROD_DATABASE_URL ayarlanmamis"})
-    if not dev_url:
-        return jsonify({"success": False, "error": "DATABASE_URL bulunamadi"})
-
-    if prod_url == dev_url:
-        return jsonify({"success": False, "error": "Production ve Development veritabanlari ayni! Bu islem yapilamaz."})
-
-    tables_to_sync = [
-        'users', 'classes', 'teacher_classes',
-        'report_card_exams', 'report_card_exam_pages',
-        'report_card_question_regions', 'report_card_results',
-        'book_entries',
-    ]
-    tables_to_truncate = [
-        'book_entries', 'report_card_results',
-        'report_card_question_regions', 'report_card_exam_pages',
-        'report_card_exams', 'teacher_classes', 'classes',
-        'user_sessions', 'users',
-    ]
-
-    try:
-        prod_conn = psycopg2.connect(prod_url, cursor_factory=psycopg2.extras.RealDictCursor)
-        prod_cur = prod_conn.cursor()
-        dev_conn = psycopg2.connect(dev_url)
-        dev_cur = dev_conn.cursor()
-
-        for table in tables_to_truncate:
-            try:
-                dev_cur.execute(f"TRUNCATE TABLE {table} CASCADE")
-            except:
-                dev_conn.rollback()
-        dev_conn.commit()
-
-        results = {}
-        for table in tables_to_sync:
-            prod_cur.execute(f"SELECT * FROM {table} ORDER BY id")
-            rows = prod_cur.fetchall()
-            if not rows:
-                results[table] = {"prod": 0, "dev": 0}
-                continue
-
-            columns = list(rows[0].keys())
-            json_columns = set()
-            prod_cur.execute("""
-                SELECT column_name FROM information_schema.columns 
-                WHERE table_name = %s AND data_type IN ('json', 'jsonb')
-            """, (table,))
-            for r in prod_cur.fetchall():
-                json_columns.add(r['column_name'])
-
-            placeholders = ['%s::json' if col in json_columns else '%s' for col in columns]
-            insert_sql = f"INSERT INTO {table} ({','.join(columns)}) VALUES ({','.join(placeholders)}) ON CONFLICT (id) DO NOTHING"
-
-            values_list = []
-            for row in rows:
-                values = []
-                for col in columns:
-                    val = row[col]
-                    if col in json_columns and val is not None:
-                        if isinstance(val, (dict, list)):
-                            values.append(json_mod.dumps(val, ensure_ascii=False))
-                        else:
-                            values.append(val if isinstance(val, str) else json_mod.dumps(val, ensure_ascii=False))
-                    else:
-                        values.append(val)
-                values_list.append(tuple(values))
-
-            psycopg2.extras.execute_batch(dev_cur, insert_sql, values_list, page_size=200)
-            dev_conn.commit()
-
-            try:
-                dev_cur.execute(f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), COALESCE((SELECT MAX(id) FROM {table}), 1))")
-                dev_conn.commit()
-            except:
-                dev_conn.rollback()
-
-            dev_cur.execute(f"SELECT COUNT(*) FROM {table}")
-            dev_count = dev_cur.fetchone()[0]
-            results[table] = {"prod": len(rows), "dev": dev_count}
-
-        prod_cur.close()
-        prod_conn.close()
-        dev_cur.close()
-        dev_conn.close()
-
-        return jsonify({"success": True, "results": results})
-
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)})
-
-
 @app.route("/admin/question-analysis")
 @login_required
 def admin_question_analysis():
@@ -3776,7 +3671,6 @@ def init_database():
                 answer_key_a JSON,
                 answer_key_b JSON,
                 question_counts JSON,
-                image_booklet_type VARCHAR(1) DEFAULT 'A',
                 created_by INTEGER REFERENCES users(id),
                 created_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul')
             )
@@ -3798,35 +3692,6 @@ def init_database():
                 percentile FLOAT,
                 created_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul'),
                 UNIQUE(exam_id, student_id)
-            )
-        """)
-        
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS report_card_exam_pages (
-                id SERIAL PRIMARY KEY,
-                exam_id INTEGER REFERENCES report_card_exams(id) ON DELETE CASCADE,
-                page_number INTEGER NOT NULL,
-                image_key VARCHAR(500) NOT NULL,
-                width_px INTEGER,
-                height_px INTEGER,
-                created_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul'),
-                UNIQUE(exam_id, page_number)
-            )
-        """)
-        
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS report_card_question_regions (
-                id SERIAL PRIMARY KEY,
-                exam_id INTEGER REFERENCES report_card_exams(id) ON DELETE CASCADE,
-                page_id INTEGER REFERENCES report_card_exam_pages(id) ON DELETE CASCADE,
-                subject_key VARCHAR(50) NOT NULL,
-                question_number INTEGER NOT NULL,
-                y_start_norm FLOAT NOT NULL,
-                y_end_norm FLOAT NOT NULL,
-                x_start_norm FLOAT DEFAULT 0,
-                x_end_norm FLOAT DEFAULT 1,
-                created_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul'),
-                UNIQUE(exam_id, subject_key, question_number)
             )
         """)
         
@@ -3867,11 +3732,6 @@ def init_database():
             """)
         except Exception as e:
             logger.info(f"parent_id column already exists or error: {e}")
-        
-        try:
-            cur.execute("ALTER TABLE report_card_exams ADD COLUMN IF NOT EXISTS image_booklet_type VARCHAR(1) DEFAULT 'A'")
-        except Exception as e:
-            logger.info(f"image_booklet_type column: {e}")
         
         # Dashboard Widget System (Task #10)
         cur.execute("""
