@@ -32,6 +32,26 @@ def is_allowed_url(url):
 def get_db():
     return psycopg2.connect(os.environ.get('DATABASE_URL'))
 
+def load_cookies_to_session(s):
+    cookies_data = flask_session.get('meb_cookies', [])
+    if isinstance(cookies_data, list):
+        for c in cookies_data:
+            s.cookies.set(c['name'], c['value'], domain=c.get('domain', ''), path=c.get('path', '/'))
+    elif isinstance(cookies_data, dict):
+        for k, v in cookies_data.items():
+            s.cookies.set(k, v)
+
+def save_cookies_from_session(s):
+    cookies_list = []
+    for cookie in s.cookies:
+        cookies_list.append({
+            'name': cookie.name,
+            'value': cookie.value,
+            'domain': cookie.domain,
+            'path': cookie.path
+        })
+    flask_session['meb_cookies'] = cookies_list
+
 def init_lgs_tables():
     conn = None
     try:
@@ -262,9 +282,7 @@ def get_meb_captcha():
                     import base64
                     captcha_base64 = base64.b64encode(captcha_resp.content).decode('utf-8')
 
-        cookies_dict = dict(s.cookies)
-
-        flask_session['meb_cookies'] = cookies_dict
+        save_cookies_from_session(s)
         flask_session['meb_sinav_id'] = sinav_id
         flask_session['meb_sinav_url'] = resp.url
 
@@ -326,21 +344,17 @@ def fetch_single_result():
     sinav_url = flask_session.get('meb_sinav_url', 'https://sonuc.meb.gov.tr/')
     sinav_id = flask_session.get('meb_sinav_id', '')
     form_action = flask_session.get('meb_form_action', 'sonuc.php')
-    cookies_dict = flask_session.get('meb_cookies', {})
     field_tc = flask_session.get('meb_field_tc', 'ADAY_NO')
     field_okul = flask_session.get('meb_field_okul', 'GUVENLIKNUMARASI')
 
     try:
         s = requests.Session()
-        for k, v in cookies_dict.items():
-            s.cookies.set(k, v)
+        load_cookies_to_session(s)
 
         if form_action.startswith('http'):
             post_url = form_action
         else:
-            base_url = sinav_url.rstrip('/')
-            if '/' in base_url.split('//')[1]:
-                base_url = '/'.join(base_url.split('/')[:-1])
+            base_url = '/'.join(sinav_url.rstrip('/').split('/')[:-1])
             post_url = base_url + '/' + form_action.lstrip('/')
 
         form_data = {
@@ -385,7 +399,7 @@ def fetch_single_result():
 
         save_lgs_result(result, tc, okul_no, gun, ay, yil, sinif, exam_year)
 
-        flask_session['meb_cookies'] = dict(s.cookies)
+        save_cookies_from_session(s)
 
         return jsonify({
             'success': True,
@@ -419,16 +433,12 @@ def fetch_batch_results():
     errors = []
 
     s = requests.Session()
-    cookies_dict = flask_session.get('meb_cookies', {})
-    for k, v in cookies_dict.items():
-        s.cookies.set(k, v)
+    load_cookies_to_session(s)
 
     if form_action.startswith('http'):
         post_url = form_action
     else:
-        base_url = sinav_url.rstrip('/')
-        if '/' in base_url.split('//')[1]:
-            base_url = '/'.join(base_url.split('/')[:-1])
+        base_url = '/'.join(sinav_url.rstrip('/').split('/')[:-1])
         post_url = base_url + '/' + form_action.lstrip('/')
 
     headers = {
@@ -504,7 +514,7 @@ def fetch_batch_results():
         except Exception as e:
             errors.append({'tc': tc, 'error': str(e)})
 
-    flask_session['meb_cookies'] = dict(s.cookies)
+    save_cookies_from_session(s)
 
     return jsonify({
         'success': True,
@@ -831,9 +841,7 @@ def refresh_captcha():
 
     try:
         s = requests.Session()
-        cookies_dict = flask_session.get('meb_cookies', {})
-        for k, v in cookies_dict.items():
-            s.cookies.set(k, v)
+        load_cookies_to_session(s)
 
         resp = s.get(sinav_url, timeout=10, allow_redirects=True)
         soup = BeautifulSoup(resp.text, 'html.parser')
@@ -869,7 +877,7 @@ def refresh_captcha():
                     import base64
                     captcha_base64 = base64.b64encode(captcha_resp.content).decode('utf-8')
 
-        flask_session['meb_cookies'] = dict(s.cookies)
+        save_cookies_from_session(s)
 
         return jsonify({
             'success': True,
