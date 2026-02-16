@@ -1833,87 +1833,39 @@ function hidePdfLoading() {
     if (overlay) overlay.style.display = 'none';
 }
 
-async function downloadMultiTekrarCozPdf(studentName) {
+function downloadMultiTekrarCozPdf(studentName) {
     const selectedResults = Array.from(document.querySelectorAll('.student-exam-checkbox:checked')).map(cb => parseInt(cb.value));
     
     if (selectedResults.length === 0) { alert('Lutfen en az bir sinav secin'); return; }
     
-    const overlay = showPdfLoading();
+    showPdfLoading();
     
-    try {
-        const response = await fetch('/admin/report-cards/api/wrong-questions-pdf-multi', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({result_ids: selectedResults})
-        });
-        
-        if (!response.ok) {
-            const errData = await response.json();
-            hidePdfLoading();
-            alert(errData.error || 'PDF olusturulamadi');
-            return;
-        }
-        
-        const blob = await response.blob();
-        hidePdfLoading();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Tekrar_Coz_${studentName.replace(/ /g, '_')}_Toplu.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
-    } catch (error) {
-        hidePdfLoading();
-        alert('PDF indirme hatasi: ' + error.message);
-    }
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/admin/report-cards/api/wrong-questions-pdf-multi';
+    form.target = '_blank';
+    
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'result_ids';
+    input.value = JSON.stringify(selectedResults);
+    form.appendChild(input);
+    
+    document.body.appendChild(form);
+    form.submit();
+    form.remove();
+    setTimeout(() => hidePdfLoading(), 3000);
 }
 
-async function downloadWrongQuestionsPdf(resultId) {
-    const overlay = showPdfLoading();
-
-    try {
-        const response = await fetch(`/admin/report-cards/api/wrong-questions-pdf/${resultId}`);
-        
-        if (!response.ok) {
-            let errMsg = 'PDF oluşturulamadı';
-            try {
-                const text = await response.text();
-                try {
-                    const errData = JSON.parse(text);
-                    errMsg = errData.error || errMsg;
-                } catch(e) {
-                    errMsg = `Sunucu hatası (${response.status}): ${text.substring(0, 200)}`;
-                }
-            } catch(e) {
-                errMsg = `Bağlantı hatası (${response.status})`;
-            }
-            hidePdfLoading();
-            alert(errMsg);
-            return;
-        }
-        
-        const blob = await response.blob();
-        hidePdfLoading();
-        
-        const contentDisp = response.headers.get('Content-Disposition') || '';
-        let filename = 'Tekrar_Coz.pdf';
-        const match = contentDisp.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-        if (match && match[1]) filename = match[1].replace(/['"]/g, '');
-        
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
-    } catch (error) {
-        hidePdfLoading();
-        alert('PDF indirme hatası: ' + error.message);
-    }
+function downloadWrongQuestionsPdf(resultId) {
+    showPdfLoading();
+    const link = document.createElement('a');
+    link.href = `/admin/report-cards/api/wrong-questions-pdf/${resultId}`;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => hidePdfLoading(), 3000);
 }
 
 window.onclick = function(event) {

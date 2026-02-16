@@ -10444,8 +10444,15 @@ def generate_wrong_questions_pdf_multi():
         return jsonify({"error": "Yetkisiz erişim"}), 403
     from app import object_storage
     
-    data = request.get_json()
-    result_ids = data.get('result_ids', [])
+    data = request.get_json(silent=True)
+    if data:
+        result_ids = data.get('result_ids', [])
+    else:
+        raw = request.form.get('result_ids', '[]')
+        try:
+            result_ids = json.loads(raw)
+        except:
+            result_ids = []
     
     if not result_ids or len(result_ids) == 0:
         return jsonify({"error": "Sinav seciniz"}), 400
