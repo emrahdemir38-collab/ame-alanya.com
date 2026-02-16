@@ -252,9 +252,9 @@ def verify_pdf_token(token, max_age=300):
         return None
 
 # Session yapılandırması - GÜVENLİK AYARLARI
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Lax: iframe ve proxy uyumlu
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'  # None: iframe preview uyumlu
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SECURE'] = False  # Replit proxy için False
+app.config['SESSION_COOKIE_SECURE'] = True  # SameSite=None için Secure gerekli (Replit HTTPS kullanır)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)  # 30 dakika sonra oturum sona erer
 app.config['SESSION_REFRESH_EACH_REQUEST'] = True  # Her istekte cookie yenilenir
 app.config['SESSION_COOKIE_NAME'] = 'ameo_session'  # Özel session cookie adı
