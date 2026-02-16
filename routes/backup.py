@@ -174,7 +174,14 @@ def restore_all_tables(tables_data, selected_tables=None):
     errors = []
 
     try:
-        cur.execute("SET session_replication_role = 'replica';")
+        delete_order = list(reversed(restore_order))
+        for table in delete_order:
+            try:
+                cur.execute(f'DELETE FROM "{table}";')
+            except Exception as e:
+                conn.rollback()
+                logger.warning(f"Delete from {table} failed: {e}")
+        conn.commit()
 
         for table in restore_order:
             try:
@@ -185,8 +192,6 @@ def restore_all_tables(tables_data, selected_tables=None):
                 columns = list(rows[0].keys())
                 col_list = ', '.join([f'"{c}"' for c in columns])
                 placeholders = ', '.join(['%s'] * len(columns))
-
-                cur.execute(f'DELETE FROM "{table}";')
 
                 insert_sql = f'INSERT INTO "{table}" ({col_list}) VALUES ({placeholders})'
                 for row in rows:
@@ -208,23 +213,18 @@ def restore_all_tables(tables_data, selected_tables=None):
                         new_val = max_val if max_val else 1
                         cur.execute(f"SELECT setval('{seq_name}', {new_val});")
 
+                conn.commit()
                 results.append({'table': table, 'rows': len(rows)})
             except Exception as e:
+                conn.rollback()
                 logger.error(f"Restore error for {table}: {e}")
                 errors.append({'table': table, 'error': str(e)})
 
-        cur.execute("SET session_replication_role = 'origin';")
-        conn.commit()
     except Exception as e:
         conn.rollback()
         logger.error(f"Restore transaction error: {e}")
         raise
     finally:
-        try:
-            cur.execute("SET session_replication_role = 'origin';")
-            conn.commit()
-        except:
-            pass
         cur.close()
         conn.close()
 
