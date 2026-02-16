@@ -19211,6 +19211,7 @@ from routes.daily_tracking import daily_tracking_bp
 from routes.teacher_study_plan import teacher_study_plan_bp
 from routes.report_cards import report_cards_bp, init_object_storage
 from routes.kelebek import kelebek_bp, init_kelebek_tables
+from routes.lgs_results import lgs_results_bp, init_lgs_tables
 
 # Object Storage'ı report_cards modülüne aktar
 init_object_storage(object_storage)
@@ -19225,6 +19226,7 @@ app.register_blueprint(daily_tracking_bp)
 app.register_blueprint(teacher_study_plan_bp)
 app.register_blueprint(report_cards_bp)
 app.register_blueprint(kelebek_bp)
+app.register_blueprint(lgs_results_bp)
 # ==================== MODÜLER BLUEPRINT'LER SONU ====================
 
 # Uygulama başlarken veritabanını initialize et
@@ -19234,6 +19236,8 @@ with app.app_context():
     init_kelebek_tables(conn_kb)
     conn_kb.close()
     logger.info("✅ Kelebek tabloları kontrol edildi/oluşturuldu")
+    init_lgs_tables()
+    logger.info("✅ LGS sonuç tabloları kontrol edildi/oluşturuldu")
     
     init_admin_user()
     

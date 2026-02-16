@@ -99,6 +99,8 @@ The system is built on Python 3.11 with the Flask 3.1.2 framework. It uses a Pos
 - ✅ **PDF Report Stability:** Removed RotatedParagraph class that caused PDF corruption; using multi-line text instead
 - ✅ **APK Password Persistence Guide:** Created `APK_PASSWORD_PERSISTENCE.md` with TinyDB/SharedPreferences implementation steps for auto-login
 
+- ✅ **LGS Sonuç Çekme Sistemi:** Admin paneline MEB sonuç sayfasından toplu LGS sonucu çekme özelliği eklendi. Güvenlik kodlu ve kodsuz hibrit mod, Excel şablon indirme/yükleme, sonuç veritabanı kaydı ve Excel dışa aktarma desteği.
+
 ## Known Issues & Workarounds
 - **APK PDF Opening:** Resolved - Now returns PNG format instead of PDF
 - **APK Password Persistence:** Requires Kodular implementation using TinyDB component (see `APK_PASSWORD_PERSISTENCE.md`)
@@ -119,3 +121,5 @@ The system is built on Python 3.11 with the Flask 3.1.2 framework. It uses a Pos
 - **matplotlib:** Chart generation for Python analytics.
 - **google-cloud-storage:** Object storage integration.
 - **replit.object_storage:** Replit native object storage client.
+- **beautifulsoup4:** HTML parsing for MEB sonuç sayfası scraping.
+- **requests:** HTTP library for MEB API communication.
