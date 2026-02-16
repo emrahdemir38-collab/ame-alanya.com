@@ -149,6 +149,35 @@
     .tab-btn.active { background: #7c3aed; color: white; box-shadow: 0 4px 12px rgba(124,58,237,0.3); }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
+    .room-config-table {
+        width: 100%; border-collapse: collapse; font-size: 0.9rem;
+    }
+    .room-config-table th {
+        background: #f3e8ff; color: #6d28d9; padding: 10px 12px;
+        text-align: left; font-size: 0.8rem; font-weight: 700;
+        border-bottom: 2px solid #ddd6fe;
+    }
+    .room-config-table td {
+        padding: 8px 12px; border-bottom: 1px solid #f3f4f6;
+        vertical-align: middle;
+    }
+    .room-config-table tr:hover { background: #faf5ff; }
+    .room-config-table input[type="number"],
+    .room-config-table input[type="text"] {
+        width: 100%; padding: 6px 10px; border: 1.5px solid #d1d5db;
+        border-radius: 8px; font-size: 0.85rem; background: #f9fafb;
+    }
+    .room-config-table input:focus {
+        border-color: #7c3aed; outline: none; box-shadow: 0 0 0 2px rgba(124,58,237,0.1);
+    }
+    .type-badge {
+        padding: 4px 12px; border-radius: 20px; font-size: 0.75rem;
+        font-weight: 600; cursor: pointer; display: inline-block; user-select: none;
+    }
+    .type-badge.exam { background: #dbeafe; color: #1e40af; }
+    .type-badge.study { background: #d1fae5; color: #065f46; }
+    .type-badge.auto { background: #f3f4f6; color: #6b7280; }
+    .add-room-row { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; align-items: flex-end; }
     .loading-overlay {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         background: rgba(0,0,0,0.6); display: flex; justify-content: center;
@@ -189,6 +218,7 @@
     <div class="tab-container">
         <button class="tab-btn active" onclick="switchTab('plans')">📋 Planlar</button>
         <button class="tab-btn" onclick="switchTab('create')">➕ Yeni Plan</button>
+        <button class="tab-btn" onclick="switchTab('rooms')">🏫 Sınıf Ayarları</button>
         <button class="tab-btn" onclick="switchTab('result')" id="resultTab" style="display:none;">📊 Sonuc</button>
     </div>
 
@@ -230,6 +260,59 @@
         </div>
     </div>
 
+    <div id="tabRooms" class="tab-content">
+        <div class="section-card">
+            <div class="section-title">🏫 Sınıf Ayarları</div>
+            <div class="info-banner">
+                <span class="icon">ℹ️</span>
+                <div>
+                    <strong>Sınıf türleri:</strong>
+                    <b>Sınav</b> = her zaman sınav sınıfı olarak kullanılır,
+                    <b>Ders</b> = her zaman ders sınıfı olarak kullanılır,
+                    <b>Otomatik</b> = sistem ihtiyaca göre karar verir.
+                    Sıra sayısı ve kapasite değerlerini doğrudan tabloda düzenleyebilirsiniz.
+                </div>
+            </div>
+            <div style="overflow-x:auto;">
+                <table class="room-config-table">
+                    <thead>
+                        <tr>
+                            <th style="width:180px;">Sınıf Adı</th>
+                            <th style="width:100px;">Sıra Sayısı</th>
+                            <th style="width:100px;">Kapasite</th>
+                            <th style="width:140px;">Varsayılan Tür</th>
+                            <th style="width:80px;text-align:right;">İşlem</th>
+                        </tr>
+                    </thead>
+                    <tbody id="roomConfigBody"></tbody>
+                </table>
+            </div>
+            <div class="add-room-row">
+                <div style="flex:2;min-width:150px;">
+                    <label style="font-size:0.8rem;font-weight:600;color:#374151;">Yeni Sınıf Adı</label>
+                    <input type="text" id="newRoomName" placeholder="Ornegin: Yedek Sınıf 2" style="padding:8px 12px;border:1.5px solid #d1d5db;border-radius:8px;width:100%;font-size:0.9rem;">
+                </div>
+                <div style="flex:1;min-width:80px;">
+                    <label style="font-size:0.8rem;font-weight:600;color:#374151;">Sıra</label>
+                    <input type="number" id="newRoomDesks" placeholder="14" min="1" style="padding:8px 12px;border:1.5px solid #d1d5db;border-radius:8px;width:100%;font-size:0.9rem;">
+                </div>
+                <div style="flex:1;min-width:80px;">
+                    <label style="font-size:0.8rem;font-weight:600;color:#374151;">Kapasite</label>
+                    <input type="number" id="newRoomCapacity" placeholder="28" min="1" style="padding:8px 12px;border:1.5px solid #d1d5db;border-radius:8px;width:100%;font-size:0.9rem;">
+                </div>
+                <div style="flex:1;min-width:120px;">
+                    <label style="font-size:0.8rem;font-weight:600;color:#374151;">Tür</label>
+                    <select id="newRoomType" style="padding:8px 12px;border:1.5px solid #d1d5db;border-radius:8px;width:100%;font-size:0.9rem;">
+                        <option value="auto">Otomatik</option>
+                        <option value="exam">Sınav</option>
+                        <option value="study">Ders</option>
+                    </select>
+                </div>
+                <button class="btn btn-success" onclick="addRoom()" style="height:38px;">➕ Ekle</button>
+            </div>
+        </div>
+    </div>
+
     <div id="tabResult" class="tab-content">
         <div id="planDetail"></div>
     </div>
@@ -245,7 +328,13 @@ function switchTab(tab) {
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('active');
-    event.target.classList.add('active');
+    document.querySelectorAll('.tab-btn').forEach(b => {
+        if (tab === 'plans' && b.textContent.includes('Plan')) b.classList.add('active');
+        if (tab === 'create' && b.textContent.includes('Yeni')) b.classList.add('active');
+        if (tab === 'rooms' && b.textContent.includes('Sınıf Ayar')) b.classList.add('active');
+        if (tab === 'result' && b.textContent.includes('Sonuc')) b.classList.add('active');
+    });
+    if (tab === 'rooms') loadRoomConfig();
 }
 
 function toggleGrade(el) {
@@ -681,6 +770,107 @@ async function regeneratePlan() {
 function downloadPdf() {
     if (!currentPlanId) return;
     window.location.href = `/admin/kelebek/api/room-list-pdf/${currentPlanId}`;
+}
+
+async function loadRoomConfig() {
+    try {
+        const res = await fetch('/admin/kelebek/api/room-config');
+        const data = await res.json();
+        const tbody = document.getElementById('roomConfigBody');
+        if (!data.rooms || data.rooms.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#888;padding:20px;">Henüz sınıf eklenmemiş</td></tr>';
+            return;
+        }
+        const typeLabels = {auto: 'Otomatik', exam: 'Sınav', study: 'Ders'};
+        const typeNext = {auto: 'exam', exam: 'study', study: 'auto'};
+        tbody.innerHTML = data.rooms.map(r => `
+            <tr data-id="${r.id}">
+                <td><input type="text" value="${r.room_name}" onchange="updateRoom(${r.id}, 'room_name', this.value)"></td>
+                <td><input type="number" value="${r.desks}" min="1" style="width:70px;" onchange="updateRoom(${r.id}, 'desks', this.value)"></td>
+                <td><input type="number" value="${r.capacity}" min="1" style="width:70px;" onchange="updateRoom(${r.id}, 'capacity', this.value)"></td>
+                <td>
+                    <span class="type-badge ${r.default_type}" onclick="cycleType(${r.id}, '${r.default_type}')">
+                        ${typeLabels[r.default_type] || 'Otomatik'}
+                    </span>
+                </td>
+                <td style="text-align:right;">
+                    <button class="btn btn-danger btn-sm" onclick="deleteRoom(${r.id}, '${r.room_name}')">🗑️</button>
+                </td>
+            </tr>
+        `).join('');
+    } catch(e) { console.error('Room config load error:', e); }
+}
+
+async function updateRoom(roomId, field, value) {
+    try {
+        const body = {};
+        body[field] = value;
+        const res = await fetch(`/admin/kelebek/api/room-config/${roomId}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!res.ok) alert(data.error || 'Güncelleme hatası');
+    } catch(e) { alert('Hata: ' + e.message); }
+}
+
+async function cycleType(roomId, currentType) {
+    const typeNext = {auto: 'exam', exam: 'study', study: 'auto'};
+    const newType = typeNext[currentType] || 'auto';
+    try {
+        const res = await fetch(`/admin/kelebek/api/room-config/${roomId}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({default_type: newType})
+        });
+        if (res.ok) loadRoomConfig();
+        else {
+            const data = await res.json();
+            alert(data.error || 'Güncelleme hatası');
+        }
+    } catch(e) { alert('Hata: ' + e.message); }
+}
+
+async function addRoom() {
+    const name = document.getElementById('newRoomName').value.trim();
+    const desks = parseInt(document.getElementById('newRoomDesks').value);
+    const capacity = parseInt(document.getElementById('newRoomCapacity').value);
+    const type = document.getElementById('newRoomType').value;
+
+    if (!name) return alert('Sınıf adı giriniz');
+    if (!desks || desks <= 0) return alert('Sıra sayısı giriniz');
+    if (!capacity || capacity <= 0) return alert('Kapasite giriniz');
+
+    try {
+        const res = await fetch('/admin/kelebek/api/room-config', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({room_name: name, desks, capacity, default_type: type})
+        });
+        const data = await res.json();
+        if (res.ok) {
+            document.getElementById('newRoomName').value = '';
+            document.getElementById('newRoomDesks').value = '';
+            document.getElementById('newRoomCapacity').value = '';
+            document.getElementById('newRoomType').value = 'auto';
+            loadRoomConfig();
+        } else {
+            alert(data.error || 'Ekleme hatası');
+        }
+    } catch(e) { alert('Hata: ' + e.message); }
+}
+
+async function deleteRoom(roomId, roomName) {
+    if (!confirm(`"${roomName}" sınıfını silmek istediğinize emin misiniz?`)) return;
+    try {
+        const res = await fetch(`/admin/kelebek/api/room-config/${roomId}`, {method: 'DELETE'});
+        if (res.ok) loadRoomConfig();
+        else {
+            const data = await res.json();
+            alert(data.error || 'Silme hatası');
+        }
+    } catch(e) { alert('Hata: ' + e.message); }
 }
 
 document.addEventListener('DOMContentLoaded', loadPlans);
