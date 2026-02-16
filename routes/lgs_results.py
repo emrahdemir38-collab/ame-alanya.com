@@ -232,17 +232,30 @@ def get_meb_captcha():
         sinav_id = sinav_id_input['value'] if sinav_id_input else ''
 
         captcha_img = soup.find('img', {'id': 'image'})
-        has_captcha = captcha_img is not None
+        if not captcha_img:
+            captcha_img = soup.find('img', {'id': 'capcha'})
+        if not captcha_img:
+            captcha_img = soup.find('img', {'name': 'capcha'})
+        if not captcha_img:
+            for img in soup.find_all('img'):
+                src = img.get('src', '')
+                if 'captcha' in src.lower():
+                    captcha_img = img
+                    break
+
+        gk_input = soup.find('input', {'name': 'GUVENLIKKODU'})
+        has_captcha = captcha_img is not None or gk_input is not None
 
         captcha_base64 = None
-        if has_captcha:
+        if captcha_img:
             captcha_src = captcha_img.get('src', '')
             if captcha_src:
                 if captcha_src.startswith('/'):
-                    base_url = '/'.join(sinav_url.rstrip('/').split('/')[:3])
+                    base_url = '/'.join(resp.url.rstrip('/').split('/')[:3])
                     captcha_url = base_url + captcha_src
                 else:
-                    captcha_url = sinav_url.rstrip('/') + '/' + captcha_src
+                    base_url = '/'.join(resp.url.rstrip('/').split('/')[:-1])
+                    captcha_url = base_url + '/' + captcha_src
 
                 captcha_resp = s.get(captcha_url, timeout=10)
                 if captcha_resp.status_code == 200:
@@ -253,7 +266,7 @@ def get_meb_captcha():
 
         flask_session['meb_cookies'] = cookies_dict
         flask_session['meb_sinav_id'] = sinav_id
-        flask_session['meb_sinav_url'] = sinav_url
+        flask_session['meb_sinav_url'] = resp.url
 
         form_action = 'sonuc.php'
         form_tag = soup.find('form')
@@ -830,15 +843,27 @@ def refresh_captcha():
             flask_session['meb_sinav_id'] = sinav_id_input['value']
 
         captcha_img = soup.find('img', {'id': 'image'})
+        if not captcha_img:
+            captcha_img = soup.find('img', {'id': 'capcha'})
+        if not captcha_img:
+            captcha_img = soup.find('img', {'name': 'capcha'})
+        if not captcha_img:
+            for img in soup.find_all('img'):
+                src = img.get('src', '')
+                if 'captcha' in src.lower():
+                    captcha_img = img
+                    break
+
         captcha_base64 = None
         if captcha_img:
             captcha_src = captcha_img.get('src', '')
             if captcha_src:
                 if captcha_src.startswith('/'):
-                    base_url = '/'.join(sinav_url.rstrip('/').split('/')[:3])
+                    base_url = '/'.join(resp.url.rstrip('/').split('/')[:3])
                     captcha_url = base_url + captcha_src
                 else:
-                    captcha_url = sinav_url.rstrip('/') + '/' + captcha_src
+                    base_url = '/'.join(resp.url.rstrip('/').split('/')[:-1])
+                    captcha_url = base_url + '/' + captcha_src
                 captcha_resp = s.get(captcha_url, timeout=10)
                 if captcha_resp.status_code == 200:
                     import base64
