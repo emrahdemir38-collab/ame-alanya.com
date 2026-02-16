@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import logging
 import random
@@ -54,6 +55,12 @@ DEFAULT_ROOM_CAPACITIES = {
 
 PRIORITY_EXAM_ROOMS = ['8A', '8B', '7A', '7B', '6A', '6C']
 ALWAYS_STUDY_ROOMS = ['8D', '7C']
+
+def extract_grade_from_room(room_name):
+    m = re.match(r'^(\d)[A-ZÇĞİÖŞÜa-zçğıöşü]$', room_name.strip())
+    if m:
+        return int(m.group(1))
+    return None
 
 
 def get_db():
@@ -666,12 +673,8 @@ def _run_butterfly_algorithm(plan_id, conn):
     room_default_types = {}
     for rc in all_room_configs:
         rname = rc['room_name']
-        room_grade = None
-        for ch in rname:
-            if ch.isdigit():
-                room_grade = int(ch)
-                break
-        is_relevant = (room_grade and room_grade in grade_levels) or (not room_grade)
+        room_grade = extract_grade_from_room(rname)
+        is_relevant = (room_grade and room_grade in grade_levels) or (room_grade is None)
         if is_relevant:
             relevant_rooms[rname] = {'desks': rc['desks'], 'capacity': rc['capacity']}
             room_default_types[rname] = rc['default_type']
@@ -723,11 +726,7 @@ def _run_butterfly_algorithm(plan_id, conn):
 
     for room_name in study_rooms:
         info = relevant_rooms[room_name]
-        room_grade = None
-        for ch in room_name:
-            if ch.isdigit():
-                room_grade = int(ch)
-                break
+        room_grade = extract_grade_from_room(room_name)
         cur.execute("""
             INSERT INTO kelebek_rooms (plan_id, room_name, desk_count, capacity, room_type, grade_for_study)
             VALUES (%s, %s, %s, %s, 'study', %s)
@@ -737,11 +736,7 @@ def _run_butterfly_algorithm(plan_id, conn):
 
     study_room_by_grade = {}
     for room_name in study_rooms:
-        room_grade = None
-        for ch in room_name:
-            if ch.isdigit():
-                room_grade = int(ch)
-                break
+        room_grade = extract_grade_from_room(room_name)
         if room_grade:
             study_room_by_grade.setdefault(room_grade, []).append(room_name)
 
@@ -793,15 +788,11 @@ def _run_butterfly_algorithm(plan_id, conn):
         if remaining_cap <= 0:
             continue
 
-        room_grade = None
-        for ch in room_name:
-            if ch.isdigit():
-                room_grade = int(ch)
-                break
+        room_grade = extract_grade_from_room(room_name)
 
         same_grade_classes = sorted(
             [cls for cls in non_exam_by_class if cls != room_name and len(non_exam_by_class[cls]) > 0
-             and any(ch.isdigit() and int(ch) == room_grade for ch in cls)],
+             and extract_grade_from_room(cls) == room_grade],
             key=lambda cls: len(non_exam_by_class[cls]), reverse=True
         ) if room_grade else []
 
@@ -874,11 +865,7 @@ def _run_butterfly_algorithm(plan_id, conn):
         room_id = room_ids[room_name]
         num_desks = room_info['desks']
 
-        room_grade = None
-        for ch in room_name:
-            if ch.isdigit():
-                room_grade = int(ch)
-                break
+        room_grade = extract_grade_from_room(room_name)
 
         cur.execute("SELECT desk_number FROM kelebek_assignments WHERE room_id = %s ORDER BY desk_number", (room_id,))
         filled_left_desks = set(row['desk_number'] for row in cur.fetchall())
