@@ -65,15 +65,6 @@ def init_kelebek_tables(conn):
     cur = conn.cursor()
     try:
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS kelebek_room_config (
-                id SERIAL PRIMARY KEY,
-                room_name VARCHAR(50) NOT NULL UNIQUE,
-                desks INTEGER NOT NULL,
-                capacity INTEGER NOT NULL,
-                default_type VARCHAR(20) DEFAULT 'auto',
-                sort_order INTEGER DEFAULT 0
-            );
-
             CREATE TABLE IF NOT EXISTS kelebek_plans (
                 id SERIAL PRIMARY KEY,
                 plan_name VARCHAR(200) NOT NULL,
@@ -116,25 +107,6 @@ def init_kelebek_tables(conn):
             );
         """)
         conn.commit()
-
-        cur.execute("SELECT COUNT(*) FROM kelebek_room_config")
-        count = cur.fetchone()[0]
-        if count == 0:
-            sort_order = 0
-            for room_name, info in DEFAULT_ROOM_CAPACITIES.items():
-                default_type = 'auto'
-                if room_name in ALWAYS_STUDY_ROOMS:
-                    default_type = 'study'
-                elif room_name == 'Yedek Sınıf':
-                    default_type = 'exam'
-                cur.execute("""
-                    INSERT INTO kelebek_room_config (room_name, desks, capacity, default_type, sort_order)
-                    VALUES (%s, %s, %s, %s, %s) ON CONFLICT (room_name) DO NOTHING
-                """, (room_name, info['desks'], info['capacity'], default_type, sort_order))
-                sort_order += 1
-            conn.commit()
-            logger.info("Kelebek room config seeded with defaults")
-
         logger.info("Kelebek tables created successfully")
     except Exception as e:
         conn.rollback()
@@ -150,148 +122,6 @@ def kelebek_page():
     if current_user.role not in ['admin']:
         return jsonify({"error": "Yetkisiz erişim"}), 403
     return render_template('kelebek.html')
-
-
-@kelebek_bp.route('/api/room-config', methods=['GET'])
-@login_required
-def get_room_config():
-    if current_user.role not in ['admin']:
-        return jsonify({"error": "Yetkisiz erişim"}), 403
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute("SELECT * FROM kelebek_room_config ORDER BY sort_order, room_name")
-        rooms = cur.fetchall()
-        return jsonify({"success": True, "rooms": rooms})
-    except Exception as e:
-        logger.error(f"Error getting room config: {e}")
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if conn:
-            conn.close()
-
-
-@kelebek_bp.route('/api/room-config', methods=['POST'])
-@login_required
-def add_room_config():
-    if current_user.role not in ['admin']:
-        return jsonify({"error": "Yetkisiz erişim"}), 403
-    conn = None
-    try:
-        data = request.get_json()
-        room_name = data.get('room_name', '').strip()
-        desks = int(data.get('desks', 0))
-        capacity = int(data.get('capacity', 0))
-        default_type = data.get('default_type', 'auto')
-
-        if not room_name:
-            return jsonify({"error": "Sınıf adı gereklidir"}), 400
-        if desks <= 0 or capacity <= 0:
-            return jsonify({"error": "Sıra ve kapasite 0'dan büyük olmalıdır"}), 400
-        if default_type not in ('auto', 'exam', 'study'):
-            default_type = 'auto'
-
-        conn = get_db()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute("SELECT COALESCE(MAX(sort_order), 0) + 1 as next_order FROM kelebek_room_config")
-        next_order = cur.fetchone()['next_order']
-        cur.execute("""
-            INSERT INTO kelebek_room_config (room_name, desks, capacity, default_type, sort_order)
-            VALUES (%s, %s, %s, %s, %s) RETURNING *
-        """, (room_name, desks, capacity, default_type, next_order))
-        room = cur.fetchone()
-        conn.commit()
-        return jsonify({"success": True, "room": room})
-    except psycopg2.IntegrityError:
-        if conn:
-            conn.rollback()
-        return jsonify({"error": f"'{room_name}' zaten mevcut"}), 400
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        logger.error(f"Error adding room config: {e}")
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if conn:
-            conn.close()
-
-
-@kelebek_bp.route('/api/room-config/<int:room_id>', methods=['PUT'])
-@login_required
-def update_room_config(room_id):
-    if current_user.role not in ['admin']:
-        return jsonify({"error": "Yetkisiz erişim"}), 403
-    conn = None
-    try:
-        data = request.get_json()
-        conn = get_db()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-
-        updates = []
-        params = []
-        if 'room_name' in data:
-            updates.append("room_name = %s")
-            params.append(data['room_name'].strip())
-        if 'desks' in data:
-            updates.append("desks = %s")
-            params.append(int(data['desks']))
-        if 'capacity' in data:
-            updates.append("capacity = %s")
-            params.append(int(data['capacity']))
-        if 'default_type' in data:
-            dt = data['default_type']
-            if dt not in ('auto', 'exam', 'study'):
-                dt = 'auto'
-            updates.append("default_type = %s")
-            params.append(dt)
-
-        if not updates:
-            return jsonify({"error": "Güncellenecek alan yok"}), 400
-
-        params.append(room_id)
-        cur.execute(f"UPDATE kelebek_room_config SET {', '.join(updates)} WHERE id = %s RETURNING *", params)
-        room = cur.fetchone()
-        if not room:
-            return jsonify({"error": "Sınıf bulunamadı"}), 404
-        conn.commit()
-        return jsonify({"success": True, "room": room})
-    except psycopg2.IntegrityError:
-        if conn:
-            conn.rollback()
-        return jsonify({"error": "Bu isimde bir sınıf zaten mevcut"}), 400
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        logger.error(f"Error updating room config: {e}")
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if conn:
-            conn.close()
-
-
-@kelebek_bp.route('/api/room-config/<int:room_id>', methods=['DELETE'])
-@login_required
-def delete_room_config(room_id):
-    if current_user.role not in ['admin']:
-        return jsonify({"error": "Yetkisiz erişim"}), 403
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute("DELETE FROM kelebek_room_config WHERE id = %s", (room_id,))
-        if cur.rowcount == 0:
-            return jsonify({"error": "Sınıf bulunamadı"}), 404
-        conn.commit()
-        return jsonify({"success": True})
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        logger.error(f"Error deleting room config: {e}")
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if conn:
-            conn.close()
 
 
 @kelebek_bp.route('/api/create-plan', methods=['POST'])
@@ -659,22 +489,18 @@ def _run_butterfly_algorithm(plan_id, conn):
     cur.execute("DELETE FROM kelebek_assignments WHERE plan_id = %s", (plan_id,))
     cur.execute("DELETE FROM kelebek_rooms WHERE plan_id = %s", (plan_id,))
 
-    cur.execute("SELECT * FROM kelebek_room_config ORDER BY sort_order, room_name")
-    all_room_configs = cur.fetchall()
-
     relevant_rooms = {}
-    room_default_types = {}
-    for rc in all_room_configs:
-        rname = rc['room_name']
+    for room_name, info in DEFAULT_ROOM_CAPACITIES.items():
+        if room_name == 'Yedek Sınıf':
+            relevant_rooms[room_name] = info
+            continue
         room_grade = None
-        for ch in rname:
+        for ch in room_name:
             if ch.isdigit():
                 room_grade = int(ch)
                 break
-        is_relevant = (room_grade and room_grade in grade_levels) or (not room_grade)
-        if is_relevant:
-            relevant_rooms[rname] = {'desks': rc['desks'], 'capacity': rc['capacity']}
-            room_default_types[rname] = rc['default_type']
+        if room_grade and room_grade in grade_levels:
+            relevant_rooms[room_name] = info
 
     exam_rooms = []
     study_rooms = []
@@ -682,19 +508,32 @@ def _run_butterfly_algorithm(plan_id, conn):
 
     total_exam_students = len(exam_students)
 
-    for room in relevant_rooms:
-        if room_default_types.get(room) == 'study':
+    for room in ALWAYS_STUDY_ROOMS:
+        if room in relevant_rooms:
             study_rooms.append(room)
             used_rooms.add(room)
 
     candidate_exam_rooms = []
-    for room in relevant_rooms:
-        if room_default_types.get(room) == 'exam' and room not in used_rooms:
+    if 'Yedek Sınıf' in relevant_rooms:
+        candidate_exam_rooms.append('Yedek Sınıf')
+        used_rooms.add('Yedek Sınıf')
+
+    for room in PRIORITY_EXAM_ROOMS:
+        if room in relevant_rooms and room not in used_rooms and room not in ALWAYS_STUDY_ROOMS:
             candidate_exam_rooms.append(room)
             used_rooms.add(room)
 
+    fifth_grade_rooms = [r for r in relevant_rooms if r.startswith('5') and r not in used_rooms]
+    if fifth_grade_rooms:
+        fifth_grade_rooms.sort(key=lambda r: exam_count_by_class.get(r, 0), reverse=True)
+        candidate_exam_rooms.append(fifth_grade_rooms[0])
+        used_rooms.add(fifth_grade_rooms[0])
+        for r in fifth_grade_rooms[1:]:
+            study_rooms.append(r)
+            used_rooms.add(r)
+
     remaining_rooms = [r for r in relevant_rooms if r not in used_rooms]
-    remaining_rooms.sort(key=lambda r: exam_count_by_class.get(r, 0), reverse=True)
+    remaining_rooms.sort(key=lambda r: relevant_rooms[r]['capacity'], reverse=True)
     for room in remaining_rooms:
         candidate_exam_rooms.append(room)
         used_rooms.add(room)
