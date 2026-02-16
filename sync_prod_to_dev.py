@@ -39,6 +39,24 @@ def sync(skip_tables=None):
         print("HATA: DATABASE_URL ortam degiskeni bulunamadi!")
         sys.exit(1)
 
+    if PROD_DB_URL == DEV_DB_URL:
+        print("HATA: PROD_DATABASE_URL ve DATABASE_URL ayni veritabanina isaret ediyor!")
+        print("Bu durumda senkronizasyon veri kaybina yol acar. Islem iptal edildi.")
+        sys.exit(1)
+
+    def get_host(url):
+        try:
+            return url.split('@')[1].split('/')[0].split(':')[0]
+        except:
+            return ''
+
+    prod_host = get_host(PROD_DB_URL)
+    dev_host = get_host(DEV_DB_URL)
+    if prod_host == dev_host:
+        print(f"HATA: Her iki URL de ayni host'a isaret ediyor: {prod_host}")
+        print("Senkronizasyon iptal edildi.")
+        sys.exit(1)
+
     skip_tables = skip_tables or set()
 
     print("Production DB'ye baglaniliyor...")
