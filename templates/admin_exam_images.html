@@ -144,48 +144,6 @@
         font-size: 0.75rem;
     }
 
-    .floating-undo {
-        position: fixed;
-        bottom: 24px;
-        right: 24px;
-        z-index: 999;
-        display: none;
-        flex-direction: column;
-        gap: 8px;
-        align-items: flex-end;
-    }
-    .floating-undo.visible { display: flex; }
-    .floating-undo-btn {
-        padding: 12px 20px;
-        border: none;
-        border-radius: 12px;
-        font-weight: 700;
-        cursor: pointer;
-        font-size: 0.95rem;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-        transition: all 0.2s;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-    .floating-undo-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.25); }
-    .floating-undo-btn.undo { background: #6b7280; color: white; }
-    .floating-undo-btn.save { background: #10b981; color: white; }
-    .floating-undo-btn.cancel { background: #ef4444; color: white; font-size: 0.8rem; padding: 8px 14px; }
-    .floating-info {
-        background: white;
-        border: 1px solid #e5e7eb;
-        border-radius: 10px;
-        padding: 8px 14px;
-        font-size: 0.8rem;
-        color: #374151;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        text-align: right;
-    }
-    .floating-info .subject-name { font-weight: 700; color: #7c3aed; }
-    .floating-info .question-num { font-weight: 700; color: #1e40af; }
-    .floating-info kbd { background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 4px; padding: 1px 5px; font-size: 0.7rem; }
-
     .toolbar {
         background: #f9fafb;
         border-radius: 12px;
@@ -222,15 +180,6 @@
             <button class="modal-close" onclick="closeEditor()">&times;</button>
         </div>
         <div id="editorContent"></div>
-    </div>
-</div>
-
-<div class="floating-undo" id="floatingUndo">
-    <div class="floating-info" id="floatingInfo"></div>
-    <div style="display:flex;gap:8px;align-items:center;">
-        <button class="floating-undo-btn cancel" id="floatingCancelBtn" onclick="cancelFirstClick()" style="display:none;">Ilk tiklama iptal</button>
-        <button class="floating-undo-btn undo" onclick="undoLastMarker()">&#x21A9; Geri Al <kbd style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);border-radius:4px;padding:1px 5px;font-size:0.7rem;margin-left:4px;">Ctrl+Z</kbd></button>
-        <button class="floating-undo-btn save" onclick="saveAllRegions()">&#x2713; Kaydet</button>
     </div>
 </div>
 {% endblock %}
@@ -292,7 +241,6 @@ async function openEditor(examId, examName) {
 function closeEditor() {
     document.getElementById('editorModal').style.display = 'none';
     currentExamId = null;
-    updateFloatingPanel();
     loadExams();
 }
 
@@ -432,7 +380,6 @@ function updateToolbarOnly() {
     markers.forEach(m => {
         renderPageMarkers(m.page_id);
     });
-    updateFloatingPanel();
 }
 
 function renderEditor() {
@@ -459,7 +406,6 @@ function renderEditor() {
         `;
         content.innerHTML = html;
         pagesRendered = false;
-        updateFloatingPanel();
         return;
     }
     
@@ -488,7 +434,6 @@ function renderEditor() {
     
     content.innerHTML = html;
     pagesRendered = true;
-    updateFloatingPanel();
 }
 
 let clickState = null;
@@ -504,7 +449,6 @@ function handlePageClick(event, pageId) {
     if (!clickState) {
         clickState = { pageId, xStart: xNorm, yStart: yNorm };
         showTempCorner(pageId, xNorm, yNorm, 'Sol ust');
-        updateFloatingPanel();
     } else {
         if (clickState.pageId !== pageId) {
             alert('Baslangic ve bitis ayni sayfada olmali');
@@ -547,7 +491,6 @@ function handlePageClick(event, pageId) {
         }
         
         updateToolbarOnly();
-        updateFloatingPanel();
     }
 }
 
@@ -647,21 +590,7 @@ function removeMarker(idx) {
     updateToolbarOnly();
 }
 
-function cancelFirstClick() {
-    if (clickState) {
-        clickState = null;
-        removeTempLines();
-        updateFloatingPanel();
-    }
-}
-
 function undoLastMarker() {
-    if (clickState) {
-        clickState = null;
-        removeTempLines();
-        updateFloatingPanel();
-        return;
-    }
     if (markers.length === 0) return;
     const removed = markers.pop();
     activeSubject = removed.subject_key;
@@ -670,40 +599,6 @@ function undoLastMarker() {
     removeTempLines();
     renderPageMarkers(removed.page_id);
     updateToolbarOnly();
-    updateFloatingPanel();
-}
-
-function updateFloatingPanel() {
-    const panel = document.getElementById('floatingUndo');
-    const info = document.getElementById('floatingInfo');
-    const cancelBtn = document.getElementById('floatingCancelBtn');
-    const isEditorOpen = document.getElementById('editorModal').style.display === 'flex';
-    const hasSubjects = Object.keys(subjectQuestions).length > 0;
-    
-    if (!isEditorOpen || !hasSubjects) {
-        panel.classList.remove('visible');
-        return;
-    }
-    
-    panel.classList.add('visible');
-    
-    if (cancelBtn) {
-        cancelBtn.style.display = clickState ? 'block' : 'none';
-    }
-    
-    let infoHtml = '';
-    if (activeSubject && subjectQuestions[activeSubject]) {
-        const markedCount = markers.filter(m => m.subject_key === activeSubject).length;
-        const totalCount = subjectQuestions[activeSubject].count;
-        infoHtml += `<span class="subject-name">${subjectQuestions[activeSubject].label}</span> S<span class="question-num">${activeQuestionNum}</span>`;
-        infoHtml += `<br>${markedCount}/${totalCount} isaretli`;
-        if (clickState) {
-            infoHtml += `<br><span style="color:#ef4444;font-weight:600;">Sol ust secildi - sag alt tiklayin</span>`;
-        }
-        infoHtml += `<br>Toplam: ${markers.length} soru`;
-        infoHtml += `<br><kbd>Ctrl+Z</kbd> Geri al`;
-    }
-    info.innerHTML = infoHtml;
 }
 
 async function saveAllRegions() {
@@ -806,19 +701,6 @@ async function setBookletType(type) {
         updateToolbarOnly();
     }
 }
-
-document.addEventListener('keydown', function(e) {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
-        const isEditorOpen = document.getElementById('editorModal').style.display === 'flex';
-        if (isEditorOpen) {
-            e.preventDefault();
-            undoLastMarker();
-        }
-    }
-    if (e.key === 'Escape' && clickState) {
-        cancelFirstClick();
-    }
-});
 
 loadExams();
 </script>

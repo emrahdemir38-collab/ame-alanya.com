@@ -5,7 +5,7 @@ import os
 import json
 import logging
 import uuid
-from flask import Blueprint, request, jsonify, render_template, current_app, send_file, make_response
+from flask import Blueprint, request, jsonify, render_template, current_app, send_file
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 import psycopg2
@@ -9853,162 +9853,6 @@ def build_booklet_question_mapping(cur, exam_id, from_booklet, to_booklet):
     return mapping
 
 
-def _build_tekrar_coz_pdf(student_name, sections):
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, KeepTogether
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib import colors
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_CENTER
-    from reportlab.platypus import Image as RLImage
-    
-    pdf_buffer = BytesIO()
-    doc = SimpleDocTemplate(pdf_buffer, pagesize=A4, topMargin=25, bottomMargin=25, leftMargin=30, rightMargin=30)
-    elements = []
-    styles = getSampleStyleSheet()
-    
-    page_width = A4[0] - 60
-    col_gap = 12
-    col_width = (page_width - col_gap) / 2
-    max_single_col_height = 200
-    
-    try:
-        title_style = ParagraphStyle('WTTitle', parent=styles['Title'], fontName='DejaVuSans', fontSize=13, spaceAfter=4)
-        subtitle_style = ParagraphStyle('WTSub', parent=styles['Normal'], fontName='DejaVuSans', fontSize=9, spaceAfter=8, textColor=colors.grey)
-        subject_style = ParagraphStyle('WTSubject', parent=styles['Heading2'], fontName='DejaVuSans-Bold', fontSize=11, spaceBefore=10, spaceAfter=4, textColor=colors.HexColor('#7c3aed'))
-        q_label_style = ParagraphStyle('WTQLabel', parent=styles['Normal'], fontName='DejaVuSans', fontSize=7, textColor=colors.HexColor('#4b5563'), spaceAfter=2)
-        warn_style = ParagraphStyle('WTWarn', parent=styles['Normal'], fontName='DejaVuSans', fontSize=7, textColor=colors.HexColor('#dc2626'), spaceAfter=6)
-        exam_header_style = ParagraphStyle('WTExamH', parent=styles['Heading2'], fontName='DejaVuSans-Bold', fontSize=11, spaceBefore=6, spaceAfter=4, textColor=colors.HexColor('#1e40af'))
-    except:
-        title_style = ParagraphStyle('WTTitle', parent=styles['Title'], fontSize=13, spaceAfter=4)
-        subtitle_style = ParagraphStyle('WTSub', parent=styles['Normal'], fontSize=9, spaceAfter=8, textColor=colors.grey)
-        subject_style = ParagraphStyle('WTSubject', parent=styles['Heading2'], fontSize=11, spaceBefore=10, spaceAfter=4, textColor=colors.HexColor('#7c3aed'))
-        q_label_style = ParagraphStyle('WTQLabel', parent=styles['Normal'], fontSize=7, textColor=colors.HexColor('#4b5563'), spaceAfter=2)
-        warn_style = ParagraphStyle('WTWarn', parent=styles['Normal'], fontSize=7, textColor=colors.HexColor('#dc2626'), spaceAfter=6)
-        exam_header_style = ParagraphStyle('WTExamH', parent=styles['Heading2'], fontSize=11, spaceBefore=6, spaceAfter=4, textColor=colors.HexColor('#1e40af'))
-    
-    total_questions = sum(len(s['items']) for s in sections)
-    exam_names = ', '.join(s['exam_name'] for s in sections)
-    elements.append(Paragraph(f"Tekrar Coz - {student_name}", title_style))
-    elements.append(Paragraph(f"{exam_names} | {total_questions} soru", subtitle_style))
-    elements.append(Spacer(1, 6))
-    
-    for sec_idx, section in enumerate(sections):
-        if sec_idx > 0:
-            elements.append(PageBreak())
-        
-        if len(sections) > 1:
-            elements.append(Paragraph(f"📝 {section['exam_name']}", exam_header_style))
-        
-        if section.get('warning'):
-            elements.append(Paragraph(f"Not: {section['warning']}", warn_style))
-        
-        items = section['items']
-        if not items:
-            continue
-        
-        current_subject = None
-        pending_pair = []
-        
-        def flush_pair():
-            if not pending_pair:
-                return
-            if len(pending_pair) == 1:
-                q = pending_pair[0]
-                q['image_buf'].seek(0)
-                iw, ih = q['width'], q['height']
-                if ih > max_single_col_height or iw > col_width:
-                    scale = min(page_width / iw, 1.0)
-                    dw = iw * scale
-                    dh = ih * scale
-                    max_h = A4[1] * 0.5
-                    if dh > max_h:
-                        s2 = max_h / dh
-                        dw *= s2
-                        dh *= s2
-                    block = [
-                        Paragraph(f"S{q['question_number']}", q_label_style),
-                        RLImage(q['image_buf'], width=dw, height=dh)
-                    ]
-                else:
-                    scale = min(col_width / iw, 1.0)
-                    dw = iw * scale
-                    dh = ih * scale
-                    block = [
-                        Paragraph(f"S{q['question_number']}", q_label_style),
-                        RLImage(q['image_buf'], width=dw, height=dh)
-                    ]
-                elements.append(KeepTogether(block))
-                elements.append(Spacer(1, 6))
-            else:
-                row_data = []
-                for q in pending_pair:
-                    q['image_buf'].seek(0)
-                    iw, ih = q['width'], q['height']
-                    scale = min(col_width / iw, 1.0)
-                    dw = iw * scale
-                    dh = ih * scale
-                    max_h = A4[1] * 0.4
-                    if dh > max_h:
-                        s2 = max_h / dh
-                        dw *= s2
-                        dh *= s2
-                    label = Paragraph(f"S{q['question_number']}", q_label_style)
-                    img = RLImage(q['image_buf'], width=dw, height=dh)
-                    row_data.append(KeepTogether([label, img]))
-                
-                while len(row_data) < 2:
-                    row_data.append(Paragraph('', q_label_style))
-                
-                tbl = Table([row_data], colWidths=[col_width, col_width], spaceBefore=2, spaceAfter=6)
-                tbl.setStyle(TableStyle([
-                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                    ('LEFTPADDING', (0, 0), (-1, -1), 0),
-                    ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-                    ('TOPPADDING', (0, 0), (-1, -1), 0),
-                    ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
-                ]))
-                elements.append(tbl)
-            pending_pair.clear()
-        
-        for item in items:
-            if item['subject_label'] != current_subject:
-                flush_pair()
-                current_subject = item['subject_label']
-                elements.append(Paragraph(f"{current_subject}", subject_style))
-            
-            iw, ih = item['width'], item['height']
-            is_tall = ih > max_single_col_height or (ih / max(iw, 1)) > 2.5
-            is_wide = iw > col_width * 1.2
-            
-            if is_tall or is_wide:
-                flush_pair()
-                pending_pair.append(item)
-                flush_pair()
-            else:
-                pending_pair.append(item)
-                if len(pending_pair) >= 2:
-                    flush_pair()
-        
-        flush_pair()
-    
-    try:
-        doc.build(elements)
-    except Exception as build_err:
-        logger.error(f"PDF build error (retrying without KeepTogether): {build_err}")
-        pdf_buffer = BytesIO()
-        doc2 = SimpleDocTemplate(pdf_buffer, pagesize=A4, topMargin=25, bottomMargin=25, leftMargin=30, rightMargin=30)
-        flat_elements = []
-        for el in elements:
-            if isinstance(el, KeepTogether):
-                flat_elements.extend(el._content if hasattr(el, '_content') else [el])
-            else:
-                flat_elements.append(el)
-        doc2.build(flat_elements)
-    
-    pdf_buffer.seek(0)
-    return pdf_buffer
-
-
 @report_cards_bp.route('/api/wrong-questions-pdf-check/<int:result_id>')
 @login_required
 def check_wrong_questions_pdf(result_id):
@@ -10197,18 +10041,8 @@ def generate_wrong_questions_pdf(result_id):
             
             cropped = page_img.crop((x1, y1, x2, y2))
             
-            max_dim = 800
-            cw, ch = cropped.size
-            if cw > max_dim or ch > max_dim:
-                scale = min(max_dim / cw, max_dim / ch)
-                new_w = int(cw * scale)
-                new_h = int(ch * scale)
-                cropped = cropped.resize((new_w, new_h), PILImage.LANCZOS)
-            
             crop_buf = BytesIO()
-            if cropped.mode == 'RGBA':
-                cropped = cropped.convert('RGB')
-            cropped.save(crop_buf, format='JPEG', quality=80, optimize=True)
+            cropped.save(crop_buf, format='PNG')
             crop_buf.seek(0)
             
             cropped_items.append({
@@ -10234,10 +10068,29 @@ def generate_wrong_questions_pdf(result_id):
                 return jsonify({"error": f"Kitapcik eslestirmesi yapilamadi. Ogrenci {student_booklet} kitapcigi, gorsel {image_booklet} kitapcigi. Lutfen kazanimli cevap anahtari yukleyin."}), 404
             return jsonify({"error": "Eslesen soru gorseli bulunamadi"}), 404
         
+        pdf_buffer = BytesIO()
+        doc = SimpleDocTemplate(pdf_buffer, pagesize=A4, topMargin=30, bottomMargin=30, leftMargin=40, rightMargin=40)
+        elements = []
+        styles = getSampleStyleSheet()
+        
+        try:
+            title_style = ParagraphStyle('WrongTitle', parent=styles['Title'], fontName='DejaVuSans', fontSize=14, spaceAfter=6)
+            subtitle_style = ParagraphStyle('WrongSubtitle', parent=styles['Normal'], fontName='DejaVuSans', fontSize=10, spaceAfter=12, textColor=colors.grey)
+            subject_style = ParagraphStyle('WrongSubject', parent=styles['Heading2'], fontName='DejaVuSans-Bold', fontSize=12, spaceBefore=16, spaceAfter=6, textColor=colors.HexColor('#7c3aed'))
+            info_style = ParagraphStyle('WrongInfo', parent=styles['Normal'], fontName='DejaVuSans', fontSize=8, textColor=colors.grey, spaceAfter=4)
+            warn_style = ParagraphStyle('WrongWarn', parent=styles['Normal'], fontName='DejaVuSans', fontSize=8, textColor=colors.HexColor('#dc2626'), spaceAfter=8)
+        except:
+            title_style = ParagraphStyle('WrongTitle', parent=styles['Title'], fontSize=14, spaceAfter=6)
+            subtitle_style = ParagraphStyle('WrongSubtitle', parent=styles['Normal'], fontSize=10, spaceAfter=12, textColor=colors.grey)
+            subject_style = ParagraphStyle('WrongSubject', parent=styles['Heading2'], fontSize=12, spaceBefore=16, spaceAfter=6, textColor=colors.HexColor('#7c3aed'))
+            info_style = ParagraphStyle('WrongInfo', parent=styles['Normal'], fontSize=8, textColor=colors.grey, spaceAfter=4)
+            warn_style = ParagraphStyle('WrongWarn', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#dc2626'), spaceAfter=8)
+        
         student_name = result.get('student_name', '')
         exam_name = result.get('exam_name', '')
-        
-        warning_text = None
+        elements.append(Paragraph(f"Tekrar Coz - {student_name}", title_style))
+        subtitle = f"{exam_name} | {len(cropped_items)} soru"
+        elements.append(Paragraph(subtitle, subtitle_style))
         if missing_total > 0:
             warnings = []
             if no_region_count > 0:
@@ -10245,262 +10098,55 @@ def generate_wrong_questions_pdf(result_id):
             if no_mapping_count > 0:
                 warnings.append(f"{no_mapping_count} soru kitapcik farkindan dolayi eslestirilemedi (Ogrenci: {student_booklet}, Gorsel: {image_booklet})")
             if warnings:
-                warning_text = ' | '.join(warnings)
+                elements.append(Paragraph(f"Not: {' | '.join(warnings)}", warn_style))
+        elements.append(Spacer(1, 10))
         
-        sections = [{'exam_name': exam_name, 'items': cropped_items, 'warning': warning_text}]
+        current_subject = None
+        page_width = A4[0] - 80
         
-        logger.info(f"Tekrar Çöz PDF oluşturuluyor: {student_name}, {len(cropped_items)} görsel")
-        pdf_buffer = _build_tekrar_coz_pdf(student_name, sections)
-        pdf_size = pdf_buffer.getbuffer().nbytes
-        logger.info(f"Tekrar Çöz PDF oluşturuldu: {pdf_size} bytes ({pdf_size/1024:.0f} KB)")
+        for item in cropped_items:
+            if item['subject_label'] != current_subject:
+                current_subject = item['subject_label']
+                elements.append(Paragraph(f"{current_subject}", subject_style))
+            
+            elements.append(Paragraph(
+                f"Soru {item['question_number']}",
+                info_style
+            ))
+            
+            img_width = item['width']
+            img_height = item['height']
+            
+            scale = min(page_width / img_width, 1.0)
+            display_width = img_width * scale
+            display_height = img_height * scale
+            
+            max_height = A4[1] * 0.6
+            if display_height > max_height:
+                scale2 = max_height / display_height
+                display_width *= scale2
+                display_height *= scale2
+            
+            item['image_buf'].seek(0)
+            elements.append(RLImage(item['image_buf'], width=display_width, height=display_height))
+            elements.append(Spacer(1, 12))
+        
+        doc.build(elements)
+        pdf_buffer.seek(0)
         
         safe_name = student_name.replace(' ', '_')
         filename = f"Tekrar_Coz_{safe_name}_{exam_name.replace(' ', '_')}.pdf"
         
-        response = make_response(pdf_buffer.getvalue())
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
-        response.headers['Content-Length'] = pdf_size
-        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        return response
-    
-    except Exception as ex:
-        logger.error(f"Hatalı soru PDF hatası: {ex}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": f"PDF oluşturma hatası: {str(ex)}"}), 500
-    finally:
-        cur.close()
-        conn.close()
-
-def _extract_wrong_question_images(result, cur, object_storage):
-    exam_id = result['exam_id']
-    
-    subjects = result.get('subjects') or {}
-    if isinstance(subjects, str):
-        subjects = json.loads(subjects)
-    
-    wrong_questions = []
-    for subj_key, subj_data in subjects.items():
-        for ans in subj_data.get('answers', []):
-            if ans.get('status') in ('wrong', 'blank'):
-                wrong_questions.append({
-                    'subject_key': subj_key,
-                    'question_number': ans.get('question_number'),
-                    'subject_label': subj_data.get('subject_label', subj_key),
-                    'outcome': ans.get('outcome', ''),
-                    'status': ans.get('status'),
-                    'student_answer': ans.get('student_answer', '-'),
-                    'correct_answer': ans.get('correct_answer', '-')
-                })
-    
-    if not wrong_questions:
-        return [], None
-    
-    image_booklet = result.get('image_booklet_type', 'A') or 'A'
-    student_booklet = result.get('booklet_type', '') or ''
-    if not student_booklet:
-        first_subj = next(iter(subjects.values()), {})
-        student_booklet = first_subj.get('booklet_type', 'A') or 'A'
-    student_booklet = student_booklet.upper()
-    
-    q_mapping = {}
-    if student_booklet != image_booklet:
-        q_mapping = build_booklet_question_mapping(cur, exam_id, student_booklet, image_booklet)
-    
-    cur.execute("""
-        SELECT qr.*, ep.image_key, ep.width_px, ep.height_px
-        FROM report_card_question_regions qr
-        JOIN report_card_exam_pages ep ON qr.page_id = ep.id
-        WHERE qr.exam_id = %s
-    """, (exam_id,))
-    regions = cur.fetchall()
-    
-    region_map = {}
-    for r in regions:
-        key = f"{r['subject_key']}_{r['question_number']}"
-        region_map[key] = r
-    
-    marked_subjects = set()
-    for rk in region_map:
-        subj = rk.rsplit('_', 1)[0]
-        marked_subjects.add(subj)
-    
-    page_images_cache = {}
-    cropped_items = []
-    no_region_count = 0
-    no_mapping_count = 0
-    download_fail_count = 0
-    
-    for wq in wrong_questions:
-        lookup_q_num = wq['question_number']
-        mapping_failed = False
-        if q_mapping and wq['subject_key'] in q_mapping:
-            mapped = q_mapping[wq['subject_key']].get(lookup_q_num)
-            if mapped:
-                lookup_q_num = mapped
-            else:
-                mapping_failed = True
-        elif student_booklet != image_booklet and wq['subject_key'] not in (q_mapping or {}):
-            mapping_failed = True
-        
-        key = f"{wq['subject_key']}_{lookup_q_num}"
-        region = region_map.get(key)
-        if not region:
-            if mapping_failed:
-                no_mapping_count += 1
-            else:
-                no_region_count += 1
-            continue
-        
-        image_key = region['image_key']
-        if image_key not in page_images_cache:
-            try:
-                if object_storage.is_available():
-                    data, _ = object_storage.download_as_bytes(image_key)
-                    from PIL import Image as PILImage
-                    page_images_cache[image_key] = PILImage.open(BytesIO(data))
-                else:
-                    download_fail_count += 1
-                    page_images_cache[image_key] = None
-            except Exception as dl_err:
-                logger.warning(f"Image download failed for {image_key}: {dl_err}")
-                download_fail_count += 1
-                page_images_cache[image_key] = None
-        
-        if page_images_cache.get(image_key) is None:
-            continue
-        
-        page_img = page_images_cache[image_key]
-        w, h = page_img.size
-        
-        x1 = int(region['x_start_norm'] * w)
-        y1 = int(region['y_start_norm'] * h)
-        x2 = int(region['x_end_norm'] * w)
-        y2 = int(region['y_end_norm'] * h)
-        
-        cropped = page_img.crop((x1, y1, x2, y2))
-        
-        max_dim = 800
-        cw, ch = cropped.size
-        if cw > max_dim or ch > max_dim:
-            scale = min(max_dim / cw, max_dim / ch)
-            new_w = int(cw * scale)
-            new_h = int(ch * scale)
-            cropped = cropped.resize((new_w, new_h), PILImage.LANCZOS)
-        
-        crop_buf = BytesIO()
-        if cropped.mode == 'RGBA':
-            cropped = cropped.convert('RGB')
-        cropped.save(crop_buf, format='JPEG', quality=80, optimize=True)
-        crop_buf.seek(0)
-        
-        cropped_items.append({
-            'image_buf': crop_buf,
-            'width': cropped.width,
-            'height': cropped.height,
-            'subject_label': wq['subject_label'],
-            'question_number': wq['question_number'],
-            'outcome': wq['outcome'],
-            'status': wq['status'],
-            'student_answer': wq['student_answer'],
-            'correct_answer': wq['correct_answer']
-        })
-    
-    warning_text = None
-    missing_total = len(wrong_questions) - len(cropped_items)
-    if missing_total > 0:
-        warnings = []
-        if no_region_count > 0:
-            warnings.append(f"{no_region_count} sorunun gorseli isaretlenmemis")
-        if no_mapping_count > 0:
-            warnings.append(f"{no_mapping_count} soru kitapcik farkindan eslestirilemedi")
-        if download_fail_count > 0:
-            warnings.append(f"{download_fail_count} gorsel indirilemedi")
-        if warnings:
-            warning_text = ' | '.join(warnings)
-    
-    return cropped_items, warning_text
-
-
-@report_cards_bp.route('/api/wrong-questions-pdf-multi', methods=['POST'])
-@login_required
-def generate_wrong_questions_pdf_multi():
-    if current_user.role not in ['admin', 'teacher']:
-        return jsonify({"error": "Yetkisiz erişim"}), 403
-    from app import object_storage
-    
-    data = request.get_json()
-    result_ids = data.get('result_ids', [])
-    
-    if not result_ids or len(result_ids) == 0:
-        return jsonify({"error": "Sinav seciniz"}), 400
-    
-    conn = get_db()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-    
-    try:
-        allowed_classes = None
-        if current_user.role == 'teacher':
-            cur.execute("SELECT class_name FROM teacher_classes WHERE teacher_id = %s", (current_user.id,))
-            allowed_classes = [row['class_name'] for row in cur.fetchall()]
-            allowed_classes_norm = [c.replace('/', '') for c in allowed_classes]
-        
-        sections = []
-        student_name = ''
-        
-        for result_id in result_ids:
-            cur.execute("""
-                SELECT r.*, e.exam_name, e.id as exam_id, e.image_booklet_type
-                FROM report_card_results r
-                JOIN report_card_exams e ON r.exam_id = e.id
-                WHERE r.id = %s
-            """, (result_id,))
-            result = cur.fetchone()
-            
-            if not result:
-                continue
-            
-            if allowed_classes is not None:
-                result_class = result.get('class_name', '')
-                if result_class not in allowed_classes and result_class.replace('/', '') not in allowed_classes_norm:
-                    continue
-            
-            if not student_name:
-                student_name = result.get('student_name', '')
-            
-            cur.execute("SELECT COUNT(*) as cnt FROM report_card_question_regions WHERE exam_id = %s", (result['exam_id'],))
-            if cur.fetchone()['cnt'] == 0:
-                continue
-            
-            cropped_items, warning_text = _extract_wrong_question_images(result, cur, object_storage)
-            
-            if cropped_items:
-                sections.append({
-                    'exam_name': result.get('exam_name', ''),
-                    'items': cropped_items,
-                    'warning': warning_text
-                })
-        
-        if not sections:
-            return jsonify({"error": "Secilen sinavlarda gorsel bulunamadi"}), 404
-        
-        pdf_buffer = _build_tekrar_coz_pdf(student_name, sections)
-        
-        safe_name = student_name.replace(' ', '_')
-        filename = f"Tekrar_Coz_{safe_name}_Toplu.pdf"
-        
         return send_file(pdf_buffer, mimetype='application/pdf', as_attachment=True, download_name=filename)
     
     except Exception as ex:
-        logger.error(f"Toplu Tekrar Çöz PDF hatası: {ex}")
+        logger.error(f"Hatalı soru PDF hatası: {ex}")
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(ex)}), 500
     finally:
         cur.close()
         conn.close()
-
 
 @report_cards_bp.route('/api/exam-images/<int:exam_id>/has-images')
 @login_required
