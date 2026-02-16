@@ -5,6 +5,8 @@ import os
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 import uuid
+import unicodedata
+from urllib.parse import quote as url_quote
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import json
@@ -18,6 +20,17 @@ from contextlib import contextmanager
 import subprocess
 import tempfile
 import gzip
+
+_TR_MAP = str.maketrans('çğıöşüÇĞİÖŞÜ', 'cgiosuCGIOSU')
+
+def _safe_filename(name):
+    ascii_name = name.translate(_TR_MAP)
+    ascii_name = unicodedata.normalize('NFKD', ascii_name).encode('ascii', 'ignore').decode('ascii')
+    return ascii_name
+
+def _content_disposition(filename):
+    ascii_name = _safe_filename(filename)
+    return f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{url_quote(filename)}"
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib import colors
 from reportlab.lib.units import inch
@@ -3207,7 +3220,7 @@ def download_file_direct(filename):
         
         # Header'lar
         response.headers['Content-Type'] = content_type
-        response.headers['Content-Disposition'] = f'attachment; filename="{base_filename}"'
+        response.headers['Content-Disposition'] = _content_disposition(base_filename)
         
         # Önbellek - 1 saat
         response.headers['Cache-Control'] = 'public, max-age=3600'
@@ -3545,7 +3558,7 @@ def serve_file_with_mime(filename):
     
     # fetch + blob için gerekli header'lar
     response.headers['Content-Type'] = mimetype
-    response.headers['Content-Disposition'] = f'attachment; filename="{base_filename}"'
+    response.headers['Content-Disposition'] = _content_disposition(base_filename)
     response.headers['Content-Length'] = len(file_data)
     response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     response.headers['Access-Control-Allow-Origin'] = '*'
@@ -12870,7 +12883,7 @@ def generate_student_report_pdf(student_id):
             buffer,
             mimetype='application/pdf',
             as_attachment=False,
-            download_name=f'{student["full_name"]}_deneme_raporu_{datetime.now().strftime("%Y%m%d")}.pdf'
+            download_name=_safe_filename(f'{student["full_name"]}_deneme_raporu_{datetime.now().strftime("%Y%m%d")}.pdf')
         )
     
     except Exception as e:
@@ -18837,7 +18850,7 @@ def download_single_report_card_pdf(exam_number):
             buffer,
             mimetype='application/pdf',
             as_attachment=False,
-            download_name=f'karne_deneme_{exam_number}_{temp_user.full_name.replace(" ", "_")}.pdf'
+            download_name=_safe_filename(f'karne_deneme_{exam_number}_{temp_user.full_name.replace(" ", "_")}.pdf')
         )
         
     except Exception as e:
@@ -18948,7 +18961,7 @@ def download_student_report_card_pdf():
             buffer,
             mimetype='application/pdf',
             as_attachment=False,
-            download_name=f"karne_{current_user.full_name.replace(' ', '_')}.pdf"
+            download_name=_safe_filename(f"karne_{current_user.full_name.replace(' ', '_')}.pdf")
         )
         
     except Exception as e:
