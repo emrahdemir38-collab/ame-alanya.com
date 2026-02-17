@@ -542,7 +542,14 @@ def load_user(user_id):
 
 @app.route("/health")
 def health_check():
-    return "OK", 200
+    status = {"status": "ok", "timestamp": datetime.now().isoformat()}
+    try:
+        conn = get_db()
+        conn.close()
+        status["database"] = "connected"
+    except Exception as e:
+        status["database"] = f"error: {str(e)}"
+    return jsonify(status), 200
 
 @app.route("/")
 def index():
