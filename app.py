@@ -477,7 +477,10 @@ def get_file_data(file_path):
 
 def get_db():
     """Veritabanı bağlantısı oluştur"""
-    return psycopg2.connect(os.environ.get('DATABASE_URL'))
+    db_url = os.environ.get('DATABASE_URL', '')
+    if db_url.startswith('postgres://'):
+        db_url = db_url.replace('postgres://', 'postgresql://', 1)
+    return psycopg2.connect(db_url)
 
 
 def allowed_file(filename, file_type='all'):
