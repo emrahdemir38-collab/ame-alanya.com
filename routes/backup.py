@@ -10,13 +10,15 @@ from uuid import UUID
 from flask import Blueprint, request, jsonify, render_template, send_file, session as flask_session
 from flask_login import login_required, current_user
 import psycopg2
-from psycopg2.extras import RealDictCursor
+from psycopg2.extras import RealDictCursor, Json
 
 logger = logging.getLogger(__name__)
 
 backup_bp = Blueprint('backup', __name__)
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
+PROD_DATABASE_URL = os.environ.get('PROD_DATABASE_URL')
+RAILWAY_DB_URL = os.environ.get('RAILWAY_DB_URL')
 
 BACKUP_TABLES = [
     'users', 'classes', 'teacher_classes', 'teacher_students',
@@ -472,3 +474,338 @@ def delete_cloud_backup():
     except Exception as e:
         logger.error(f"Delete backup error: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+def get_source_db(source_type):
+    if source_type == 'prod':
+        url = PROD_DATABASE_URL
+    elif source_type == 'dev':
+        url = DATABASE_URL
+    else:
+        url = DATABASE_URL
+    if not url:
+        raise Exception(f'{source_type} veritabanı URL bulunamadı')
+    return psycopg2.connect(url)
+
+
+def sync_to_railway(source_type='prod'):
+    if not RAILWAY_DB_URL:
+        raise Exception('RAILWAY_DB_URL tanımlanmamış')
+
+    source_conn = get_source_db(source_type)
+    source_cur = source_conn.cursor(cursor_factory=RealDictCursor)
+
+    source_cur.execute("""SELECT table_name FROM information_schema.tables 
+                         WHERE table_schema = 'public' AND table_type = 'BASE TABLE' ORDER BY table_name""")
+    source_tables = [r['table_name'] for r in source_cur.fetchall()]
+
+    railway_conn = psycopg2.connect(RAILWAY_DB_URL)
+    railway_cur = railway_conn.cursor(cursor_factory=RealDictCursor)
+
+    railway_cur.execute("""SELECT table_name FROM information_schema.tables 
+                          WHERE table_schema = 'public' AND table_type = 'BASE TABLE' ORDER BY table_name""")
+    railway_tables = [r['table_name'] for r in railway_cur.fetchall()]
+
+    results = []
+    errors = []
+    skipped = []
+
+    for table in source_tables:
+        try:
+            if table not in railway_tables:
+                source_cur.execute(f"""SELECT column_name, data_type, is_nullable, column_default, 
+                                      character_maximum_length, numeric_precision, numeric_scale
+                                   FROM information_schema.columns 
+                                   WHERE table_name = '{table}' AND table_schema = 'public'
+                                   ORDER BY ordinal_position""")
+                columns_info = source_cur.fetchall()
+
+                if not columns_info:
+                    skipped.append({'table': table, 'reason': 'Sütun bilgisi alınamadı'})
+                    continue
+
+                col_defs = []
+                for col in columns_info:
+                    col_name = col['column_name']
+                    data_type = col['data_type']
+                    nullable = col['is_nullable']
+                    default = col['column_default']
+                    max_len = col['character_maximum_length']
+
+                    if default and 'nextval' in str(default):
+                        col_def = f'"{col_name}" SERIAL'
+                    else:
+                        if data_type == 'character varying':
+                            type_str = f'VARCHAR({max_len})' if max_len else 'VARCHAR(255)'
+                        elif data_type == 'integer':
+                            type_str = 'INTEGER'
+                        elif data_type == 'bigint':
+                            type_str = 'BIGINT'
+                        elif data_type == 'boolean':
+                            type_str = 'BOOLEAN'
+                        elif data_type == 'text':
+                            type_str = 'TEXT'
+                        elif data_type == 'numeric':
+                            p = col['numeric_precision']
+                            s = col['numeric_scale']
+                            type_str = f'NUMERIC({p},{s})' if p else 'NUMERIC'
+                        elif data_type == 'timestamp without time zone':
+                            type_str = 'TIMESTAMP'
+                        elif data_type == 'timestamp with time zone':
+                            type_str = 'TIMESTAMPTZ'
+                        elif data_type == 'date':
+                            type_str = 'DATE'
+                        elif data_type == 'time without time zone':
+                            type_str = 'TIME'
+                        elif data_type == 'double precision':
+                            type_str = 'DOUBLE PRECISION'
+                        elif data_type == 'real':
+                            type_str = 'REAL'
+                        elif data_type == 'smallint':
+                            type_str = 'SMALLINT'
+                        elif data_type == 'json':
+                            type_str = 'JSON'
+                        elif data_type == 'jsonb':
+                            type_str = 'JSONB'
+                        elif data_type == 'bytea':
+                            type_str = 'BYTEA'
+                        elif data_type == 'uuid':
+                            type_str = 'UUID'
+                        elif data_type == 'ARRAY':
+                            type_str = 'TEXT[]'
+                        else:
+                            type_str = 'TEXT'
+
+                        col_def = f'"{col_name}" {type_str}'
+                        if nullable == 'NO' and not (default and 'nextval' in str(default)):
+                            col_def += ' NOT NULL'
+                        if default and 'nextval' not in str(default):
+                            col_def += f' DEFAULT {default}'
+
+                    col_defs.append(col_def)
+
+                source_cur.execute(f"""SELECT kcu.column_name
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name
+                    WHERE tc.table_name = '{table}' AND tc.constraint_type = 'PRIMARY KEY'""")
+                pk_cols = [r['column_name'] for r in source_cur.fetchall()]
+                if pk_cols:
+                    pk_str = ', '.join([f'"{c}"' for c in pk_cols])
+                    col_defs.append(f'PRIMARY KEY ({pk_str})')
+
+                create_sql = f'CREATE TABLE IF NOT EXISTS "{table}" ({", ".join(col_defs)})'
+                try:
+                    railway_cur.execute(create_sql)
+                    railway_conn.commit()
+                    logger.info(f"Railway: Created table {table}")
+                except Exception as ce:
+                    railway_conn.rollback()
+                    errors.append({'table': table, 'error': f'Tablo oluşturulamadı: {ce}'})
+                    continue
+
+        except Exception as e:
+            source_conn.rollback()
+            errors.append({'table': table, 'error': f'Tablo yapısı hatası: {e}'})
+            logger.error(f"Railway table create error for {table}: {e}")
+
+    railway_cur.execute("""SELECT column_name, table_name, data_type 
+                          FROM information_schema.columns 
+                          WHERE table_schema = 'public' AND data_type IN ('json', 'jsonb')""")
+    jsonb_cols_map = {}
+    for r in railway_cur.fetchall():
+        jsonb_cols_map.setdefault(r['table_name'], set()).add(r['column_name'])
+
+    railway_cur.execute("SET session_replication_role = 'replica';")
+    railway_conn.commit()
+
+    try:
+        for table in source_tables:
+            try:
+                railway_cur.execute("""SELECT table_name FROM information_schema.tables 
+                                     WHERE table_schema = 'public' AND table_name = %s""", (table,))
+                if not railway_cur.fetchone():
+                    skipped.append({'table': table, 'reason': 'Tablo Railway\'da yok'})
+                    continue
+
+                source_cur.execute(f'SELECT COUNT(*) as cnt FROM "{table}"')
+                source_count = source_cur.fetchone()['cnt']
+
+                if source_count == 0:
+                    skipped.append({'table': table, 'reason': 'Boş tablo'})
+                    continue
+
+                try:
+                    railway_cur.execute(f'DELETE FROM "{table}"')
+                    railway_conn.commit()
+                except:
+                    railway_conn.rollback()
+
+                railway_cur.execute("""SELECT column_name FROM information_schema.columns 
+                                     WHERE table_name = %s AND table_schema = 'public'""", (table,))
+                railway_col_set = set(r['column_name'] for r in railway_cur.fetchall())
+                jsonb_set = jsonb_cols_map.get(table, set())
+
+                source_cur.execute(f'SELECT * FROM "{table}"')
+                rows = source_cur.fetchall()
+                if not rows:
+                    continue
+
+                source_columns = list(rows[0].keys())
+                valid_columns = [c for c in source_columns if c in railway_col_set]
+                if not valid_columns:
+                    skipped.append({'table': table, 'reason': 'Eşleşen sütun yok'})
+                    continue
+
+                col_list = ', '.join([f'"{c}"' for c in valid_columns])
+                placeholders = ', '.join(['%s'] * len(valid_columns))
+                insert_sql = f'INSERT INTO "{table}" ({col_list}) VALUES ({placeholders})'
+
+                inserted = 0
+                row_errors = 0
+                for row in rows:
+                    values = []
+                    for col in valid_columns:
+                        v = row[col]
+                        if col in jsonb_set and isinstance(v, (dict, list)):
+                            values.append(Json(v))
+                        else:
+                            values.append(v)
+                    try:
+                        railway_cur.execute(insert_sql, values)
+                        inserted += 1
+                        if inserted % 200 == 0:
+                            railway_conn.commit()
+                    except Exception as ie:
+                        railway_conn.rollback()
+                        row_errors += 1
+                        if row_errors >= 5:
+                            errors.append({'table': table, 'error': f'{row_errors} satır hatası (son: {ie})'})
+                            break
+
+                if inserted > 0:
+                    railway_conn.commit()
+
+                    try:
+                        railway_cur.execute("""SELECT column_name FROM information_schema.columns
+                            WHERE table_name=%s AND column_default LIKE 'nextval%%' AND table_schema='public'""", (table,))
+                        seq_cols = railway_cur.fetchall()
+                        for seq_col_row in seq_cols:
+                            seq_col = seq_col_row['column_name']
+                            railway_cur.execute(f'SELECT MAX("{seq_col}") as max_val FROM "{table}"')
+                            max_val = railway_cur.fetchone()['max_val']
+                            if max_val:
+                                railway_cur.execute("SELECT pg_get_serial_sequence(%s, %s)", (table, seq_col))
+                                seq_result = railway_cur.fetchone()
+                                if seq_result and seq_result.get('pg_get_serial_sequence'):
+                                    railway_cur.execute("SELECT setval(%s, %s)", (seq_result['pg_get_serial_sequence'], max_val))
+                        railway_conn.commit()
+                    except Exception as se:
+                        railway_conn.rollback()
+                        logger.warning(f"Sequence fix for {table}: {se}")
+
+                    results.append({'table': table, 'rows': inserted})
+                    logger.info(f"Railway sync: {table} - {inserted}/{source_count} rows")
+
+            except Exception as e:
+                railway_conn.rollback()
+                source_conn.rollback()
+                errors.append({'table': table, 'error': str(e)})
+                logger.error(f"Railway sync error for {table}: {e}")
+
+    finally:
+        try:
+            railway_cur.execute("SET session_replication_role = 'origin';")
+            railway_conn.commit()
+        except:
+            pass
+
+    source_cur.close()
+    source_conn.close()
+    railway_cur.close()
+    railway_conn.close()
+
+    return results, errors, skipped
+
+
+@backup_bp.route('/api/backup/sync-to-railway', methods=['POST'])
+@login_required
+def sync_to_railway_endpoint():
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Yetkisiz'}), 403
+
+    data = request.get_json() or {}
+    source_type = data.get('source', 'prod')
+
+    try:
+        safety_backup = create_backup_data()
+        safety_path = save_backup_to_object_storage(safety_backup)
+        safety_rows = sum(t['count'] for t in safety_backup['tables'].values())
+        logger.info(f"Safety backup saved before Railway sync: {safety_path} ({safety_rows} rows)")
+
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        local_filename = f'ameo_railway_safety_{timestamp}.json.gz'
+        json_str = json.dumps(safety_backup, ensure_ascii=False, default=str)
+        compressed = gzip.compress(json_str.encode('utf-8'))
+        local_path = os.path.join('/tmp', local_filename)
+        with open(local_path, 'wb') as f:
+            f.write(compressed)
+        logger.info(f"Local safety backup: {local_path}")
+
+        results, errors, skipped = sync_to_railway(source_type)
+
+        total_synced = sum(r['rows'] for r in results)
+        return jsonify({
+            'success': True,
+            'synced_tables': results,
+            'errors': errors,
+            'skipped': skipped,
+            'total_synced_rows': total_synced,
+            'safety_backup_path': safety_path,
+            'message': f'{len(results)} tablo, {total_synced} kayıt Railway\'a aktarıldı'
+        })
+    except Exception as e:
+        logger.error(f"Railway sync error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@backup_bp.route('/api/backup/railway-status')
+@login_required
+def railway_status():
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Yetkisiz'}), 403
+
+    if not RAILWAY_DB_URL:
+        return jsonify({'error': 'RAILWAY_DB_URL tanımlanmamış', 'connected': False})
+
+    try:
+        conn = psycopg2.connect(RAILWAY_DB_URL)
+        cur = conn.cursor()
+
+        cur.execute("""SELECT table_name FROM information_schema.tables 
+                      WHERE table_schema = 'public' AND table_type = 'BASE TABLE' ORDER BY table_name""")
+        tables = [r[0] for r in cur.fetchall()]
+
+        counts = {}
+        total = 0
+        for table in tables:
+            try:
+                cur.execute(f'SELECT COUNT(*) FROM "{table}"')
+                cnt = cur.fetchone()[0]
+                if cnt > 0:
+                    counts[table] = cnt
+                    total += cnt
+            except:
+                conn.rollback()
+
+        cur.close()
+        conn.close()
+
+        return jsonify({
+            'connected': True,
+            'table_count': len(counts),
+            'total_rows': total,
+            'tables': counts
+        })
+    except Exception as e:
+        logger.error(f"Railway status error: {e}")
+        return jsonify({'error': str(e), 'connected': False})

@@ -160,6 +160,29 @@
         <div id="restoreInfo" style="display:none; margin-top: 16px;"></div>
     </div>
 
+    <div class="backup-card" style="border-left: 4px solid #8b5cf6;">
+        <h3><span class="icon">🚂</span> Railway Veritabanı</h3>
+        <div id="railwayStatus" style="margin-bottom: 16px;">
+            <p style="color: #9ca3af;">Bağlantı kontrol ediliyor...</p>
+        </div>
+        <div style="margin-bottom: 16px; padding: 12px; background: #fef3c7; border-radius: 8px; font-size: 13px; color: #92400e;">
+            ⚠️ Bu işlem Production veritabanındaki tüm verileri Railway'a aktarır. Mevcut Railway verileri üzerine yazılır. İşlem öncesi otomatik güvenlik yedeği alınır.
+        </div>
+        <div class="action-buttons">
+            <button class="btn-backup primary" onclick="syncToRailway('prod')" id="btnSyncRailway" style="background: #7c3aed;">
+                🚂 Production → Railway Yedekle
+            </button>
+            <button class="btn-backup success" onclick="syncToRailway('dev')" id="btnSyncRailwayDev" style="background: #0891b2;">
+                💻 Development → Railway Yedekle
+            </button>
+        </div>
+        <div class="progress-section" id="railwayProgress">
+            <div class="progress-bar-bg"><div class="progress-bar-fill" id="railwayProgressBar" style="background: linear-gradient(90deg, #7c3aed, #a78bfa);"></div></div>
+            <div class="progress-text" id="railwayProgressText">Railway'a aktarılıyor...</div>
+        </div>
+        <div id="railwaySyncResult" style="display:none; margin-top: 16px;"></div>
+    </div>
+
     <div class="backup-card">
         <h3><span class="icon">📊</span> Tablo Detayları</h3>
         <div class="table-list" id="tableList">
@@ -375,6 +398,94 @@ function showProgress(show) {
     }
 }
 
+async function loadRailwayStatus() {
+    try {
+        const resp = await fetch('/api/backup/railway-status');
+        const data = await resp.json();
+        const container = document.getElementById('railwayStatus');
+
+        if (data.connected) {
+            const tablesList = Object.entries(data.tables || {}).sort((a,b) => b[1] - a[1]).slice(0, 5);
+            const topTablesHtml = tablesList.map(([t, c]) => `<span style="background:#ede9fe;color:#6d28d9;padding:2px 8px;border-radius:4px;font-size:12px;margin:2px;">${t}: ${c}</span>`).join(' ');
+            container.innerHTML = `
+                <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
+                    <span style="color:#059669;font-weight:600;">✅ Bağlantı başarılı</span>
+                    <span style="color:#6b7280;font-size:14px;">${data.table_count} tablo | ${data.total_rows.toLocaleString('tr-TR')} kayıt</span>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:4px;">${topTablesHtml}${tablesList.length < Object.keys(data.tables || {}).length ? '<span style="color:#9ca3af;font-size:12px;">...</span>' : ''}</div>
+            `;
+        } else {
+            container.innerHTML = `<span style="color:#dc2626;font-weight:600;">❌ Bağlantı hatası: ${data.error || 'Bilinmeyen'}</span>`;
+        }
+    } catch (e) {
+        document.getElementById('railwayStatus').innerHTML = `<span style="color:#dc2626;">❌ Durum alınamadı: ${e.message}</span>`;
+    }
+}
+
+async function syncToRailway(source) {
+    const sourceName = source === 'prod' ? 'Production' : 'Development';
+    if (!confirm(`${sourceName} veritabanındaki TÜM veriler Railway'a aktarılacak.\n\nRailway'daki mevcut veriler üzerine yazılacak.\nİşlem öncesi otomatik güvenlik yedeği alınacak.\n\nDevam etmek istiyor musunuz?`)) return;
+
+    const btnId = source === 'prod' ? 'btnSyncRailway' : 'btnSyncRailwayDev';
+    const btn = document.getElementById(btnId);
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Aktarılıyor...';
+
+    const progress = document.getElementById('railwayProgress');
+    progress.style.display = 'block';
+    document.getElementById('railwayProgressBar').style.width = '100%';
+    document.getElementById('railwayProgressText').textContent = `${sourceName} → Railway aktarımı devam ediyor... (Bu biraz zaman alabilir)`;
+
+    const resultDiv = document.getElementById('railwaySyncResult');
+    resultDiv.style.display = 'none';
+
+    try {
+        const resp = await fetch('/api/backup/sync-to-railway', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source })
+        });
+        const data = await resp.json();
+
+        if (data.success) {
+            let html = `<div class="alert success" style="display:block;">
+                <strong>✅ ${data.message}</strong><br>
+                <small>Güvenlik yedeği: ${data.safety_backup_path || 'Kaydedildi'}</small>
+            </div>`;
+
+            if (data.synced_tables && data.synced_tables.length > 0) {
+                html += '<div style="max-height:200px;overflow-y:auto;margin-top:8px;">';
+                data.synced_tables.forEach(t => {
+                    html += `<div class="table-item"><span class="table-name">${t.table}</span><span class="table-count">${t.rows} kayıt</span></div>`;
+                });
+                html += '</div>';
+            }
+
+            if (data.errors && data.errors.length > 0) {
+                html += '<div class="alert error" style="display:block;margin-top:8px;"><strong>Hatalar:</strong><br>';
+                data.errors.forEach(e => { html += `${e.table}: ${e.error}<br>`; });
+                html += '</div>';
+            }
+
+            resultDiv.innerHTML = html;
+            resultDiv.style.display = 'block';
+            showAlert(data.message, 'success');
+            loadRailwayStatus();
+        } else {
+            showAlert('Railway aktarım hatası: ' + (data.error || 'Bilinmeyen hata'), 'error');
+            resultDiv.innerHTML = `<div class="alert error" style="display:block;">${data.error}</div>`;
+            resultDiv.style.display = 'block';
+        }
+    } catch (e) {
+        showAlert('Railway aktarım hatası: ' + e.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = source === 'prod' ? '🚂 Production → Railway Yedekle' : '💻 Development → Railway Yedekle';
+        progress.style.display = 'none';
+    }
+}
+
 loadStatus();
+loadRailwayStatus();
 </script>
 {% endblock %}
