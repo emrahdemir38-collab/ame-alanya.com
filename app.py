@@ -19250,9 +19250,6 @@ with app.app_context():
     init_default_classes()
 
 if __name__ == "__main__":
-    # Production'da debug=False, development'ta debug=True
     debug_mode = os.environ.get('FLASK_ENV') != 'production'
-    app.run(host="0.0.0.0", port=5000, debug=debug_mode)
-
-# Temp test logging
-import sys
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host="0.0.0.0", port=port, debug=debug_mode)
