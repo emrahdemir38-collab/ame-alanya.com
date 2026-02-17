@@ -481,9 +481,12 @@ def get_file_data(file_path):
 def get_db():
     """Veritabanı bağlantısı oluştur"""
     db_url = os.environ.get('DATABASE_URL', '')
+    if not db_url:
+        logger.error("DATABASE_URL ortam değişkeni tanımlı değil!")
+        raise Exception("DATABASE_URL not configured")
     if db_url.startswith('postgres://'):
         db_url = db_url.replace('postgres://', 'postgresql://', 1)
-    return psycopg2.connect(db_url)
+    return psycopg2.connect(db_url, connect_timeout=10)
 
 
 def allowed_file(filename, file_type='all'):
