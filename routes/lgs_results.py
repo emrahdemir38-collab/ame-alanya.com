@@ -560,56 +560,80 @@ def fetch_batch_results():
 def parse_meb_tables(tables):
     result = {}
     try:
-        table0 = tables[0]
-        rows0 = table0.find_all('tr')
-        if len(rows0) > 1:
-            cells = rows0[1].find_all('td')
-            ad_soyad = cells[1].get_text(strip=True) if len(cells) > 1 else ''
-        else:
-            ad_soyad = ''
-        if len(rows0) > 2:
-            cells2 = rows0[2].find_all('td')
-            yerlestigi = cells2[1].get_text(strip=True) if len(cells2) > 1 else ''
-        else:
-            yerlestigi = ''
+        logger.info(f"MEB parse: {len(tables)} tables found")
+        for ti, t in enumerate(tables):
+            rows = t.find_all('tr')
+            logger.info(f"  Table[{ti}]: {len(rows)} rows")
+            for ri, r in enumerate(rows):
+                cells = r.find_all(['td', 'th'])
+                cell_texts = [c.get_text(strip=True) for c in cells]
+                logger.info(f"    Row[{ri}]: {cell_texts}")
+
+        ad_soyad = ''
+        yerlestigi = ''
+        sinav_puan = '0'
+        genel_yuzdelik = ''
+        il_yuzdelik = ''
+
+        for ti, table in enumerate(tables):
+            rows = table.find_all('tr')
+            for ri, row in enumerate(rows):
+                cells = row.find_all(['td', 'th'])
+                if len(cells) >= 2:
+                    label = cells[0].get_text(strip=True).lower()
+                    value = cells[1].get_text(strip=True)
+
+                    if 'adı' in label and 'soyadı' in label:
+                        ad_soyad = value
+                    elif 'yerleştiği' in label or 'yerleştir' in label:
+                        yerlestigi = value
+                    elif 'sınav puanı' in label or 'ağırlıklı puan' in label:
+                        sinav_puan = value
+                    elif 'genel' in label and 'yüzdelik' in label:
+                        genel_yuzdelik = value
+                    elif 'il' in label and 'yüzdelik' in label:
+                        il_yuzdelik = value
+
         result['ad_soyad'] = ad_soyad
-        if yerlestigi:
-            result['ad_soyad'] = ad_soyad
-            result['yerlestigi_okul'] = yerlestigi
+        result['yerlestigi_okul'] = yerlestigi
 
-        table1 = tables[1]
-        rows1 = table1.find_all('tr')
-        if rows1:
-            cells1 = rows1[0].find_all('td')
-            puan_text = cells1[1].get_text(strip=True) if len(cells1) > 1 else '0'
-            puan_parts = puan_text.split(',')
-            if len(puan_parts) >= 2:
-                result['sinav_puan'] = puan_parts[0] + ',' + puan_parts[1][:4]
-            else:
-                result['sinav_puan'] = puan_text
+        puan_parts = sinav_puan.split(',')
+        if len(puan_parts) >= 2:
+            result['sinav_puan'] = puan_parts[0] + ',' + puan_parts[1][:4]
+        else:
+            result['sinav_puan'] = sinav_puan
 
-        if len(rows1) > 1:
-            cells_g = rows1[1].find_all('td')
-            result['genel_yuzdelik'] = cells_g[1].get_text(strip=True) if len(cells_g) > 1 else ''
+        result['genel_yuzdelik'] = genel_yuzdelik
+        result['il_yuzdelik'] = il_yuzdelik
 
-        if len(rows1) > 2:
-            cells_i = rows1[2].find_all('td')
-            result['il_yuzdelik'] = cells_i[1].get_text(strip=True) if len(cells_i) > 1 else ''
+        dersler_map = {
+            'türkçe': 'turkce',
+            'matematik': 'matematik',
+            'fen': 'fen',
+            'ink': 'inkilap',
+            'atatürk': 'inkilap',
+            'din': 'din',
+            'yabancı': 'yabanci_dil',
+            'ingilizce': 'yabanci_dil',
+        }
 
-        table2 = tables[2]
-        rows2 = table2.find_all('tr')
-        dersler = ['turkce', 'matematik', 'fen', 'inkilap', 'din', 'yabanci_dil']
-        for i, ders in enumerate(dersler):
-            row_idx = i + 1
-            if row_idx < len(rows2):
-                cells_d = rows2[row_idx].find_all('td')
-                result[f'{ders}_dogru'] = safe_int(cells_d[1].get_text(strip=True)) if len(cells_d) > 1 else 0
-                result[f'{ders}_yanlis'] = safe_int(cells_d[2].get_text(strip=True)) if len(cells_d) > 2 else 0
-                result[f'{ders}_bos'] = safe_int(cells_d[3].get_text(strip=True)) if len(cells_d) > 3 else 0
-            else:
-                result[f'{ders}_dogru'] = 0
-                result[f'{ders}_yanlis'] = 0
-                result[f'{ders}_bos'] = 0
+        for ders_key in ['turkce', 'matematik', 'fen', 'inkilap', 'din', 'yabanci_dil']:
+            result[f'{ders_key}_dogru'] = 0
+            result[f'{ders_key}_yanlis'] = 0
+            result[f'{ders_key}_bos'] = 0
+
+        for table in tables:
+            rows = table.find_all('tr')
+            for row in rows:
+                cells = row.find_all(['td', 'th'])
+                if len(cells) >= 4:
+                    label = cells[0].get_text(strip=True).lower()
+                    for ders_label, ders_key in dersler_map.items():
+                        if ders_label in label:
+                            result[f'{ders_key}_dogru'] = safe_int(cells[1].get_text(strip=True))
+                            result[f'{ders_key}_yanlis'] = safe_int(cells[2].get_text(strip=True))
+                            result[f'{ders_key}_bos'] = safe_int(cells[3].get_text(strip=True))
+                            break
 
     except Exception as e:
         logger.error(f"Parse MEB tables error: {e}")
