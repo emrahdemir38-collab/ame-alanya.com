@@ -103,7 +103,10 @@ def create_pdf_footer_text():
     return "Ayşe Melahat Erkin Ortaokulu - Öğrenci Takip Sistemi"
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from google.cloud import storage
+try:
+    from google.cloud import storage
+except ImportError:
+    storage = None
 import requests
 try:
     from replit.object_storage import Client
@@ -19238,19 +19241,39 @@ app.register_blueprint(kelebek_bp)
 app.register_blueprint(lgs_results_bp)
 # ==================== MODÜLER BLUEPRINT'LER SONU ====================
 
-# Uygulama başlarken veritabanını initialize et
+def initialize_app():
+    """Uygulama başlatma - hata olursa uygulama yine de çalışır"""
+    try:
+        init_database()
+    except Exception as e:
+        logger.error(f"Veritabanı init hatası: {e}")
+    
+    try:
+        conn_kb = get_db()
+        init_kelebek_tables(conn_kb)
+        conn_kb.close()
+        logger.info("✅ Kelebek tabloları kontrol edildi/oluşturuldu")
+    except Exception as e:
+        logger.error(f"Kelebek tabloları init hatası: {e}")
+    
+    try:
+        init_lgs_tables()
+        logger.info("✅ LGS sonuç tabloları kontrol edildi/oluşturuldu")
+    except Exception as e:
+        logger.error(f"LGS tabloları init hatası: {e}")
+    
+    try:
+        init_admin_user()
+    except Exception as e:
+        logger.error(f"Admin kullanıcı init hatası: {e}")
+    
+    try:
+        init_default_classes()
+    except Exception as e:
+        logger.error(f"Sınıflar init hatası: {e}")
+
 with app.app_context():
-    init_database()
-    conn_kb = get_db()
-    init_kelebek_tables(conn_kb)
-    conn_kb.close()
-    logger.info("✅ Kelebek tabloları kontrol edildi/oluşturuldu")
-    init_lgs_tables()
-    logger.info("✅ LGS sonuç tabloları kontrol edildi/oluşturuldu")
-    
-    init_admin_user()
-    
-    init_default_classes()
+    initialize_app()
 
 if __name__ == "__main__":
     debug_mode = os.environ.get('FLASK_ENV') != 'production'
