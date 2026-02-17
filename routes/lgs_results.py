@@ -206,6 +206,19 @@ def upload_lgs_excel():
                 else:
                     dogum_str = str(dogum).strip()
 
+            if dogum_str:
+                import re
+                parts = dogum_str.split('.')
+                if len(parts) == 3:
+                    g, a, y = parts
+                    if len(y) > 4:
+                        y = y[:4]
+                    if len(g) == 1:
+                        g = '0' + g
+                    if len(a) == 1:
+                        a = '0' + a
+                    dogum_str = f"{g}.{a}.{y}"
+
             students.append({
                 'tc': tc,
                 'okul_no': okul_no or '',
