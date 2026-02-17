@@ -65,6 +65,7 @@ def init_lgs_tables():
                 school_no VARCHAR(20),
                 birth_date DATE,
                 exam_year INTEGER DEFAULT 2024,
+                sonuc_tipi VARCHAR(20) DEFAULT 'sinav',
                 sinav_puan DECIMAL(8,4),
                 genel_yuzdelik VARCHAR(50),
                 il_yuzdelik VARCHAR(50),
@@ -87,6 +88,12 @@ def init_lgs_tables():
                 yabanci_dil_yanlis INTEGER DEFAULT 0,
                 yabanci_dil_bos INTEGER DEFAULT 0,
                 yerlestigi_okul VARCHAR(500),
+                baba_adi VARCHAR(200),
+                yerlestirme_turu VARCHAR(200),
+                okul_turu VARCHAR(200),
+                bolum_alan VARCHAR(300),
+                sonuc_text VARCHAR(500),
+                pansiyon VARCHAR(200),
                 sinif VARCHAR(10),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -353,6 +360,7 @@ def fetch_single_result():
     captcha_code = data.get('captcha_code', '')
     sinif = data.get('sinif', '')
     exam_year = data.get('exam_year', 2024)
+    sonuc_tipi = data.get('sonuc_tipi', 'sinav')
 
     sinav_url = flask_session.get('meb_sinav_url', 'https://sonuc.meb.gov.tr/')
     sinav_id = flask_session.get('meb_sinav_id', '')
@@ -425,7 +433,7 @@ def fetch_single_result():
                 return jsonify({'error': 'Sonuç bulunamadı. Bilgileri kontrol edin.'}), 404
             return jsonify({'error': 'MEB sonuç sayfası beklenmeyen formatta. Güvenlik kodu yanlış olabilir.', 'is_captcha_error': True}), 400
 
-        result = parse_meb_tables(tables)
+        result = parse_meb_tables(tables, sonuc_tipi)
         result['tc'] = tc
         result['sinif'] = sinif
         result['exam_year'] = exam_year
@@ -557,10 +565,10 @@ def fetch_batch_results():
     })
 
 
-def parse_meb_tables(tables):
-    result = {}
+def parse_meb_tables(tables, sonuc_tipi='sinav'):
+    result = {'sonuc_tipi': sonuc_tipi}
     try:
-        logger.info(f"MEB parse: {len(tables)} tables found")
+        logger.info(f"MEB parse ({sonuc_tipi}): {len(tables)} tables found")
         for ti, t in enumerate(tables):
             rows = t.find_all('tr')
             logger.info(f"  Table[{ti}]: {len(rows)} rows")
@@ -569,33 +577,46 @@ def parse_meb_tables(tables):
                 cell_texts = [c.get_text(strip=True) for c in cells]
                 logger.info(f"    Row[{ri}]: {cell_texts}")
 
-        ad_soyad = ''
-        yerlestigi = ''
-        sinav_puan = '0'
-        genel_yuzdelik = ''
-        il_yuzdelik = ''
-
-        for ti, table in enumerate(tables):
+        all_labels = {}
+        for table in tables:
             rows = table.find_all('tr')
-            for ri, row in enumerate(rows):
+            for row in rows:
                 cells = row.find_all(['td', 'th'])
                 if len(cells) >= 2:
-                    label = cells[0].get_text(strip=True).lower()
+                    label = cells[0].get_text(strip=True)
                     value = cells[1].get_text(strip=True)
+                    all_labels[label.lower()] = value
 
-                    if 'adı' in label and 'soyadı' in label:
-                        ad_soyad = value
-                    elif 'yerleştiği' in label or 'yerleştir' in label:
-                        yerlestigi = value
-                    elif 'sınav puanı' in label or 'ağırlıklı puan' in label:
-                        sinav_puan = value
-                    elif 'genel' in label and 'yüzdelik' in label:
-                        genel_yuzdelik = value
-                    elif 'il' in label and 'yüzdelik' in label:
-                        il_yuzdelik = value
+        for label, value in all_labels.items():
+            if 'adı soyadı' in label or ('adı' in label and 'soyadı' in label):
+                result['ad_soyad'] = value
+            elif label.strip() == 'adı soyadı' or label.strip() == 'ad soyad':
+                result['ad_soyad'] = value
+            elif 'baba' in label:
+                result['baba_adi'] = value
+            elif 'doğum' in label:
+                pass
 
-        result['ad_soyad'] = ad_soyad
-        result['yerlestigi_okul'] = yerlestigi
+        sinav_puan = '0'
+        for table in tables:
+            text = table.get_text()
+            if 'Merkezi Sınav Puanı' in text or 'Sınav Puanı' in text or 'Ağırlıklı Puan' in text:
+                rows = table.find_all('tr')
+                for row in rows:
+                    cells = row.find_all(['td', 'th'])
+                    for cell in cells:
+                        ct = cell.get_text(strip=True)
+                        if ct and ct.replace(',', '').replace('.', '').replace('-', '').isdigit() and len(ct) > 2:
+                            sinav_puan = ct
+                            break
+                    if sinav_puan != '0':
+                        break
+
+        if sinav_puan == '0':
+            for label, value in all_labels.items():
+                if 'puan' in label and value.replace(',', '').replace('.', '').replace('-', '').isdigit():
+                    sinav_puan = value
+                    break
 
         puan_parts = sinav_puan.split(',')
         if len(puan_parts) >= 2:
@@ -603,37 +624,59 @@ def parse_meb_tables(tables):
         else:
             result['sinav_puan'] = sinav_puan
 
-        result['genel_yuzdelik'] = genel_yuzdelik
-        result['il_yuzdelik'] = il_yuzdelik
+        if sonuc_tipi == 'yerlestirme':
+            for label, value in all_labels.items():
+                if 'yerleşme türü' in label or 'yerleştirme türü' in label:
+                    result['yerlestirme_turu'] = value
+                elif 'yerleştirildiğiniz okul' in label or 'okul adı' in label:
+                    result['yerlestigi_okul'] = value
+                elif 'okul türü' in label:
+                    result['okul_turu'] = value
+                elif 'bölüm' in label or 'alan' in label:
+                    result['bolum_alan'] = value
+                elif label.strip() == 'sonuç' or label.strip() == 'sonuc':
+                    result['sonuc_text'] = value
+                elif 'pansiyon' in label:
+                    result['pansiyon'] = value
 
-        dersler_map = {
-            'türkçe': 'turkce',
-            'matematik': 'matematik',
-            'fen': 'fen',
-            'ink': 'inkilap',
-            'atatürk': 'inkilap',
-            'din': 'din',
-            'yabancı': 'yabanci_dil',
-            'ingilizce': 'yabanci_dil',
-        }
+        elif sonuc_tipi == 'sinav':
+            for label, value in all_labels.items():
+                if 'genel' in label and 'yüzdelik' in label:
+                    result['genel_yuzdelik'] = value
+                elif 'il' in label and 'yüzdelik' in label:
+                    result['il_yuzdelik'] = value
 
-        for ders_key in ['turkce', 'matematik', 'fen', 'inkilap', 'din', 'yabanci_dil']:
-            result[f'{ders_key}_dogru'] = 0
-            result[f'{ders_key}_yanlis'] = 0
-            result[f'{ders_key}_bos'] = 0
+            dersler_map = {
+                'türkçe': 'turkce',
+                'matematik': 'matematik',
+                'fen': 'fen',
+                'ink': 'inkilap',
+                'atatürk': 'inkilap',
+                'din': 'din',
+                'yabancı': 'yabanci_dil',
+                'ingilizce': 'yabanci_dil',
+            }
 
-        for table in tables:
-            rows = table.find_all('tr')
-            for row in rows:
-                cells = row.find_all(['td', 'th'])
-                if len(cells) >= 4:
-                    label = cells[0].get_text(strip=True).lower()
-                    for ders_label, ders_key in dersler_map.items():
-                        if ders_label in label:
-                            result[f'{ders_key}_dogru'] = safe_int(cells[1].get_text(strip=True))
-                            result[f'{ders_key}_yanlis'] = safe_int(cells[2].get_text(strip=True))
-                            result[f'{ders_key}_bos'] = safe_int(cells[3].get_text(strip=True))
-                            break
+            for ders_key in ['turkce', 'matematik', 'fen', 'inkilap', 'din', 'yabanci_dil']:
+                result[f'{ders_key}_dogru'] = 0
+                result[f'{ders_key}_yanlis'] = 0
+                result[f'{ders_key}_bos'] = 0
+
+            for table in tables:
+                rows = table.find_all('tr')
+                for row in rows:
+                    cells = row.find_all(['td', 'th'])
+                    if len(cells) >= 4:
+                        label = cells[0].get_text(strip=True).lower()
+                        for ders_label, ders_key in dersler_map.items():
+                            if ders_label in label:
+                                result[f'{ders_key}_dogru'] = safe_int(cells[1].get_text(strip=True))
+                                result[f'{ders_key}_yanlis'] = safe_int(cells[2].get_text(strip=True))
+                                result[f'{ders_key}_bos'] = safe_int(cells[3].get_text(strip=True))
+                                break
+
+        if 'ad_soyad' not in result:
+            result['ad_soyad'] = ''
 
     except Exception as e:
         logger.error(f"Parse MEB tables error: {e}")
@@ -661,9 +704,11 @@ def save_lgs_result(result, tc, okul_no, gun, ay, yil, sinif, exam_year):
         except:
             puan_val = 0
 
+        sonuc_tipi = result.get('sonuc_tipi', 'sinav')
+
         cur.execute("""
             INSERT INTO lgs_results (
-                student_name, tc_no, school_no, birth_date, exam_year,
+                student_name, tc_no, school_no, birth_date, exam_year, sonuc_tipi,
                 sinav_puan, genel_yuzdelik, il_yuzdelik,
                 turkce_dogru, turkce_yanlis, turkce_bos,
                 matematik_dogru, matematik_yanlis, matematik_bos,
@@ -671,9 +716,10 @@ def save_lgs_result(result, tc, okul_no, gun, ay, yil, sinif, exam_year):
                 inkilap_dogru, inkilap_yanlis, inkilap_bos,
                 din_dogru, din_yanlis, din_bos,
                 yabanci_dil_dogru, yabanci_dil_yanlis, yabanci_dil_bos,
-                yerlestigi_okul, sinif, updated_at
+                yerlestigi_okul, baba_adi, yerlestirme_turu, okul_turu, bolum_alan, sonuc_text, pansiyon,
+                sinif, updated_at
             ) VALUES (
-                %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s,
                 %s, %s, %s,
                 %s, %s, %s,
                 %s, %s, %s,
@@ -681,12 +727,14 @@ def save_lgs_result(result, tc, okul_no, gun, ay, yil, sinif, exam_year):
                 %s, %s, %s,
                 %s, %s, %s,
                 %s, %s, %s,
-                %s, %s, CURRENT_TIMESTAMP
+                %s, %s, %s, %s, %s, %s, %s,
+                %s, CURRENT_TIMESTAMP
             )
             ON CONFLICT (tc_no, exam_year) DO UPDATE SET
                 student_name = EXCLUDED.student_name,
                 school_no = EXCLUDED.school_no,
                 birth_date = EXCLUDED.birth_date,
+                sonuc_tipi = EXCLUDED.sonuc_tipi,
                 sinav_puan = EXCLUDED.sinav_puan,
                 genel_yuzdelik = EXCLUDED.genel_yuzdelik,
                 il_yuzdelik = EXCLUDED.il_yuzdelik,
@@ -709,11 +757,17 @@ def save_lgs_result(result, tc, okul_no, gun, ay, yil, sinif, exam_year):
                 yabanci_dil_yanlis = EXCLUDED.yabanci_dil_yanlis,
                 yabanci_dil_bos = EXCLUDED.yabanci_dil_bos,
                 yerlestigi_okul = EXCLUDED.yerlestigi_okul,
+                baba_adi = EXCLUDED.baba_adi,
+                yerlestirme_turu = EXCLUDED.yerlestirme_turu,
+                okul_turu = EXCLUDED.okul_turu,
+                bolum_alan = EXCLUDED.bolum_alan,
+                sonuc_text = EXCLUDED.sonuc_text,
+                pansiyon = EXCLUDED.pansiyon,
                 sinif = EXCLUDED.sinif,
                 updated_at = CURRENT_TIMESTAMP
         """, (
             result.get('ad_soyad', ''),
-            tc, okul_no, birth_date, exam_year,
+            tc, okul_no, birth_date, exam_year, sonuc_tipi,
             puan_val,
             result.get('genel_yuzdelik', ''),
             result.get('il_yuzdelik', ''),
@@ -724,6 +778,12 @@ def save_lgs_result(result, tc, okul_no, gun, ay, yil, sinif, exam_year):
             result.get('din_dogru', 0), result.get('din_yanlis', 0), result.get('din_bos', 0),
             result.get('yabanci_dil_dogru', 0), result.get('yabanci_dil_yanlis', 0), result.get('yabanci_dil_bos', 0),
             result.get('yerlestigi_okul', ''),
+            result.get('baba_adi', ''),
+            result.get('yerlestirme_turu', ''),
+            result.get('okul_turu', ''),
+            result.get('bolum_alan', ''),
+            result.get('sonuc_text', ''),
+            result.get('pansiyon', ''),
             sinif
         ))
         conn.commit()
@@ -743,16 +803,24 @@ def list_lgs_results():
         return jsonify({'error': 'Yetkisiz'}), 403
 
     exam_year = request.args.get('year', type=int)
+    tipi = request.args.get('tipi', '')
 
     conn = None
     try:
         conn = get_db()
         cur = conn.cursor(cursor_factory=RealDictCursor)
 
+        conditions = []
+        params = []
         if exam_year:
-            cur.execute("SELECT * FROM lgs_results WHERE exam_year = %s ORDER BY sinav_puan DESC", (exam_year,))
-        else:
-            cur.execute("SELECT * FROM lgs_results ORDER BY exam_year DESC, sinav_puan DESC")
+            conditions.append("exam_year = %s")
+            params.append(exam_year)
+        if tipi:
+            conditions.append("COALESCE(sonuc_tipi, 'sinav') = %s")
+            params.append(tipi)
+
+        where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
+        cur.execute(f"SELECT * FROM lgs_results{where_clause} ORDER BY exam_year DESC, sinav_puan DESC", params)
 
         results = cur.fetchall()
 
