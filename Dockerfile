@@ -13,6 +13,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-EXPOSE 5000
-
-CMD gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 2 --timeout 120 app:app
+CMD gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 2 --timeout 120 --graceful-timeout 30 --worker-tmp-dir /dev/shm app:app
