@@ -19309,6 +19309,8 @@ with app.app_context():
     initialize_app()
 
 if __name__ == "__main__":
-    debug_mode = os.environ.get('FLASK_ENV') != 'production'
+    is_railway = os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_SERVICE_NAME')
+    debug_mode = not is_railway and os.environ.get('FLASK_ENV') != 'production'
     port = int(os.environ.get('PORT', 5000))
+    logger.info(f"Starting Flask on port {port}, debug={debug_mode}")
     app.run(host="0.0.0.0", port=port, debug=debug_mode)
