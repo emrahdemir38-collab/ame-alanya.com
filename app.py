@@ -556,7 +556,21 @@ def health_check():
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    try:
+        return render_template("index.html")
+    except Exception as e:
+        logger.error(f"Index page error: {e}")
+        return f"Error: {str(e)}", 500
+
+@app.errorhandler(500)
+def internal_error(error):
+    logger.error(f"500 Error: {error}")
+    return f"Internal Server Error: {str(error)}", 500
+
+@app.errorhandler(502)
+def bad_gateway(error):
+    logger.error(f"502 Error: {error}")
+    return f"Bad Gateway: {str(error)}", 502
 
 @app.route("/ameo_admin_giris")
 def admin_login_page():
