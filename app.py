@@ -554,12 +554,21 @@ def health_check():
         status["database"] = f"error: {str(e)}"
     return jsonify(status), 200
 
+@app.route("/test")
+def test_page():
+    return "Railway OK - AMEO calisiyor!", 200
+
 @app.route("/")
 def index():
     try:
-        return render_template("index.html")
+        logger.info("Index page requested")
+        result = render_template("index.html")
+        logger.info("Index page rendered successfully")
+        return result
     except Exception as e:
         logger.error(f"Index page error: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return f"Error: {str(e)}", 500
 
 @app.errorhandler(500)
