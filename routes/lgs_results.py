@@ -381,16 +381,36 @@ def fetch_single_result():
         if resp.status_code != 200:
             return jsonify({'error': f'MEB yanıt vermedi (HTTP {resp.status_code})'}), 500
 
+        save_cookies_from_session(s)
+
         soup = BeautifulSoup(resp.text, 'html.parser')
 
         tables = soup.find_all('table')
         if len(tables) < 3:
             error_text = soup.get_text()
-            if 'hatalı' in error_text.lower() or 'yanlış' in error_text.lower():
-                return jsonify({'error': 'Güvenlik kodu hatalı veya bilgiler yanlış'}), 400
+            logger.warning(f"MEB response text (no tables): {error_text[:500]}")
+
+            meb_error = None
+            error_div = soup.find('div', {'id': 'hata'})
+            if error_div and error_div.get_text(strip=True):
+                meb_error = error_div.get_text(strip=True)
+            if not meb_error:
+                for line in error_text.split('\n'):
+                    line = line.strip()
+                    if line and ('yanlış' in line.lower() or 'hatalı' in line.lower() or 'bulunamadı' in line.lower()):
+                        meb_error = line
+                        break
+
+            if meb_error:
+                is_captcha_error = 'güvenlik kod' in meb_error.lower() or 'captcha' in meb_error.lower()
+                return jsonify({
+                    'error': meb_error,
+                    'is_captcha_error': is_captcha_error
+                }), 400
+
             if 'bulunamadı' in error_text.lower():
                 return jsonify({'error': 'Sonuç bulunamadı. Bilgileri kontrol edin.'}), 404
-            return jsonify({'error': 'MEB sonuç sayfası beklenmeyen formatta. Güvenlik kodu yanlış olabilir.'}), 400
+            return jsonify({'error': 'MEB sonuç sayfası beklenmeyen formatta. Güvenlik kodu yanlış olabilir.', 'is_captcha_error': True}), 400
 
         result = parse_meb_tables(tables)
         result['tc'] = tc
@@ -398,8 +418,6 @@ def fetch_single_result():
         result['exam_year'] = exam_year
 
         save_lgs_result(result, tc, okul_no, gun, ay, yil, sinif, exam_year)
-
-        save_cookies_from_session(s)
 
         return jsonify({
             'success': True,
@@ -840,42 +858,23 @@ def refresh_captcha():
     sinav_url = flask_session.get('meb_sinav_url', 'https://sonuc.meb.gov.tr/')
 
     try:
+        import base64
         s = requests.Session()
         load_cookies_to_session(s)
 
-        resp = s.get(sinav_url, timeout=10, allow_redirects=True)
-        soup = BeautifulSoup(resp.text, 'html.parser')
+        from urllib.parse import urlparse
+        parsed = urlparse(sinav_url)
+        base_url = f"{parsed.scheme}://{parsed.netloc}"
+        captcha_url = base_url + '/sinavlar/sonuc/captcha.php'
 
-        sinav_id_input = soup.find('input', {'name': 'SINAV_ID'})
-        if sinav_id_input:
-            flask_session['meb_sinav_id'] = sinav_id_input['value']
-
-        captcha_img = soup.find('img', {'id': 'image'})
-        if not captcha_img:
-            captcha_img = soup.find('img', {'id': 'capcha'})
-        if not captcha_img:
-            captcha_img = soup.find('img', {'name': 'capcha'})
-        if not captcha_img:
-            for img in soup.find_all('img'):
-                src = img.get('src', '')
-                if 'captcha' in src.lower():
-                    captcha_img = img
-                    break
+        captcha_resp = s.get(captcha_url, timeout=10, headers={
+            'Referer': sinav_url,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        })
 
         captcha_base64 = None
-        if captcha_img:
-            captcha_src = captcha_img.get('src', '')
-            if captcha_src:
-                if captcha_src.startswith('/'):
-                    base_url = '/'.join(resp.url.rstrip('/').split('/')[:3])
-                    captcha_url = base_url + captcha_src
-                else:
-                    base_url = '/'.join(resp.url.rstrip('/').split('/')[:-1])
-                    captcha_url = base_url + '/' + captcha_src
-                captcha_resp = s.get(captcha_url, timeout=10)
-                if captcha_resp.status_code == 200:
-                    import base64
-                    captcha_base64 = base64.b64encode(captcha_resp.content).decode('utf-8')
+        if captcha_resp.status_code == 200 and len(captcha_resp.content) > 100:
+            captcha_base64 = base64.b64encode(captcha_resp.content).decode('utf-8')
 
         save_cookies_from_session(s)
 

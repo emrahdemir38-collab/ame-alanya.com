@@ -750,7 +750,7 @@ function submitWithCaptcha() {
 
         if (data.error) {
             appendLog(`#${currentFetchIndex + 1} HATA: ${data.error}`);
-            if (data.error.includes('Güvenlik kodu hatalı')) {
+            if (data.is_captcha_error || data.error.includes('Güvenlik kod') || data.error.includes('güvenlik kod')) {
                 appendLog('Güvenlik kodu hatalı, tekrar deneyin...');
                 refreshCaptcha();
                 document.getElementById('captchaInput').value = '';
