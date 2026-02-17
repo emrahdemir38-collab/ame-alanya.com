@@ -1,0 +1,28 @@
+You reached the start of the range
+Feb 17, 2026, 9:43 PM
+Starting Container
+[2026-02-17 18:46:08 +0000] [2] [INFO] Starting gunicorn 23.0.0
+[2026-02-17 18:46:08 +0000] [2] [INFO] Listening at: http://0.0.0.0:8080 (2)
+[2026-02-17 18:46:08 +0000] [2] [INFO] Using worker: sync
+[2026-02-17 18:46:08 +0000] [3] [INFO] Booting worker with pid: 3
+[2026-02-17 18:46:08 +0000] [4] [INFO] Booting worker with pid: 4
+2026-02-17 18:46:10,465 - WARNING - OBJECT_STORAGE_BUCKET_ID tanımlı değil - Object Storage kullanılamaz
+2026-02-17 18:46:10,479 - WARNING - OBJECT_STORAGE_BUCKET_ID tanımlı değil - Object Storage kullanılamaz
+2026-02-17 18:46:10,547 - INFO - ✅ PDF Turkish fonts registered successfully
+2026-02-17 18:46:10,557 - INFO - ✅ PDF Turkish fonts registered successfully
+2026-02-17 18:46:12,357 - INFO - ✅ Admin kullanıcısı zaten mevcut
+2026-02-17 18:46:12,381 - INFO - ✅ Sınıflar zaten mevcut (16 adet)
+2026-02-17 18:46:12,227 - INFO - ✅ Kelebek tabloları kontrol edildi/oluşturuldu
+2026-02-17 18:46:12,251 - INFO - LGS results table created/verified
+2026-02-17 18:46:12,251 - INFO - ✅ LGS sonuç tabloları kontrol edildi/oluşturuldu
+2026-02-17 18:46:12,276 - INFO - ✅ Admin kullanıcısı zaten mevcut
+2026-02-17 18:46:12,278 - INFO - ✅ Veritabanı tabloları kontrol edildi/oluşturuldu
+2026-02-17 18:46:12,305 - INFO - ✅ Sınıflar zaten mevcut (16 adet)
+2026-02-17 18:46:12,308 - INFO - Kelebek tables created successfully
+2026-02-17 18:46:12,309 - INFO - ✅ Kelebek tabloları kontrol edildi/oluşturuldu
+2026-02-17 18:46:12,331 - INFO - LGS results table created/verified
+2026-02-17 18:46:12,331 - INFO - ✅ LGS sonuç tabloları kontrol edildi/oluşturuldu
+2026-02-17 18:46:11,598 - WARNING - Gemini API anahtarlari eksik - gorsel analiz devre disi
+2026-02-17 18:46:11,660 - WARNING - Gemini API anahtarlari eksik - gorsel analiz devre disi
+2026-02-17 18:46:12,201 - INFO - ✅ Veritabanı tabloları kontrol edildi/oluşturuldu
+2026-02-17 18:46:12,227 - INFO - Kelebek tables created successfully
