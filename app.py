@@ -105,7 +105,10 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from google.cloud import storage
 import requests
-from replit.object_storage import Client
+try:
+    from replit.object_storage import Client
+except ImportError:
+    Client = None
 from PIL import Image as PILImage
 
 # Logging yapılandırması
@@ -133,6 +136,9 @@ class ObjectStorageClient:
             
             # Replit Object Storage client oluştur
             try:
+                if Client is None:
+                    logger.warning("⚠️ replit.object_storage paketi bulunamadı - Object Storage devre dışı")
+                    return
                 self.client = Client()
                 self.enabled = True
                 logger.info(f"✅ Object Storage hazır: {self.bucket_id}")
