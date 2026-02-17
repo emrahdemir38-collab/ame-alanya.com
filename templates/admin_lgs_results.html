@@ -288,20 +288,6 @@
         </div>
 
         <div class="card" id="modeSelectionCard" style="display:none;">
-            <div class="card-title"><span class="icon">📄</span> Sonuç Tipi</div>
-            <div class="mode-selector" style="margin-bottom: 16px;">
-                <div class="mode-card selected" id="typeSinav" onclick="selectSonucTipi('sinav')">
-                    <div class="mode-icon">📝</div>
-                    <div class="mode-title">Sınav Sonucu</div>
-                    <div class="mode-desc">Ders bazlı doğru/yanlış, puan ve yüzdelik bilgileri</div>
-                </div>
-                <div class="mode-card" id="typeYerlestirme" onclick="selectSonucTipi('yerlestirme')">
-                    <div class="mode-icon">🏫</div>
-                    <div class="mode-title">Yerleştirme Sonucu</div>
-                    <div class="mode-desc">Yerleştiği okul, bölüm, puan ve pansiyon bilgileri</div>
-                </div>
-            </div>
-
             <div class="card-title"><span class="icon">⚙️</span> Çekme Modu</div>
 
             <div class="mode-selector">
@@ -388,17 +374,12 @@
         <div class="card">
             <div class="card-title">
                 <span class="icon">📊</span> LGS Sonuçları
-                <div style="margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                <div style="margin-left: auto; display: flex; gap: 8px;">
                     <select class="year-select" id="filterYear" onchange="loadResults()">
                         <option value="">Tüm Yıllar</option>
                         <option value="2025">2025</option>
                         <option value="2024">2024</option>
                         <option value="2023">2023</option>
-                    </select>
-                    <select class="year-select" id="filterTipi" onchange="loadResults()">
-                        <option value="">Tüm Tipler</option>
-                        <option value="sinav">Sınav Sonucu</option>
-                        <option value="yerlestirme">Yerleştirme Sonucu</option>
                     </select>
                     <button class="btn-success" onclick="exportResults()">Excel İndir</button>
                     <button class="btn-outline" onclick="loadResults()">Yenile</button>
@@ -407,56 +388,28 @@
 
             <div id="resultStats" class="stats-row"></div>
 
-            <!-- Sınav Sonuçları Tablosu -->
-            <div id="sinavTableContainer">
-                <h3 style="font-size: 1rem; font-weight: 600; color: #1e40af; margin-bottom: 10px;">📝 Sınav Sonuçları</h3>
-                <div class="table-scroll" style="max-height: 400px;">
-                    <table class="student-table" id="resultsTableSinav">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Ad Soyad</th>
-                                <th>Sınıf</th>
-                                <th>Puan</th>
-                                <th>Genel %</th>
-                                <th>İl %</th>
-                                <th>Türkçe</th>
-                                <th>Mat</th>
-                                <th>Fen</th>
-                                <th>İnk</th>
-                                <th>Din</th>
-                                <th>Yab</th>
-                                <th>İşlem</th>
-                            </tr>
-                        </thead>
-                        <tbody id="resultsTableBodySinav"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Yerleştirme Sonuçları Tablosu -->
-            <div id="yerlestirmeTableContainer" style="margin-top: 20px;">
-                <h3 style="font-size: 1rem; font-weight: 600; color: #7c3aed; margin-bottom: 10px;">🏫 Yerleştirme Sonuçları</h3>
-                <div class="table-scroll" style="max-height: 400px;">
-                    <table class="student-table" id="resultsTableYerlestirme">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Ad Soyad</th>
-                                <th>Sınıf</th>
-                                <th>Puan</th>
-                                <th>Yerleşme Türü</th>
-                                <th>Yerleştiği Okul</th>
-                                <th>Okul Türü</th>
-                                <th>Bölüm/Alan</th>
-                                <th>Sonuç</th>
-                                <th>Pansiyon</th>
-                                <th>İşlem</th>
-                            </tr>
-                        </thead>
-                        <tbody id="resultsTableBodyYerlestirme"></tbody>
-                    </table>
-                </div>
+            <div class="table-scroll" style="max-height: 600px;">
+                <table class="student-table" id="resultsTable">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Ad Soyad</th>
+                            <th>Sınıf</th>
+                            <th>Puan</th>
+                            <th>Genel %</th>
+                            <th>İl %</th>
+                            <th>Türkçe</th>
+                            <th>Mat</th>
+                            <th>Fen</th>
+                            <th>İnk</th>
+                            <th>Din</th>
+                            <th>Yab</th>
+                            <th>Yerleştiği Okul</th>
+                            <th>İşlem</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsTableBody"></tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -467,18 +420,11 @@
 <script>
 let students = [];
 let currentMode = null;
-let sonucTipi = 'sinav';
 let hasCaptcha = false;
 let fetchRunning = false;
 let currentFetchIndex = 0;
 let successCount = 0;
 let errorCount = 0;
-
-function selectSonucTipi(tipi) {
-    sonucTipi = tipi;
-    document.getElementById('typeSinav').classList.toggle('selected', tipi === 'sinav');
-    document.getElementById('typeYerlestirme').classList.toggle('selected', tipi === 'yerlestirme');
-}
 
 function goToStep(step) {
     document.querySelectorAll('.step-content').forEach(s => s.classList.remove('active'));
@@ -794,8 +740,7 @@ function submitWithCaptcha() {
             yil: parts[2],
             captcha_code: captchaCode,
             sinif: student.sinif,
-            exam_year: parseInt(examYear),
-            sonuc_tipi: sonucTipi
+            exam_year: parseInt(examYear)
         })
     })
     .then(r => r.json())
@@ -805,7 +750,7 @@ function submitWithCaptcha() {
 
         if (data.error) {
             appendLog(`#${currentFetchIndex + 1} HATA: ${data.error}`);
-            if (data.is_captcha_error || data.error.includes('Güvenlik kod') || data.error.includes('güvenlik kod')) {
+            if (data.error.includes('Güvenlik kodu hatalı')) {
                 appendLog('Güvenlik kodu hatalı, tekrar deneyin...');
                 refreshCaptcha();
                 document.getElementById('captchaInput').value = '';
@@ -816,13 +761,8 @@ function submitWithCaptcha() {
             errorCount++;
         } else {
             const r = data.result;
-            if (sonucTipi === 'yerlestirme') {
-                appendLog(`#${currentFetchIndex + 1} OK: ${r.ad_soyad} - Puan: ${r.sinav_puan} - ${r.yerlestigi_okul || 'Yerleştirme yok'}`);
-                updateStudentStatus(currentFetchIndex, 'success', `${r.ad_soyad} - ${r.yerlestigi_okul || r.sinav_puan}`);
-            } else {
-                appendLog(`#${currentFetchIndex + 1} OK: ${r.ad_soyad} - Puan: ${r.sinav_puan}`);
-                updateStudentStatus(currentFetchIndex, 'success', `${r.ad_soyad} - ${r.sinav_puan}`);
-            }
+            appendLog(`#${currentFetchIndex + 1} OK: ${r.ad_soyad} - Puan: ${r.sinav_puan}`);
+            updateStudentStatus(currentFetchIndex, 'success', `${r.ad_soyad} - ${r.sinav_puan}`);
             successCount++;
         }
 
@@ -872,12 +812,7 @@ function appendLog(msg) {
 
 function loadResults() {
     const year = document.getElementById('filterYear').value;
-    const tipiFilter = document.getElementById('filterTipi').value;
-    let url = '/admin/lgs-results/list';
-    const params = [];
-    if (year) params.push('year=' + year);
-    if (tipiFilter) params.push('tipi=' + tipiFilter);
-    if (params.length > 0) url += '?' + params.join('&');
+    const url = '/admin/lgs-results/list' + (year ? '?year=' + year : '');
 
     fetch(url)
     .then(r => r.json())
@@ -885,92 +820,51 @@ function loadResults() {
         if (data.error) { alert(data.error); return; }
 
         const results = data.results || [];
+        const tbody = document.getElementById('resultsTableBody');
+        tbody.innerHTML = '';
 
-        const sinavResults = results.filter(r => r.sonuc_tipi === 'sinav' || !r.sonuc_tipi);
-        const yerlestirmeResults = results.filter(r => r.sonuc_tipi === 'yerlestirme');
-
-        const sinavContainer = document.getElementById('sinavTableContainer');
-        const yerlestirmeContainer = document.getElementById('yerlestirmeTableContainer');
-        const tbodySinav = document.getElementById('resultsTableBodySinav');
-        const tbodyYerlestirme = document.getElementById('resultsTableBodyYerlestirme');
-
-        tbodySinav.innerHTML = '';
-        tbodyYerlestirme.innerHTML = '';
-
-        if (!tipiFilter || tipiFilter === 'sinav') {
-            sinavContainer.style.display = '';
-            if (sinavResults.length === 0) {
-                tbodySinav.innerHTML = '<tr><td colspan="13" style="padding: 30px; color: #94a3b8; text-align: center;">Sınav sonucu bulunmuyor</td></tr>';
-            } else {
-                sinavResults.forEach((r, i) => {
-                    const puan = parseFloat(r.sinav_puan) || 0;
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${i + 1}</td>
-                        <td style="text-align:left; font-weight:600;">${r.student_name || '-'}</td>
-                        <td>${r.sinif || '-'}</td>
-                        <td style="font-weight:700; color: #1e40af;">${puan.toFixed(2)}</td>
-                        <td>${r.genel_yuzdelik || '-'}</td>
-                        <td>${r.il_yuzdelik || '-'}</td>
-                        <td><span style="color:#10b981">${r.turkce_dogru}</span>/<span style="color:#ef4444">${r.turkce_yanlis}</span>/<span style="color:#94a3b8">${r.turkce_bos}</span></td>
-                        <td><span style="color:#10b981">${r.matematik_dogru}</span>/<span style="color:#ef4444">${r.matematik_yanlis}</span>/<span style="color:#94a3b8">${r.matematik_bos}</span></td>
-                        <td><span style="color:#10b981">${r.fen_dogru}</span>/<span style="color:#ef4444">${r.fen_yanlis}</span>/<span style="color:#94a3b8">${r.fen_bos}</span></td>
-                        <td><span style="color:#10b981">${r.inkilap_dogru}</span>/<span style="color:#ef4444">${r.inkilap_yanlis}</span>/<span style="color:#94a3b8">${r.inkilap_bos}</span></td>
-                        <td><span style="color:#10b981">${r.din_dogru}</span>/<span style="color:#ef4444">${r.din_yanlis}</span>/<span style="color:#94a3b8">${r.din_bos}</span></td>
-                        <td><span style="color:#10b981">${r.yabanci_dil_dogru}</span>/<span style="color:#ef4444">${r.yabanci_dil_yanlis}</span>/<span style="color:#94a3b8">${r.yabanci_dil_bos}</span></td>
-                        <td><button class="btn-danger" style="font-size:0.75rem; padding:4px 8px;" onclick="deleteResult(${r.id})">Sil</button></td>
-                    `;
-                    tbodySinav.appendChild(tr);
-                });
-            }
-        } else {
-            sinavContainer.style.display = 'none';
-        }
-
-        if (!tipiFilter || tipiFilter === 'yerlestirme') {
-            yerlestirmeContainer.style.display = '';
-            if (yerlestirmeResults.length === 0) {
-                tbodyYerlestirme.innerHTML = '<tr><td colspan="11" style="padding: 30px; color: #94a3b8; text-align: center;">Yerle\u015ftirme sonucu bulunmuyor</td></tr>';
-            } else {
-                yerlestirmeResults.forEach((r, i) => {
-                    const puan = parseFloat(r.sinav_puan) || 0;
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${i + 1}</td>
-                        <td style="text-align:left; font-weight:600;">${r.student_name || '-'}</td>
-                        <td>${r.sinif || '-'}</td>
-                        <td style="font-weight:700; color: #7c3aed;">${puan.toFixed(2)}</td>
-                        <td>${r.yerlestirme_turu || '-'}</td>
-                        <td style="text-align:left; font-size:0.8rem; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${r.yerlestigi_okul || ''}">${r.yerlestigi_okul || '-'}</td>
-                        <td>${r.okul_turu || '-'}</td>
-                        <td style="font-size:0.8rem;">${r.bolum_alan || '-'}</td>
-                        <td>${r.sonuc_text || '-'}</td>
-                        <td>${r.pansiyon || '-'}</td>
-                        <td><button class="btn-danger" style="font-size:0.75rem; padding:4px 8px;" onclick="deleteResult(${r.id})">Sil</button></td>
-                    `;
-                    tbodyYerlestirme.appendChild(tr);
-                });
-            }
-        } else {
-            yerlestirmeContainer.style.display = 'none';
+        if (results.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="14" style="padding: 40px; color: #94a3b8;">Henüz sonuç bulunmuyor</td></tr>';
+            document.getElementById('resultStats').innerHTML = '';
+            return;
         }
 
         let totalPuan = 0, maxPuan = 0, minPuan = 999;
-        results.forEach(r => {
+        results.forEach((r, i) => {
             const puan = parseFloat(r.sinav_puan) || 0;
             totalPuan += puan;
             if (puan > maxPuan) maxPuan = puan;
             if (puan < minPuan && puan > 0) minPuan = puan;
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${i + 1}</td>
+                <td style="text-align:left; font-weight:600;">${r.student_name || '-'}</td>
+                <td>${r.sinif || '-'}</td>
+                <td style="font-weight:700; color: #1e40af;">${puan.toFixed(2)}</td>
+                <td>${r.genel_yuzdelik || '-'}</td>
+                <td>${r.il_yuzdelik || '-'}</td>
+                <td><span style="color:#10b981">${r.turkce_dogru}</span>/<span style="color:#ef4444">${r.turkce_yanlis}</span>/<span style="color:#94a3b8">${r.turkce_bos}</span></td>
+                <td><span style="color:#10b981">${r.matematik_dogru}</span>/<span style="color:#ef4444">${r.matematik_yanlis}</span>/<span style="color:#94a3b8">${r.matematik_bos}</span></td>
+                <td><span style="color:#10b981">${r.fen_dogru}</span>/<span style="color:#ef4444">${r.fen_yanlis}</span>/<span style="color:#94a3b8">${r.fen_bos}</span></td>
+                <td><span style="color:#10b981">${r.inkilap_dogru}</span>/<span style="color:#ef4444">${r.inkilap_yanlis}</span>/<span style="color:#94a3b8">${r.inkilap_bos}</span></td>
+                <td><span style="color:#10b981">${r.din_dogru}</span>/<span style="color:#ef4444">${r.din_yanlis}</span>/<span style="color:#94a3b8">${r.din_bos}</span></td>
+                <td><span style="color:#10b981">${r.yabanci_dil_dogru}</span>/<span style="color:#ef4444">${r.yabanci_dil_yanlis}</span>/<span style="color:#94a3b8">${r.yabanci_dil_bos}</span></td>
+                <td style="text-align:left; font-size:0.8rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${r.yerlestigi_okul || ''}">${r.yerlestigi_okul || '-'}</td>
+                <td><button class="btn-danger" onclick="deleteResult(${r.id})">Sil</button></td>
+            `;
+            tbody.appendChild(tr);
         });
+
         const avg = results.length > 0 ? (totalPuan / results.length).toFixed(2) : 0;
         document.getElementById('resultStats').innerHTML = `
             <div class="stat-card">
                 <div class="stat-value">${results.length}</div>
-                <div class="stat-label">\u00d6\u011frenci</div>
+                <div class="stat-label">Öğrenci</div>
             </div>
             <div class="stat-card">
                 <div class="stat-value" style="color: #10b981;">${maxPuan.toFixed(2)}</div>
-                <div class="stat-label">En Y\u00fcksek</div>
+                <div class="stat-label">En Yüksek</div>
             </div>
             <div class="stat-card">
                 <div class="stat-value">${avg}</div>
@@ -978,11 +872,11 @@ function loadResults() {
             </div>
             <div class="stat-card">
                 <div class="stat-value" style="color: #ef4444;">${minPuan < 999 ? minPuan.toFixed(2) : '-'}</div>
-                <div class="stat-label">En D\u00fc\u015f\u00fck</div>
+                <div class="stat-label">En Düşük</div>
             </div>
         `;
     })
-    .catch(err => alert('Sonu\u00e7lar y\u00fcklenemedi: ' + err.message));
+    .catch(err => alert('Sonuçlar yüklenemedi: ' + err.message));
 }
 
 function deleteResult(id) {

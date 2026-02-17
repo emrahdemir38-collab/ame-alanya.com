@@ -5,8 +5,6 @@ import os
 import json
 import logging
 import uuid
-import unicodedata
-from urllib.parse import quote
 from flask import Blueprint, request, jsonify, render_template, current_app, send_file, make_response
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
@@ -20,18 +18,6 @@ from PIL import Image as PILImage
 from utils.fmt_parser import FMTReportCardParser
 from utils.image_report_parser import ImageReportParser
 from utils.csv_parser import CSVExcelParser
-
-
-_TR_MAP = str.maketrans('çğıöşüÇĞİÖŞÜ', 'cgiosuCGIOSU')
-
-def _safe_filename(name):
-    ascii_name = name.translate(_TR_MAP)
-    ascii_name = unicodedata.normalize('NFKD', ascii_name).encode('ascii', 'ignore').decode('ascii')
-    return ascii_name
-
-def _content_disposition(filename):
-    ascii_name = _safe_filename(filename)
-    return f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(filename)}"
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 from reportlab.lib.pagesizes import A4
@@ -2652,7 +2638,7 @@ def generate_error_report_pdf():
             buffer,
             mimetype='application/pdf',
             as_attachment=True,
-            download_name=_safe_filename(f"hata_karnesi_{student_name.replace(' ', '_')}.pdf")
+            download_name=f"hata_karnesi_{student_name.replace(' ', '_')}.pdf"
         )
         
     except Exception as e:
@@ -2866,7 +2852,7 @@ def student_error_report_pdf():
             buffer,
             mimetype='application/pdf',
             as_attachment=True,
-            download_name=_safe_filename(f"hata_karnesi_{current_user.full_name.replace(' ', '_')}.pdf")
+            download_name=f"hata_karnesi_{current_user.full_name.replace(' ', '_')}.pdf"
         )
         
     except Exception as e:
@@ -6879,7 +6865,7 @@ def get_student_outcome_pdf_new(result_id):
         doc.build(elements)
         buffer.seek(0)
         
-        return send_file(buffer, mimetype='application/pdf', as_attachment=True, download_name=_safe_filename(f'kazanim_raporu_{result["student_name"]}.pdf'))
+        return send_file(buffer, mimetype='application/pdf', as_attachment=True, download_name=f'kazanim_raporu_{result["student_name"]}.pdf')
         
     except Exception as e:
         logger.error(f"PDF olusturma hatasi: {e}")
@@ -10273,7 +10259,7 @@ def generate_wrong_questions_pdf(result_id):
         
         response = make_response(pdf_buffer.getvalue())
         response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = _content_disposition(filename)
+        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
         response.headers['Content-Length'] = pdf_size
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         return response
@@ -10444,15 +10430,8 @@ def generate_wrong_questions_pdf_multi():
         return jsonify({"error": "Yetkisiz erişim"}), 403
     from app import object_storage
     
-    data = request.get_json(silent=True)
-    if data:
-        result_ids = data.get('result_ids', [])
-    else:
-        raw = request.form.get('result_ids', '[]')
-        try:
-            result_ids = json.loads(raw)
-        except:
-            result_ids = []
+    data = request.get_json()
+    result_ids = data.get('result_ids', [])
     
     if not result_ids or len(result_ids) == 0:
         return jsonify({"error": "Sinav seciniz"}), 400
@@ -10510,9 +10489,8 @@ def generate_wrong_questions_pdf_multi():
         
         safe_name = student_name.replace(' ', '_')
         filename = f"Tekrar_Coz_{safe_name}_Toplu.pdf"
-        ascii_filename = _safe_filename(filename)
         
-        return send_file(pdf_buffer, mimetype='application/pdf', as_attachment=True, download_name=ascii_filename)
+        return send_file(pdf_buffer, mimetype='application/pdf', as_attachment=True, download_name=filename)
     
     except Exception as ex:
         logger.error(f"Toplu Tekrar Çöz PDF hatası: {ex}")
