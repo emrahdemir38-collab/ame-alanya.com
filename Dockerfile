@@ -19,7 +19,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:${PORT:-5000}/health || exit 1
+ENV PORT=8080
 
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --threads 2 --timeout 180 --graceful-timeout 30 --worker-tmp-dir /dev/shm app:app 2>&1"]
+EXPOSE ${PORT}
+
+CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT} --workers 1 --threads 2 --timeout 180 --graceful-timeout 30 --worker-tmp-dir /dev/shm --log-level info --access-logfile - --error-logfile - app:app"]
