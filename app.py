@@ -734,6 +734,56 @@ def admin_sync_db_to_railway():
     return jsonify(result)
 
 
+@app.route("/api/admin/migrate-images-to-db", methods=["POST"])
+@login_required
+def migrate_images_to_db():
+    if current_user.role != 'admin':
+        return jsonify({"success": False, "error": "Yetkisiz"}), 403
+    
+    if not object_storage.is_available():
+        return jsonify({"success": False, "error": "Object Storage kullanılamıyor. Bu işlem sadece Replit'te çalışır."})
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    try:
+        cur.execute("SELECT id, image_key FROM report_card_exam_pages WHERE image_data IS NULL")
+        pages = cur.fetchall()
+        
+        if not pages:
+            return jsonify({"success": True, "message": "Tüm görseller zaten veritabanında.", "migrated": 0})
+        
+        import psycopg2 as pg2
+        migrated = 0
+        errors = 0
+        batch_size = 10
+        for i in range(0, len(pages), batch_size):
+            batch = pages[i:i+batch_size]
+            for page in batch:
+                try:
+                    data, _ = object_storage.download_as_bytes(page['image_key'])
+                    cur.execute("UPDATE report_card_exam_pages SET image_data = %s WHERE id = %s", 
+                               (pg2.Binary(data), page['id']))
+                    migrated += 1
+                except Exception as e:
+                    logger.warning(f"Görsel migrate hatası {page['image_key']}: {e}")
+                    errors += 1
+            conn.commit()
+        return jsonify({
+            "success": True, 
+            "message": f"{migrated} görsel veritabanına kopyalandı, {errors} hata.",
+            "migrated": migrated,
+            "errors": errors,
+            "total": len(pages)
+        })
+    except Exception as ex:
+        conn.rollback()
+        logger.error(f"Görsel migration hatası: {ex}")
+        return jsonify({"success": False, "error": str(ex)})
+    finally:
+        cur.close()
+        conn.close()
+
 @app.route("/admin/question-analysis")
 @login_required
 def admin_question_analysis():
@@ -3580,6 +3630,21 @@ def serve_file_with_mime(filename):
         except Exception as storage_error:
             logger.error(f"⚠️ Object Storage hatası: {storage_error}")
     
+    # Veritabanından dene (exam_pages görselleri için)
+    if file_data is None and filename.startswith('exam_pages/'):
+        try:
+            db_conn = get_db()
+            db_cur = db_conn.cursor(cursor_factory=RealDictCursor)
+            db_cur.execute("SELECT image_data FROM report_card_exam_pages WHERE image_key = %s AND image_data IS NOT NULL", (filename,))
+            db_row = db_cur.fetchone()
+            if db_row and db_row.get('image_data'):
+                file_data = bytes(db_row['image_data'])
+                source = "database"
+            db_cur.close()
+            db_conn.close()
+        except Exception as db_err:
+            logger.warning(f"DB image fallback hatası: {db_err}")
+    
     # Lokal file system dene
     if file_data is None:
         attached_path = os.path.join('attached_assets', base_filename)
@@ -4043,12 +4108,18 @@ def init_database():
                 exam_id INTEGER REFERENCES report_card_exams(id) ON DELETE CASCADE,
                 page_number INTEGER NOT NULL,
                 image_key VARCHAR(500) NOT NULL,
+                image_data BYTEA,
                 width_px INTEGER,
                 height_px INTEGER,
                 created_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul'),
                 UNIQUE(exam_id, page_number)
             )
         """)
+        
+        try:
+            cur.execute("ALTER TABLE report_card_exam_pages ADD COLUMN IF NOT EXISTS image_data BYTEA")
+        except Exception:
+            pass
         
         cur.execute("""
             CREATE TABLE IF NOT EXISTS report_card_question_regions (

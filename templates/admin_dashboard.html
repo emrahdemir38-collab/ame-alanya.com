@@ -340,6 +340,23 @@
                     ">
                         📤 Replit (Dev) → Railway
                     </button>
+                    <button id="migrateImagesBtn" onclick="migrateImagesToDb()" style="
+                        background: linear-gradient(135deg, #10b981, #059669);
+                        color: white;
+                        border: none;
+                        padding: 12px 28px;
+                        border-radius: 12px;
+                        font-size: 0.95rem;
+                        font-weight: 600;
+                        cursor: pointer;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 8px;
+                        transition: all 0.3s;
+                        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+                    ">
+                        🖼️ Gorselleri DB'ye Kopyala
+                    </button>
                 </div>
                 <div id="syncStatus" style="margin-top: 16px; display: none;"></div>
                 <div id="syncResults" style="margin-top: 16px; display: none;"></div>
@@ -609,6 +626,42 @@
             btn.innerHTML = originalText;
             btn.style.opacity = '1';
             otherBtn.style.opacity = '1';
+        }
+    }
+
+    async function migrateImagesToDb() {
+        const btn = document.getElementById('migrateImagesBtn');
+        const statusDiv = document.getElementById('syncStatus');
+        const originalText = btn.innerHTML;
+
+        if (!confirm('Object Storage\'daki sinav gorselleri veritabanina kopyalanacak. Bu islem Railway\'da gorsellerin gorunmesini saglar. Devam?')) {
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Kopyalaniyor...';
+        btn.style.opacity = '0.7';
+        statusDiv.style.display = 'block';
+        statusDiv.innerHTML = '<div style="display:flex;align-items:center;gap:8px;color:#059669;"><div class="spinner" style="width:20px;height:20px;border:3px solid var(--gray-200);border-top:3px solid #059669;border-radius:50%;animation:spin 1s linear infinite;"></div> Gorseller veritabanina kopyalaniyor...</div>';
+
+        try {
+            const response = await fetch('/api/admin/migrate-images-to-db', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                statusDiv.innerHTML = `<div style="color:#059669;font-weight:600;">✅ ${data.message}</div>`;
+            } else {
+                statusDiv.innerHTML = `<div style="color:var(--danger-600);font-weight:600;">❌ Hata: ${data.error}</div>`;
+            }
+        } catch (error) {
+            statusDiv.innerHTML = `<div style="color:var(--danger-600);font-weight:600;">❌ Baglanti hatasi: ${error.message}</div>`;
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            btn.style.opacity = '1';
         }
     }
 </script>

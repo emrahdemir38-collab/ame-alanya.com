@@ -9506,10 +9506,11 @@ def upload_exam_images(exam_id):
                         if object_storage.is_available():
                             object_storage.upload_from_file(buf, image_key)
                         
+                        import psycopg2
                         cur.execute("""
-                            INSERT INTO report_card_exam_pages (exam_id, page_number, image_key, width_px, height_px)
-                            VALUES (%s, %s, %s, %s, %s) RETURNING id
-                        """, (exam_id, next_page, image_key, pix.width, pix.height))
+                            INSERT INTO report_card_exam_pages (exam_id, page_number, image_key, image_data, width_px, height_px)
+                            VALUES (%s, %s, %s, %s, %s, %s) RETURNING id
+                        """, (exam_id, next_page, image_key, psycopg2.Binary(img_bytes), pix.width, pix.height))
                         page_id = cur.fetchone()['id']
                         uploaded_pages.append({'id': page_id, 'page_number': next_page, 'width': pix.width, 'height': pix.height})
                         next_page += 1
@@ -9527,14 +9528,17 @@ def upload_exam_images(exam_id):
                 buf = BytesIO()
                 img.save(buf, format='PNG')
                 buf.seek(0)
+                img_binary = buf.getvalue()
                 
                 if object_storage.is_available():
+                    buf.seek(0)
                     object_storage.upload_from_file(buf, image_key)
                 
+                import psycopg2
                 cur.execute("""
-                    INSERT INTO report_card_exam_pages (exam_id, page_number, image_key, width_px, height_px)
-                    VALUES (%s, %s, %s, %s, %s) RETURNING id
-                """, (exam_id, next_page, image_key, img.width, img.height))
+                    INSERT INTO report_card_exam_pages (exam_id, page_number, image_key, image_data, width_px, height_px)
+                    VALUES (%s, %s, %s, %s, %s, %s) RETURNING id
+                """, (exam_id, next_page, image_key, psycopg2.Binary(img_binary), img.width, img.height))
                 page_id = cur.fetchone()['id']
                 uploaded_pages.append({'id': page_id, 'page_number': next_page, 'width': img.width, 'height': img.height})
                 next_page += 1
@@ -9656,14 +9660,23 @@ def get_page_image(page_id):
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("SELECT image_key FROM report_card_exam_pages WHERE id = %s", (page_id,))
+        cur.execute("SELECT image_key, image_data FROM report_card_exam_pages WHERE id = %s", (page_id,))
         page = cur.fetchone()
         if not page:
             return "Sayfa bulunamadı", 404
         
+        img_data = None
         if object_storage.is_available():
-            data, content_type = object_storage.download_as_bytes(page['image_key'])
-            return send_file(BytesIO(data), mimetype=content_type or 'image/png')
+            try:
+                img_data, content_type = object_storage.download_as_bytes(page['image_key'])
+            except Exception:
+                pass
+        
+        if img_data is None and page.get('image_data'):
+            img_data = bytes(page['image_data'])
+        
+        if img_data:
+            return send_file(BytesIO(img_data), mimetype='image/png')
         
         return "Dosya bulunamadı", 404
     except Exception as ex:
@@ -10181,9 +10194,22 @@ def generate_wrong_questions_pdf(result_id):
             
             image_key = region['image_key']
             if image_key not in page_images_cache:
+                img_data = None
                 if object_storage.is_available():
-                    data, _ = object_storage.download_as_bytes(image_key)
-                    page_images_cache[image_key] = PILImage.open(BytesIO(data))
+                    try:
+                        img_data, _ = object_storage.download_as_bytes(image_key)
+                    except Exception:
+                        pass
+                if img_data is None:
+                    try:
+                        cur.execute("SELECT image_data FROM report_card_exam_pages WHERE image_key = %s AND image_data IS NOT NULL", (image_key,))
+                        db_row = cur.fetchone()
+                        if db_row and db_row.get('image_data'):
+                            img_data = bytes(db_row['image_data'])
+                    except Exception:
+                        pass
+                if img_data:
+                    page_images_cache[image_key] = PILImage.open(BytesIO(img_data))
                 else:
                     continue
             
@@ -10355,16 +10381,26 @@ def _extract_wrong_question_images(result, cur, object_storage):
         
         image_key = region['image_key']
         if image_key not in page_images_cache:
+            img_data = None
             try:
                 if object_storage.is_available():
-                    data, _ = object_storage.download_as_bytes(image_key)
-                    from PIL import Image as PILImage
-                    page_images_cache[image_key] = PILImage.open(BytesIO(data))
-                else:
-                    download_fail_count += 1
-                    page_images_cache[image_key] = None
+                    img_data, _ = object_storage.download_as_bytes(image_key)
             except Exception as dl_err:
-                logger.warning(f"Image download failed for {image_key}: {dl_err}")
+                logger.warning(f"Object Storage download failed for {image_key}: {dl_err}")
+            
+            if img_data is None:
+                try:
+                    cur.execute("SELECT image_data FROM report_card_exam_pages WHERE image_key = %s AND image_data IS NOT NULL", (image_key,))
+                    db_row = cur.fetchone()
+                    if db_row and db_row.get('image_data'):
+                        img_data = bytes(db_row['image_data'])
+                except Exception as db_err:
+                    logger.warning(f"DB image fallback failed for {image_key}: {db_err}")
+            
+            if img_data:
+                from PIL import Image as PILImage
+                page_images_cache[image_key] = PILImage.open(BytesIO(img_data))
+            else:
                 download_fail_count += 1
                 page_images_cache[image_key] = None
         

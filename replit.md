@@ -39,6 +39,16 @@ The system is built on Python 3.11 with the Flask 3.1.2 framework. It uses a Pos
 - `student_questions`: Student inquiries to teachers
 - `practice_exams`: LGS practice exam records
 
+## Recent Changes (2026-02-18)
+- **Railway Görsel Depolama Çözümü:** Object Storage'ın Railway'da mevcut olmaması sorununu çözmek için veritabanı tabanlı fallback eklendi
+  - `report_card_exam_pages` tablosuna `image_data BYTEA` sütunu eklendi
+  - Görsel yükleme: hem Object Storage'a hem veritabanına kayıt
+  - Tekrar Çöz PDF: Object Storage yoksa veritabanından görsel çekme (2 fonksiyon)
+  - Sayfa görseli sunma: DB fallback ile Railway'da çalışma
+  - `serve_file_with_mime`: exam_pages/ görselleri için DB fallback
+  - Admin paneline "Görselleri DB'ye Kopyala" butonu (mevcut görseller için migrasyon)
+  - API: `/api/admin/migrate-images-to-db` - Object Storage → DB toplu kopyalama (10'lu batch)
+
 ## Recent Changes (2026-02-15)
 - ✅ **Kelebek Sınav Düzeni Sistemi:** Deneme sınavları için otomatik oturma planı oluşturma
   - Yeni Blueprint: `routes/kelebek.py` - Kelebek algoritması, Excel şablon, PDF çıktı
