@@ -611,26 +611,10 @@ def admin_dashboard():
         return redirect('/')
     return render_template("admin_dashboard.html")
 
-@app.route("/api/admin/sync-db", methods=["POST"])
-@login_required
-def admin_sync_db():
-    if current_user.role != 'admin':
-        return jsonify({"success": False, "error": "Yetkisiz"}), 403
-
+def _sync_tables(source_url, target_url, direction_label):
     import psycopg2
     import psycopg2.extras
     import json as json_mod
-
-    prod_url = os.environ.get('PROD_DATABASE_URL')
-    dev_url = os.environ.get('DATABASE_URL')
-
-    if not prod_url:
-        return jsonify({"success": False, "error": "PROD_DATABASE_URL ayarlanmamis"})
-    if not dev_url:
-        return jsonify({"success": False, "error": "DATABASE_URL bulunamadi"})
-
-    if prod_url == dev_url:
-        return jsonify({"success": False, "error": "Production ve Development veritabanlari ayni! Bu islem yapilamaz."})
 
     tables_to_sync = [
         'users', 'classes', 'teacher_classes',
@@ -638,41 +622,36 @@ def admin_sync_db():
         'report_card_question_regions', 'report_card_results',
         'book_entries',
     ]
-    tables_to_truncate = [
-        'book_entries', 'report_card_results',
-        'report_card_question_regions', 'report_card_exam_pages',
-        'report_card_exams', 'teacher_classes', 'classes',
-        'user_sessions', 'users',
-    ]
 
     try:
-        prod_conn = psycopg2.connect(prod_url, cursor_factory=psycopg2.extras.RealDictCursor)
-        prod_cur = prod_conn.cursor()
-        dev_conn = psycopg2.connect(dev_url)
-        dev_cur = dev_conn.cursor()
-
-        for table in tables_to_truncate:
-            try:
-                dev_cur.execute(f"TRUNCATE TABLE {table} CASCADE")
-            except:
-                dev_conn.rollback()
-        dev_conn.commit()
+        source_conn = psycopg2.connect(source_url, cursor_factory=psycopg2.extras.RealDictCursor)
+        source_cur = source_conn.cursor()
+        target_conn = psycopg2.connect(target_url, cursor_factory=psycopg2.extras.RealDictCursor)
+        target_cur = target_conn.cursor()
 
         results = {}
         for table in tables_to_sync:
-            prod_cur.execute(f"SELECT * FROM {table} ORDER BY id")
-            rows = prod_cur.fetchall()
+            try:
+                source_cur.execute(f"SELECT * FROM {table} ORDER BY id")
+                rows = source_cur.fetchall()
+            except Exception as e:
+                source_conn.rollback()
+                results[table] = {"kaynak": 0, "hedef": 0, "eklenen": 0, "hata": str(e)}
+                continue
+
             if not rows:
-                results[table] = {"prod": 0, "dev": 0}
+                target_cur.execute(f"SELECT COUNT(*) FROM {table}")
+                target_count = target_cur.fetchone()['count']
+                results[table] = {"kaynak": 0, "hedef": target_count, "eklenen": 0}
                 continue
 
             columns = list(rows[0].keys())
             json_columns = set()
-            prod_cur.execute("""
+            source_cur.execute("""
                 SELECT column_name FROM information_schema.columns 
                 WHERE table_name = %s AND data_type IN ('json', 'jsonb')
             """, (table,))
-            for r in prod_cur.fetchall():
+            for r in source_cur.fetchall():
                 json_columns.add(r['column_name'])
 
             placeholders = ['%s::json' if col in json_columns else '%s' for col in columns]
@@ -692,28 +671,71 @@ def admin_sync_db():
                         values.append(val)
                 values_list.append(tuple(values))
 
-            psycopg2.extras.execute_batch(dev_cur, insert_sql, values_list, page_size=200)
-            dev_conn.commit()
+            target_cur.execute(f"SELECT COUNT(*) FROM {table}")
+            before_count = target_cur.fetchone()['count']
+
+            psycopg2.extras.execute_batch(target_cur, insert_sql, values_list, page_size=200)
+            target_conn.commit()
 
             try:
-                dev_cur.execute(f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), COALESCE((SELECT MAX(id) FROM {table}), 1))")
-                dev_conn.commit()
+                target_cur.execute(f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), COALESCE((SELECT MAX(id) FROM {table}), 1))")
+                target_conn.commit()
             except:
-                dev_conn.rollback()
+                target_conn.rollback()
 
-            dev_cur.execute(f"SELECT COUNT(*) FROM {table}")
-            dev_count = dev_cur.fetchone()[0]
-            results[table] = {"prod": len(rows), "dev": dev_count}
+            target_cur.execute(f"SELECT COUNT(*) FROM {table}")
+            after_count = target_cur.fetchone()['count']
+            results[table] = {"kaynak": len(rows), "hedef": after_count, "eklenen": after_count - before_count}
 
-        prod_cur.close()
-        prod_conn.close()
-        dev_cur.close()
-        dev_conn.close()
+        source_cur.close()
+        source_conn.close()
+        target_cur.close()
+        target_conn.close()
 
-        return jsonify({"success": True, "results": results})
+        return {"success": True, "direction": direction_label, "results": results}
 
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)})
+        return {"success": False, "error": str(e)}
+
+
+@app.route("/api/admin/sync-db", methods=["POST"])
+@login_required
+def admin_sync_db():
+    if current_user.role != 'admin':
+        return jsonify({"success": False, "error": "Yetkisiz"}), 403
+
+    prod_url = os.environ.get('PROD_DATABASE_URL')
+    dev_url = os.environ.get('DATABASE_URL')
+
+    if not prod_url:
+        return jsonify({"success": False, "error": "PROD_DATABASE_URL ayarlanmamis"})
+    if not dev_url:
+        return jsonify({"success": False, "error": "DATABASE_URL bulunamadi"})
+    if prod_url == dev_url:
+        return jsonify({"success": False, "error": "Production ve Development veritabanlari ayni!"})
+
+    result = _sync_tables(prod_url, dev_url, "Production → Development (Replit)")
+    return jsonify(result)
+
+
+@app.route("/api/admin/sync-db-to-railway", methods=["POST"])
+@login_required
+def admin_sync_db_to_railway():
+    if current_user.role != 'admin':
+        return jsonify({"success": False, "error": "Yetkisiz"}), 403
+
+    railway_url = os.environ.get('RAILWAY_DB_URL')
+    dev_url = os.environ.get('DATABASE_URL')
+
+    if not railway_url:
+        return jsonify({"success": False, "error": "RAILWAY_DB_URL ayarlanmamis"})
+    if not dev_url:
+        return jsonify({"success": False, "error": "DATABASE_URL bulunamadi"})
+    if railway_url == dev_url:
+        return jsonify({"success": False, "error": "Railway ve Development veritabanlari ayni!"})
+
+    result = _sync_tables(dev_url, railway_url, "Development (Replit) → Railway")
+    return jsonify(result)
 
 
 @app.route("/admin/question-analysis")
