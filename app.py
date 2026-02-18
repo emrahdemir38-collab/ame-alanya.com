@@ -15515,8 +15515,15 @@ def download_report_pdf():
         # APK PNG açabiliyor ama PDF açamıyor - PNG'ye convert etmeyi dene
         try:
             # Temp PDF file oluştur
-            with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as pdf_file:
-                pdf_path = pdf_file.name
+            UPLOAD_FOLDER = os.path.join("static", "report_cards")
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+pdf_path = os.path.join(UPLOAD_FOLDER, filename)
+
+with open(pdf_path, "wb") as pdf_file:
+    pdf_file.write(buffer.read())
+
                 buffer.seek(0)
                 pdf_file.write(buffer.read())
                 pdf_file.flush()
