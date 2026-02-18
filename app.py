@@ -2,10 +2,6 @@ from flask import Flask, request, jsonify, send_from_directory, render_template,
 from flask_cors import CORS
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 import os
-# Upload klasörünü garanti altına al
-UPLOAD_FOLDER = "uploads/exams"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 import uuid
