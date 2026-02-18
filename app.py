@@ -272,15 +272,11 @@ app.config['ONESIGNAL_API_KEY'] = os.environ.get('ONESIGNAL_API_KEY', '')
 
 CORS(app, supports_credentials=True)
 
-NOTIFICATION_ALLOWED_USERS = ['admin', '32260940130']
-
 def can_send_notification(user):
     """Kullanıcının bildirim gönderme yetkisi var mı kontrol et"""
     if not user:
         return False
-    if user.role == 'admin':
-        return True
-    if user.username in NOTIFICATION_ALLOWED_USERS:
+    if user.role in ['admin', 'teacher']:
         return True
     return False
 
