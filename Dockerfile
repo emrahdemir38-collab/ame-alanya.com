@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-dejavu-core \
     curl \
     && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y poppler-utils
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
