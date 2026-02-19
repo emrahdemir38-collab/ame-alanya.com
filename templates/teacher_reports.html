@@ -438,6 +438,9 @@
                     <button onclick="loadMultiExamProgress()" style="margin-left:12px;padding:10px 20px;background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:500;">
                         Raporu Getir
                     </button>
+                    <button id="multiExamPdfBtn" onclick="downloadMultiExamPdf()" style="display:none;margin-left:12px;padding:10px 20px;background:linear-gradient(135deg,#10b981,#059669);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:500;">
+                        📄 PDF İndir
+                    </button>
                 </div>
                 <div id="multiExamResults" style="background:#f9fafb;padding:16px;border-radius:8px;">
                     <p style="color:#6b7280;text-align:center;">Sınıf seçip raporu getirin</p>
@@ -540,7 +543,15 @@
             });
             html += '</tbody></table></div>';
             resultsDiv.innerHTML = html;
+            window._multiExamClassName = classId;
+            document.getElementById('multiExamPdfBtn').style.display = 'inline-block';
         } catch (error) { resultsDiv.innerHTML = `<p style="color: #ef4444;">Hata: ${error.message}</p>`; }
+    }
+    
+    function downloadMultiExamPdf() {
+        const className = window._multiExamClassName;
+        if (!className) { alert('Önce raporu getirin'); return; }
+        window.open(`/admin/report-cards/api/multi-exam-progress-pdf?class_name=${encodeURIComponent(className)}`, '_blank');
     }
     
     async function loadOutcomeAnalytics() {

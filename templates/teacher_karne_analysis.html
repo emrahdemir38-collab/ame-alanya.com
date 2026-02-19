@@ -779,6 +779,9 @@ function openMultiExamModal() {
                 <button class="action-btn btn-indigo" onclick="loadMultiExamProgress()" style="margin-left: 12px;">
                     Raporu Getir
                 </button>
+                <button class="action-btn btn-success" id="multiExamPdfBtn" style="display: none; margin-left: 12px;" onclick="downloadMultiExamPdf()">
+                    📄 PDF Indir
+                </button>
             </div>
             <div id="multiExamResults" style="background: #f9fafb; padding: 16px; border-radius: 8px;">
                 <p style="color: #6b7280; text-align: center;">Sinif secip raporu getirin</p>
@@ -830,9 +833,18 @@ async function loadMultiExamProgress() {
         html += '</tbody></table></div>';
         
         resultsDiv.innerHTML = html;
+        window._multiExamData = data;
+        window._multiExamClassName = className;
+        document.getElementById('multiExamPdfBtn').style.display = 'inline-block';
     } catch (error) { 
         resultsDiv.innerHTML = `<p style="color: #ef4444;">Hata: ${error.message}</p>`; 
     }
+}
+
+function downloadMultiExamPdf() {
+    const className = window._multiExamClassName;
+    if (!className) { alert('Once raporu getirin'); return; }
+    window.open(`/admin/report-cards/api/multi-exam-progress-pdf?class_name=${encodeURIComponent(className)}`, '_blank');
 }
 
 function openClassOutcomeModal() {

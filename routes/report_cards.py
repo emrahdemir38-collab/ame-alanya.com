@@ -3107,6 +3107,187 @@ def get_multi_exam_progress():
         conn.close()
 
 
+@report_cards_bp.route('/api/multi-exam-progress-pdf', methods=['GET'])
+@login_required
+def get_multi_exam_progress_pdf():
+    if current_user.role not in ['admin', 'teacher']:
+        return jsonify({"error": "Yetkisiz erişim"}), 403
+
+    class_name = request.args.get('class_name', '')
+    if not class_name:
+        return jsonify({"error": "Sınıf seçilmedi"}), 400
+
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    try:
+        class_normalized = class_name.replace('/', '')
+
+        if current_user.role == 'teacher':
+            cur.execute("SELECT class_name FROM teacher_classes WHERE teacher_id = %s", (current_user.id,))
+            allowed_classes = [row['class_name'] for row in cur.fetchall()]
+            allowed_normalized = [c.replace('/', '') for c in allowed_classes]
+            if class_name not in allowed_classes and class_normalized not in allowed_normalized:
+                return jsonify({"error": "Bu sınıfa erişim yetkiniz yok"}), 403
+
+        cur.execute("""
+            SELECT DISTINCT e.id, e.exam_name, e.upload_date
+            FROM report_card_exams e
+            JOIN report_card_results r ON r.exam_id = e.id
+            WHERE r.class_name = %s OR REPLACE(r.class_name, '/', '') = %s
+            ORDER BY e.upload_date ASC, e.exam_name ASC
+        """, (class_name, class_normalized))
+        exams = cur.fetchall()
+
+        if len(exams) < 1:
+            return jsonify({"error": "Bu sınıfa ait karne bulunamadı"}), 404
+
+        exam_names = [e['exam_name'] for e in exams]
+
+        cur.execute("""
+            SELECT r.student_name, r.student_no, e.exam_name, r.totals
+            FROM report_card_results r
+            JOIN report_card_exams e ON r.exam_id = e.id
+            WHERE r.class_name = %s OR REPLACE(r.class_name, '/', '') = %s
+            ORDER BY r.student_name, e.upload_date ASC
+        """, (class_name, class_normalized))
+        results = cur.fetchall()
+
+        students = {}
+        for row in results:
+            student_key = row['student_no'].strip() if row['student_no'] else row['student_name']
+            if student_key not in students:
+                students[student_key] = {
+                    'student_name': row['student_name'],
+                    'student_number': row['student_no'],
+                    'exams': {}
+                }
+            students[student_key]['student_name'] = row['student_name']
+            totals = row.get('totals') or {}
+            if isinstance(totals, str):
+                try:
+                    totals = json.loads(totals)
+                except:
+                    totals = {}
+            total_correct = totals.get('correct_count', totals.get('correct', 0)) or 0
+            total_wrong = totals.get('wrong_count', totals.get('wrong', 0)) or 0
+            total_net = totals.get('net_score', totals.get('net', 0)) or 0
+            students[student_key]['exams'][row['exam_name']] = {
+                'total_correct': total_correct,
+                'total_wrong': total_wrong,
+                'total_net': round(float(total_net), 2)
+            }
+
+        student_list = list(students.values())
+        for s in student_list:
+            available = [e for e in exam_names if e in s['exams']]
+            if len(available) >= 2:
+                s['net_change'] = round(s['exams'][available[-1]]['total_net'] - s['exams'][available[0]]['total_net'], 2)
+            else:
+                s['net_change'] = 0
+        student_list.sort(key=lambda x: x['net_change'], reverse=True)
+
+        from reportlab.lib.pagesizes import landscape
+        buffer = BytesIO()
+        page_size = landscape(A4)
+        doc = SimpleDocTemplate(buffer, pagesize=page_size, topMargin=25, bottomMargin=25, leftMargin=20, rightMargin=20)
+        elements = []
+        styles = getSampleStyleSheet()
+
+        elements.extend(create_pdf_header(styles))
+
+        title_style = ParagraphStyle('ProgressTitle', parent=styles['Heading1'], fontName=PDF_FONT_BOLD, fontSize=14, alignment=TA_CENTER, spaceAfter=10)
+        cell_style = ParagraphStyle('ProgressCell', parent=styles['Normal'], fontName=PDF_FONT, fontSize=7, leading=9, wordWrap='CJK')
+        cell_bold = ParagraphStyle('ProgressCellBold', parent=styles['Normal'], fontName=PDF_FONT_BOLD, fontSize=7, leading=9, wordWrap='CJK')
+        cell_center = ParagraphStyle('ProgressCellCenter', parent=cell_style, alignment=TA_CENTER)
+        cell_center_bold = ParagraphStyle('ProgressCellCenterBold', parent=cell_bold, alignment=TA_CENTER)
+
+        elements.append(Paragraph(f"{class_name} - Toplu Sınav Gelişim Raporu", title_style))
+        date_style = ParagraphStyle('DateStyle', parent=styles['Normal'], fontName=PDF_FONT, fontSize=8, alignment=TA_CENTER, spaceAfter=10)
+        elements.append(Paragraph(f"Oluşturma Tarihi: {datetime.now().strftime('%d.%m.%Y')}", date_style))
+        elements.append(Spacer(1, 5))
+
+        header_row = [
+            Paragraph('No', cell_center_bold),
+            Paragraph('Öğrenci Adı', cell_bold)
+        ]
+        for ename in exam_names:
+            short = ename[:15] + '..' if len(ename) > 15 else ename
+            header_row.append(Paragraph(f"{short}<br/><font size='5'>(D / Y / Net)</font>", cell_center_bold))
+        header_row.append(Paragraph('Gelişim', cell_center_bold))
+
+        table_data = [header_row]
+
+        for idx, student in enumerate(student_list):
+            row = [
+                Paragraph(str(idx + 1), cell_center),
+                Paragraph(student['student_name'] or '', cell_style)
+            ]
+            for ename in exam_names:
+                ed = student['exams'].get(ename)
+                if ed:
+                    row.append(Paragraph(f"<b>{ed['total_correct']}D {ed['total_wrong']}Y</b><br/>Net: {ed['total_net']}", cell_center))
+                else:
+                    row.append(Paragraph('-', cell_center))
+
+            nc = student['net_change']
+            change_text = f"+{nc}" if nc > 0 else str(nc)
+            if nc > 0:
+                row.append(Paragraph(f'<font color="#10b981"><b>{change_text}</b></font>', cell_center))
+            elif nc < 0:
+                row.append(Paragraph(f'<font color="#ef4444"><b>{change_text}</b></font>', cell_center))
+            else:
+                row.append(Paragraph(f'<font color="#6b7280">{change_text}</font>', cell_center))
+            table_data.append(row)
+
+        num_col_w = 25
+        name_col_w = 100
+        change_col_w = 45
+        avail_w = page_size[0] - 40 - num_col_w - name_col_w - change_col_w
+        exam_col_w = avail_w / max(len(exam_names), 1)
+        col_widths = [num_col_w, name_col_w] + [exam_col_w] * len(exam_names) + [change_col_w]
+
+        table = Table(table_data, colWidths=col_widths, repeatRows=1)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6366f1')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), PDF_FONT_BOLD),
+            ('FONTSIZE', (0, 0), (-1, 0), 8),
+            ('FONTNAME', (0, 1), (-1, -1), PDF_FONT),
+            ('FONTSIZE', (0, 1), (-1, -1), 7),
+            ('ALIGN', (0, 0), (0, -1), 'CENTER'),
+            ('ALIGN', (2, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9fafb')]),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ]))
+        elements.append(table)
+
+        elements.append(Spacer(1, 15))
+        footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontName=PDF_FONT, fontSize=7, alignment=TA_CENTER, textColor=colors.gray)
+        elements.append(Paragraph("AMEO - Ayşe Melahat Erkin Ortaokulu - Karne Analiz Sistemi", footer_style))
+
+        doc.build(elements)
+        buffer.seek(0)
+
+        safe_name = class_name.replace('/', '_').replace(' ', '_')
+        response = make_response(buffer.getvalue())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename=Toplu_Gelisim_{safe_name}.pdf'
+        return response
+
+    except Exception as e:
+        logger.error(f"Multi-exam progress PDF error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
 # ==================== ÖĞRENCİ KİŞİSEL GELİŞİM ====================
 
 @report_cards_bp.route('/api/student-progress', methods=['GET'])
