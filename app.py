@@ -642,6 +642,11 @@ def _sync_tables(source_url, target_url, direction_label):
                 continue
 
             columns = list(rows[0].keys())
+            skip_columns = set()
+            if table == 'report_card_exam_pages':
+                skip_columns.add('image_data')
+            columns = [c for c in columns if c not in skip_columns]
+
             json_columns = set()
             source_cur.execute("""
                 SELECT column_name FROM information_schema.columns 
@@ -732,6 +737,38 @@ def admin_sync_db_to_railway():
 
     result = _sync_tables(dev_url, railway_url, "Development (Replit) → Railway")
     return jsonify(result)
+
+
+@app.route("/api/admin/cleanup-railway-images", methods=["POST"])
+@login_required
+def cleanup_railway_images():
+    if current_user.role != 'admin':
+        return jsonify({"success": False, "error": "Yetkisiz"}), 403
+    
+    railway_url = os.environ.get('RAILWAY_DB_URL')
+    if not railway_url:
+        return jsonify({"success": False, "error": "RAILWAY_DB_URL ayarlanmamis"})
+    
+    try:
+        import psycopg2 as pg2
+        conn = pg2.connect(railway_url)
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM report_card_exam_pages WHERE image_data IS NOT NULL")
+        count = cur.fetchone()[0]
+        if count == 0:
+            cur.close()
+            conn.close()
+            return jsonify({"success": True, "message": "Railway DB'de zaten image_data yok.", "cleaned": 0})
+        
+        cur.execute("UPDATE report_card_exam_pages SET image_data = NULL")
+        conn.commit()
+        cur.execute("VACUUM report_card_exam_pages")
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"success": True, "message": f"Railway DB'den {count} image_data temizlendi. Disk alanı serbest bırakıldı.", "cleaned": count})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
 
 
 @app.route("/api/admin/migrate-images-to-db", methods=["POST"])
@@ -3630,8 +3667,22 @@ def serve_file_with_mime(filename):
         except Exception as storage_error:
             logger.error(f"⚠️ Object Storage hatası: {storage_error}")
     
-    # Veritabanından dene (exam_pages görselleri için)
-    if file_data is None and filename.startswith('exam_pages/'):
+    # Railway'de çalışıyorsak ve Object Storage yoksa, Replit URL'sine yönlendir
+    is_railway = os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_SERVICE_NAME')
+    replit_app_url = os.environ.get('REPLIT_APP_URL', '')
+    
+    if file_data is None and is_railway and replit_app_url and filename.startswith('exam_pages/'):
+        railway_public_url = os.environ.get('RAILWAY_PUBLIC_DOMAIN', '')
+        if railway_public_url and railway_public_url in replit_app_url:
+            logger.error(f"❌ Redirect loop engellendi: REPLIT_APP_URL Railway'e işaret ediyor!")
+        else:
+            from urllib.parse import quote as url_quote
+            redirect_url = f"{replit_app_url.rstrip('/')}/api/report-card/page-image/{url_quote(filename, safe='/')}"
+            logger.info(f"🔄 Railway → Replit yönlendirme: {redirect_url}")
+            return redirect(redirect_url)
+    
+    # Veritabanından dene (exam_pages görselleri için - sadece Replit'te)
+    if file_data is None and filename.startswith('exam_pages/') and not is_railway:
         try:
             db_conn = get_db()
             db_cur = db_conn.cursor(cursor_factory=RealDictCursor)

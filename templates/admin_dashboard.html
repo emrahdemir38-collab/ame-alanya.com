@@ -340,6 +340,23 @@
                     ">
                         📤 Replit (Dev) → Railway
                     </button>
+                    <button id="cleanupRailwayBtn" onclick="cleanupRailwayImages()" style="
+                        background: linear-gradient(135deg, #ef4444, #dc2626);
+                        color: white;
+                        border: none;
+                        padding: 12px 28px;
+                        border-radius: 12px;
+                        font-size: 0.95rem;
+                        font-weight: 600;
+                        cursor: pointer;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 8px;
+                        transition: all 0.3s;
+                        box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+                    ">
+                        🗑 Railway Image Temizle
+                    </button>
                     <button id="migrateImagesBtn" onclick="migrateImagesToDb()" style="
                         background: linear-gradient(135deg, #10b981, #059669);
                         color: white;
@@ -626,6 +643,39 @@
             btn.innerHTML = originalText;
             btn.style.opacity = '1';
             otherBtn.style.opacity = '1';
+        }
+    }
+
+    async function cleanupRailwayImages() {
+        const btn = document.getElementById('cleanupRailwayBtn');
+        const statusDiv = document.getElementById('syncStatus');
+        const originalText = btn.innerHTML;
+
+        if (!confirm('Railway veritabanindaki tum resim verileri (image_data) silinecek. Resimler Replit uzerinden sunulmaya devam edecek. Devam etmek istiyor musunuz?')) {
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Temizleniyor...';
+        statusDiv.style.display = 'block';
+        statusDiv.innerHTML = '<div style="color:var(--primary-600);">Railway image_data temizleniyor...</div>';
+
+        try {
+            const response = await fetch('/api/admin/cleanup-railway-images', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            });
+            const data = await response.json();
+            if (data.success) {
+                statusDiv.innerHTML = `<div style="color:var(--success-600);font-weight:600;">✅ ${data.message}</div>`;
+            } else {
+                statusDiv.innerHTML = `<div style="color:var(--error-600);">❌ Hata: ${data.error}</div>`;
+            }
+        } catch (err) {
+            statusDiv.innerHTML = `<div style="color:var(--error-600);">❌ Bağlantı hatası: ${err.message}</div>`;
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
         }
     }
 
