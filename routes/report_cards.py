@@ -3273,9 +3273,14 @@ def get_multi_exam_progress_pdf():
         buffer.seek(0)
 
         safe_name = class_name.replace('/', '_').replace(' ', '_')
+        filename = f"Toplu_Gelisim_{safe_name}.pdf"
+        ascii_name = filename.encode('ascii', 'ignore').decode('ascii').replace('__', '_')
+        if not ascii_name or ascii_name == '.pdf':
+            ascii_name = 'Toplu_Gelisim.pdf'
         response = make_response(buffer.getvalue())
         response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename=Toplu_Gelisim_{safe_name}.pdf'
+        from urllib.parse import quote
+        response.headers['Content-Disposition'] = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(filename)}"
         return response
 
     except Exception as e:
@@ -10463,10 +10468,14 @@ def generate_wrong_questions_pdf(result_id):
         
         safe_name = student_name.replace(' ', '_')
         filename = f"Tekrar_Coz_{safe_name}_{exam_name.replace(' ', '_')}.pdf"
+        ascii_name = filename.encode('ascii', 'ignore').decode('ascii').replace('__', '_')
+        if not ascii_name or ascii_name == '.pdf':
+            ascii_name = 'Tekrar_Coz.pdf'
         
         response = make_response(pdf_buffer.getvalue())
         response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        from urllib.parse import quote
+        response.headers['Content-Disposition'] = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(filename)}"
         response.headers['Content-Length'] = pdf_size
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         return response
@@ -10706,8 +10715,15 @@ def generate_wrong_questions_pdf_multi():
         
         safe_name = student_name.replace(' ', '_')
         filename = f"Tekrar_Coz_{safe_name}_Toplu.pdf"
+        ascii_name = filename.encode('ascii', 'ignore').decode('ascii').replace('__', '_')
+        if not ascii_name or ascii_name == '.pdf':
+            ascii_name = 'Tekrar_Coz_Toplu.pdf'
         
-        return send_file(pdf_buffer, mimetype='application/pdf', as_attachment=True, download_name=filename)
+        response = make_response(pdf_buffer.getvalue())
+        response.headers['Content-Type'] = 'application/pdf'
+        from urllib.parse import quote
+        response.headers['Content-Disposition'] = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(filename)}"
+        return response
     
     except Exception as ex:
         logger.error(f"Toplu Tekrar Çöz PDF hatası: {ex}")
