@@ -112,6 +112,12 @@ try:
     from replit.object_storage import Client
 except ImportError:
     Client = None
+try:
+    import boto3 as boto3_lib
+    from botocore.exceptions import ClientError as BotoClientError
+except ImportError:
+    boto3_lib = None
+    BotoClientError = Exception
 from PIL import Image as PILImage
 
 # Logging yapılandırması
@@ -233,8 +239,85 @@ class ObjectStorageClient:
         """Object Storage kullanılabilir mi?"""
         return self.enabled
 
-# Object Storage client
-object_storage = ObjectStorageClient()
+class S3StorageClient:
+    """IDrive e2 / S3-compatible storage client - Railway için"""
+
+    def __init__(self):
+        self.enabled = False
+        self.client = None
+        self.bucket = os.environ.get('IDR2_BUCKET', 'ameo-exam-images')
+        self._initialize()
+
+    def _initialize(self):
+        endpoint = os.environ.get('IDR2_ENDPOINT', '')
+        access_key = os.environ.get('IDR2_ACCESS_KEY', '')
+        secret_key = os.environ.get('IDR2_SECRET_KEY', '')
+        region = os.environ.get('IDR2_REGION', 'us-west-1')
+        if not (endpoint and access_key and secret_key):
+            return
+        if boto3_lib is None:
+            logger.warning("⚠️ boto3 bulunamadı - S3 storage devre dışı")
+            return
+        try:
+            self.client = boto3_lib.client('s3',
+                endpoint_url=endpoint,
+                region_name=region,
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key
+            )
+            # Bağlantı testi
+            self.client.head_bucket(Bucket=self.bucket)
+            self.enabled = True
+            logger.info(f"✅ S3 Storage (IDrive e2) hazır: {self.bucket}")
+        except Exception as e:
+            logger.warning(f"⚠️ S3 Storage başlatma hatası: {e}")
+
+    def upload_from_bytes(self, data, destination_path, content_type='image/png'):
+        if not self.enabled:
+            raise Exception("S3 Storage kullanılamıyor")
+        self.client.put_object(Bucket=self.bucket, Key=destination_path, Body=data, ContentType=content_type)
+        return destination_path
+
+    def upload_from_file(self, source_file, destination_path):
+        if not self.enabled:
+            raise Exception("S3 Storage kullanılamıyor")
+        source_file.seek(0)
+        data = source_file.read()
+        ext = destination_path.rsplit('.', 1)[-1].lower()
+        ctype = {'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'pdf': 'application/pdf'}.get(ext, 'application/octet-stream')
+        self.client.put_object(Bucket=self.bucket, Key=destination_path, Body=data, ContentType=ctype)
+        return destination_path
+
+    def download_as_bytes(self, source_path):
+        if not self.enabled:
+            raise Exception("S3 Storage kullanılamıyor")
+        resp = self.client.get_object(Bucket=self.bucket, Key=source_path)
+        data = resp['Body'].read()
+        ctype = resp.get('ContentType', 'application/octet-stream')
+        return data, ctype
+
+    def delete(self, file_path):
+        if not self.enabled:
+            return
+        self.client.delete_object(Bucket=self.bucket, Key=file_path)
+
+    def is_available(self):
+        return self.enabled
+
+
+# Object Storage: Önce Replit Object Storage dene, yoksa IDrive e2 S3 kullan
+_replit_storage = ObjectStorageClient()
+if _replit_storage.is_available():
+    object_storage = _replit_storage
+    logger.info("✅ Depolama: Replit Object Storage kullanılıyor")
+else:
+    _s3_storage = S3StorageClient()
+    if _s3_storage.is_available():
+        object_storage = _s3_storage
+        logger.info("✅ Depolama: IDrive e2 S3 kullanılıyor")
+    else:
+        object_storage = _replit_storage
+        logger.warning("⚠️ Depolama: Hiçbir storage kullanılamıyor")
 
 
 app = Flask(__name__)
@@ -678,16 +761,12 @@ def _sync_tables(source_url, target_url, direction_label):
             psycopg2.extras.execute_batch(target_cur, insert_sql, values_list, page_size=200)
             target_conn.commit()
 
-            try:
-                target_cur.execute(f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), COALESCE((SELECT MAX(id) FROM {table}), 1))")
-                target_conn.commit()
-            except:
-                target_conn.rollback()
-
             target_cur.execute(f"SELECT COUNT(*) FROM {table}")
             after_count = target_cur.fetchone()['count']
             results[table] = {"kaynak": len(rows), "hedef": after_count, "eklenen": after_count - before_count}
 
+        fix_all_sequences(target_cur, target_conn)
+        
         source_cur.close()
         source_conn.close()
         target_cur.close()
@@ -3937,6 +4016,22 @@ def init_database():
             )
         """)
         
+        # Exam Sessions tablosu (Toplu yükleme oturumları - tarih+sınıf bazlı gruplama)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS exam_sessions (
+                id SERIAL PRIMARY KEY,
+                grade_level INTEGER NOT NULL,
+                session_number INTEGER NOT NULL,
+                session_name VARCHAR(200),
+                session_date DATE NOT NULL,
+                cluster_start TIMESTAMP NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
+        cur.execute("ALTER TABLE practice_exams ADD COLUMN IF NOT EXISTS session_id INTEGER REFERENCES exam_sessions(id)")
+        cur.execute("ALTER TABLE practice_exams ADD COLUMN IF NOT EXISTS exam_name VARCHAR(150)")
+        cur.execute("ALTER TABLE practice_exams ADD COLUMN IF NOT EXISTS exam_date DATE")
+
         # Classes tablosu (Dinamik sınıf/grup yönetimi)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS classes (
@@ -4481,10 +4576,85 @@ def init_database():
         
         logger.info("✅ Veritabanı tabloları kontrol edildi/oluşturuldu")
         
+        fix_all_sequences(cur, conn)
+        
         cur.close()
         conn.close()
     except Exception as e:
         logger.info(f"⚠️ Veritabanı oluşturulurken hata: {e}")
+
+
+def fix_all_sequences(cur=None, conn=None):
+    own_connection = False
+    try:
+        if cur is None or conn is None:
+            conn = get_db()
+            cur = conn.cursor()
+            own_connection = True
+        
+        tables_with_serial = [
+            'users', 'classes', 'teacher_classes', 'exam_submissions',
+            'assignments', 'assignment_submissions', 'announcements', 'student_questions',
+            'teacher_announcements', 'public_announcements', 'practice_exams',
+            'lesson_schedules', 'exam_calendar', 'teacher_study_plan', 'study_plan_pdf',
+            'report_card_exams', 'report_card_exam_pages', 'report_card_question_regions',
+            'report_card_results', 'book_entries', 'kelebek_exams', 'kelebek_students',
+            'kelebek_seating', 'lgs_results'
+        ]
+        
+        fixed = 0
+        skipped = []
+        errors = []
+        for table in tables_with_serial:
+            try:
+                cur.execute(f"SAVEPOINT seq_fix_{table}")
+                cur.execute(f"SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = '{table}')")
+                exists = cur.fetchone()
+                table_exists = exists[0] if isinstance(exists, tuple) else exists.get('exists', False)
+                if not table_exists:
+                    skipped.append(table)
+                    cur.execute(f"RELEASE SAVEPOINT seq_fix_{table}")
+                    continue
+                cur.execute(f"SELECT pg_get_serial_sequence('{table}', 'id')")
+                seq_result = cur.fetchone()
+                seq_name = seq_result[0] if isinstance(seq_result, tuple) else seq_result.get('pg_get_serial_sequence')
+                if not seq_name:
+                    skipped.append(table)
+                    cur.execute(f"RELEASE SAVEPOINT seq_fix_{table}")
+                    continue
+                cur.execute(f"""
+                    SELECT setval(
+                        '{seq_name}',
+                        GREATEST(COALESCE((SELECT MAX(id) FROM {table}), 1), 1)
+                    )
+                """)
+                cur.execute(f"RELEASE SAVEPOINT seq_fix_{table}")
+                fixed += 1
+            except Exception as seq_err:
+                logger.warning(f"⚠️ {table} sayaç hatası: {seq_err}")
+                errors.append(table)
+                try:
+                    cur.execute(f"ROLLBACK TO SAVEPOINT seq_fix_{table}")
+                except:
+                    pass
+        
+        conn.commit()
+        msg = f"✅ {fixed} tablo sayacı senkronize edildi"
+        if skipped:
+            msg += f" ({len(skipped)} atlandı)"
+        if errors:
+            msg += f" ({len(errors)} hata: {', '.join(errors)})"
+        logger.info(msg)
+    except Exception as e:
+        logger.warning(f"Sayaç düzeltme hatası: {e}")
+    finally:
+        if own_connection and conn:
+            try:
+                cur.close()
+                conn.close()
+            except:
+                pass
+
 
 def init_admin_user():
     """Varsayılan admin kullanıcısını oluşturur - GÜVENLİ şifre ile"""
@@ -4503,17 +4673,26 @@ def init_admin_user():
         cur.execute("SELECT * FROM users WHERE username = 'admin' AND role = 'admin'")
         admin = cur.fetchone()
         
+        admin_password = os.environ.get('ADMIN_PASSWORD')
         if not admin:
             # Ortam değişkeninden şifre al veya güçlü rastgele şifre oluştur
-            admin_password = os.environ.get('ADMIN_PASSWORD', generate_secure_password())
-            hashed_password = generate_password_hash(admin_password)
+            password_to_use = admin_password if admin_password else generate_secure_password()
+            hashed_password = generate_password_hash(password_to_use)
             cur.execute(
                 "INSERT INTO users (username, password, role, full_name) VALUES (%s, %s, %s, %s)",
                 ('admin', hashed_password, 'admin', 'System Administrator')
             )
             conn.commit()
-            logger.info(f"✅ Admin kullanıcısı oluşturuldu. Şifre güvenli olarak ayarlandı.")
-            # Güvenlik: Şifreyi loglama!
+            logger.info(f"✅ Admin kullanıcısı oluşturuldu.")
+        elif admin_password:
+            # ADMIN_PASSWORD ayarlıysa mevcut adminin şifresini güncelle
+            hashed_password = generate_password_hash(admin_password)
+            cur.execute(
+                "UPDATE users SET password = %s WHERE username = 'admin' AND role = 'admin'",
+                (hashed_password,)
+            )
+            conn.commit()
+            logger.info("✅ Admin şifresi ADMIN_PASSWORD ile güncellendi.")
         else:
             logger.info("✅ Admin kullanıcısı zaten mevcut")
         
@@ -9105,6 +9284,49 @@ def upload_practice_exams():
         logger.error(f"Practice exam upload error: {str(e)}")
         return jsonify({"error": f"Yükleme hatası: {str(e)}"}), 500
 
+# Admin API - Deneme yükleme geçmişi
+@app.route("/admin/api/practice-exams/upload-history")
+@login_required
+def get_practice_exam_upload_history():
+    if current_user.role != 'admin':
+        return jsonify({"error": "Yetkisiz erişim"}), 403
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("""
+            SELECT 
+                es.grade_level,
+                es.session_number,
+                es.session_name,
+                es.session_date,
+                es.cluster_start as ilk_yukleme,
+                COUNT(DISTINCT pe.student_id) as student_count
+            FROM exam_sessions es
+            LEFT JOIN practice_exams pe ON pe.session_id = es.id
+            GROUP BY es.id, es.grade_level, es.session_number, es.session_name, es.session_date, es.cluster_start
+            ORDER BY es.grade_level, es.session_number
+        """)
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        by_grade = {}
+        for row in rows:
+            g = row["grade_level"]
+            if g not in by_grade:
+                by_grade[g] = []
+            by_grade[g].append({
+                "session_number": row["session_number"],
+                "session_name": row["session_name"],
+                "session_date": row["session_date"].strftime("%d.%m.%Y") if row["session_date"] else "-",
+                "student_count": row["student_count"],
+                "ilk_yukleme": row["ilk_yukleme"].strftime("%d.%m.%Y %H:%M") if row["ilk_yukleme"] else "-"
+            })
+        return jsonify({"by_grade": by_grade})
+    except Exception as e:
+        logger.error(f"Upload history error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 # TOPLU Excel yükleme (Akıllı Eşleşme: Sınıf+Ad Soyad VEYA Öğrenci No)
 @app.route("/admin/practice-exams/upload-bulk", methods=["POST"])
 @login_required
@@ -9126,6 +9348,17 @@ def upload_bulk_practice_exams():
         # Güncelleme modu: 'update' = son denemeyi güncelle, 'new' = yeni deneme ekle (varsayılan)
         update_mode = request.form.get('update_mode', 'new')
         
+        # Sınav adı ve tarihi (batch-level: tüm öğrenciler aynı sınav adını alır)
+        exam_name = request.form.get('exam_name', '').strip() or None
+        exam_date_str = request.form.get('exam_date', '').strip() or None
+        exam_date = None
+        if exam_date_str:
+            try:
+                from datetime import date as date_type
+                exam_date = date_type.fromisoformat(exam_date_str)
+            except Exception:
+                pass
+        
         # Excel dosyasını oku
         import pandas as pd
         df = pd.read_excel(file, sheet_name='Toplu Deneme Yükleme')
@@ -9140,6 +9373,7 @@ def upload_bulk_practice_exams():
         not_found_students = []
         matched_by_name = 0
         matched_by_no = 0
+        processed_pairs = []  # (student_id, exam_number) — session_id atamak için
         
         for index, row in df.iterrows():
             try:
@@ -9261,10 +9495,17 @@ def upload_bulk_practice_exams():
                 exam_count = cur.fetchone()[0]
                 
                 # Önce bu deneme var mı kontrol et
-                cur.execute("""
-                    SELECT id FROM practice_exams 
-                    WHERE student_id = %s AND exam_number = %s
-                """, (student_id, exam_number))
+                # Eğer exam_name verilmişse, (student_id, exam_name) üzerinden kontrol et
+                if exam_name:
+                    cur.execute("""
+                        SELECT id FROM practice_exams 
+                        WHERE student_id = %s AND exam_name = %s
+                    """, (student_id, exam_name))
+                else:
+                    cur.execute("""
+                        SELECT id FROM practice_exams 
+                        WHERE student_id = %s AND exam_number = %s
+                    """, (student_id, exam_number))
                 
                 existing = cur.fetchone()
                 
@@ -9309,6 +9550,7 @@ def upload_bulk_practice_exams():
                 
                 if existing:
                     # Güncelle
+                    existing_id = existing[0]
                     cur.execute("""
                         UPDATE practice_exams SET
                             turkce_dogru = %s, turkce_yanlis = %s, turkce_net = %s,
@@ -9317,8 +9559,9 @@ def upload_bulk_practice_exams():
                             sosyal_dogru = %s, sosyal_yanlis = %s, sosyal_net = %s,
                             ingilizce_dogru = %s, ingilizce_yanlis = %s, ingilizce_net = %s,
                             din_dogru = %s, din_yanlis = %s, din_net = %s,
-                            lgs_score = %s
-                        WHERE student_id = %s AND exam_number = %s
+                            lgs_score = %s,
+                            exam_name = %s, exam_date = %s
+                        WHERE id = %s
                     """, (
                         turkce_dogru, turkce_yanlis, turkce_net,
                         matematik_dogru, matematik_yanlis, matematik_net,
@@ -9327,9 +9570,11 @@ def upload_bulk_practice_exams():
                         ingilizce_dogru, ingilizce_yanlis, ingilizce_net,
                         din_dogru, din_yanlis, din_net,
                         lgs_score,
-                        student_id, exam_number
+                        exam_name, exam_date,
+                        existing_id
                     ))
                     updated_count += 1
+                    processed_pairs.append((student_id, exam_number))
                 elif exam_count >= 80:
                     # Maksimum 80 deneme sınırı
                     error_rows.append(f"Satır {index+2}: '{full_name}' için maksimum 80 deneme sınırına ulaşıldı")
@@ -9339,7 +9584,7 @@ def upload_bulk_practice_exams():
                     # Yeni kayıt ekle
                     cur.execute("""
                         INSERT INTO practice_exams (
-                            student_id, exam_number,
+                            student_id, exam_number, exam_name, exam_date,
                             turkce_dogru, turkce_yanlis, turkce_net,
                             matematik_dogru, matematik_yanlis, matematik_net,
                             fen_dogru, fen_yanlis, fen_net,
@@ -9347,9 +9592,9 @@ def upload_bulk_practice_exams():
                             ingilizce_dogru, ingilizce_yanlis, ingilizce_net,
                             din_dogru, din_yanlis, din_net,
                             lgs_score
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
-                        student_id, exam_number,
+                        student_id, exam_number, exam_name, exam_date,
                         turkce_dogru, turkce_yanlis, turkce_net,
                         matematik_dogru, matematik_yanlis, matematik_net,
                         fen_dogru, fen_yanlis, fen_net,
@@ -9359,12 +9604,62 @@ def upload_bulk_practice_exams():
                         lgs_score
                     ))
                     inserted_count += 1
+                    processed_pairs.append((student_id, exam_number))
                     conn.commit()
             
             except Exception as row_error:
                 conn.rollback()
                 error_rows.append(f"Satır {index+2}: {str(row_error)}")
                 continue
+
+        # Session atama: batch'in tüm kayıtlarını bugünün oturumuna bağla
+        if processed_pairs:
+            try:
+                from datetime import datetime as dt_now_type, date as date_only_type
+                batch_time = dt_now_type.now()
+                today = batch_time.date()
+                grade_pairs = {}
+                for sid, enum in processed_pairs:
+                    cur.execute(
+                        "SELECT LEFT(class_name, 1) FROM users WHERE id = %s AND class_name ~ '^[5-8]'",
+                        (sid,)
+                    )
+                    row_g = cur.fetchone()
+                    if row_g and row_g[0].isdigit():
+                        g = int(row_g[0])
+                        grade_pairs.setdefault(g, []).append((sid, enum))
+
+                for g, pairs in grade_pairs.items():
+                    cur.execute(
+                        "SELECT id FROM exam_sessions WHERE grade_level = %s AND session_date = %s ORDER BY cluster_start DESC LIMIT 1",
+                        (g, today)
+                    )
+                    es_row = cur.fetchone()
+                    if not es_row:
+                        cur.execute(
+                            "SELECT COALESCE(MAX(session_number), 0) FROM exam_sessions WHERE grade_level = %s",
+                            (g,)
+                        )
+                        max_num = cur.fetchone()[0]
+                        snum = max_num + 1
+                        sname = f"{g}. Sınıf {snum}. Denemesi ({today.strftime('%d.%m.%Y')})"
+                        cur.execute(
+                            "INSERT INTO exam_sessions (grade_level, session_number, session_name, session_date, cluster_start) VALUES (%s, %s, %s, %s, %s) RETURNING id",
+                            (g, snum, sname, today, batch_time)
+                        )
+                        session_id = cur.fetchone()[0]
+                    else:
+                        session_id = es_row[0]
+
+                    for sid, enum in pairs:
+                        cur.execute(
+                            "UPDATE practice_exams SET session_id = %s WHERE student_id = %s AND exam_number = %s",
+                            (session_id, sid, enum)
+                        )
+                conn.commit()
+            except Exception as sess_err:
+                logger.error(f"Session atama hatası: {str(sess_err)}")
+
         cur.close()
         conn.close()
         
@@ -9433,6 +9728,333 @@ def upload_bulk_practice_exams():
         logger.error(f"Bulk practice exam upload error: {str(e)}")
         logger.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": f"Toplu yükleme hatası: {str(e)}"}), 500
+
+# ──────────────────────────────────────────────────────────────────
+# ANKARA CSV YÜKLEME — Optik okuyucu TXT→CSV çıktısı + Cevap Anahtarı Excel
+# ──────────────────────────────────────────────────────────────────
+@app.route("/admin/practice-exams/upload-ankara-csv", methods=["POST"])
+@login_required
+def upload_ankara_csv():
+    if current_user.role != 'admin':
+        return jsonify({"error": "Yetkisiz erişim"}), 403
+    try:
+        csv_file   = request.files.get('csv_file')
+        cevap_file = request.files.get('cevap_file')
+        update_mode = request.form.get('update_mode', 'new')
+
+        if not csv_file or not csv_file.filename:
+            return jsonify({"error": "CSV dosyası seçilmedi"}), 400
+        if not cevap_file or not cevap_file.filename:
+            return jsonify({"error": "Cevap anahtarı Excel'i seçilmedi"}), 400
+
+        import pandas as pd, csv as csvlib, io
+        from datetime import date as date_type, datetime as dt_type
+
+        # ── 1. CEVAP ANAHTARI PARSE ──────────────────────────────────
+        # Cevap anahtarı Excel'i satır satır okuyarak 6 dersi sıraya göre yakala.
+        # Format: her ders bloğunun ilk satırı başlık (col[0] sayı DEĞİL),
+        # devam satırları: soru_no | kazanım | A_kitapçık_cevabı | B_kitapçık_pozisyonu
+        cevap_file.seek(0)
+        df_key = pd.read_excel(cevap_file, header=None)
+
+        # CSV'deki sütun sırası ile eşleşen 6 ders (sabit sıra)
+        SUBJ_ORDER = ['TÜRKÇE', 'İNKILAP', 'DİN', 'İNGİLİZCE', 'MATEMATİK', 'FEN']
+        SUBJ_DB    = {
+            'TÜRKÇE':    'turkce',
+            'İNKILAP':   'sosyal',
+            'DİN':        'din',
+            'İNGİLİZCE': 'ingilizce',
+            'MATEMATİK': 'matematik',
+            'FEN':        'fen',
+        }
+
+        subjects   = {}           # subj_key -> [{q, a_ans, b_pos}, ...]
+        subj_idx   = 0
+        cur_key    = None
+        cur_rows   = []
+
+        for _, row in df_key.iterrows():
+            cell0 = str(row.iloc[0]).strip()
+            try:
+                int(cell0)
+                is_header = False
+            except ValueError:
+                is_header = True
+
+            if is_header:
+                if cur_key and cur_rows:
+                    subjects[cur_key] = cur_rows
+                if subj_idx < len(SUBJ_ORDER):
+                    cur_key = SUBJ_ORDER[subj_idx]
+                    subj_idx += 1
+                    cur_rows = []
+            else:
+                try:
+                    a_ans = str(row.iloc[2]).strip()
+                    b_pos_raw = row.iloc[3]
+                    b_pos = int(float(str(b_pos_raw))) if str(b_pos_raw).strip() not in ('nan','') else None
+                    cur_rows.append({
+                        'q':     int(cell0),
+                        'a_ans': a_ans if a_ans in ('A','B','C','D') else None,
+                        'b_pos': b_pos
+                    })
+                except Exception:
+                    pass
+
+        if cur_key and cur_rows:
+            subjects[cur_key] = cur_rows
+
+        if len(subjects) < 6:
+            return jsonify({"error": f"Cevap anahtarında {len(subjects)} ders bulundu, 6 ders bekleniyor (TÜRKÇE, İNKILAP, DİN, İNGİLİZCE, MATEMATİK, FEN)."}), 400
+
+        # Her ders için soru sayısını kaydet
+        subj_sizes = {k: len(v) for k, v in subjects.items()}
+
+        # ── 2. CSV PARSE ─────────────────────────────────────────────
+        # Format: okul_kodu;öğr_optik_no;satır_tipi(1|2);kitapçık(A|B);ad soyad;sınıf;...
+        # Type-2: col[6]=Türkçe(20), col[7]=İnkılap(10), col[8]=Din(10), col[9]=İngilizce(10)
+        # Type-1: col[10]=Matematik(20), col[11]=Fen(20)
+        csv_file.seek(0)
+        raw_bytes = csv_file.read()
+        text = None
+        for enc in ('utf-8-sig', 'cp1254', 'windows-1254', 'latin-1', 'utf-8'):
+            try:
+                text = raw_bytes.decode(enc)
+                break
+            except Exception:
+                pass
+        if text is None:
+            return jsonify({"error": "CSV dosyası okunamadı, kodlama sorunu"}), 400
+
+        reader = csvlib.reader(io.StringIO(text), delimiter=';')
+        students_raw = {}  # opt_no -> dict
+
+        for row in reader:
+            if len(row) < 6:
+                continue
+            opt_no   = row[1].strip()
+            row_type = row[2].strip()
+            if not opt_no or row_type not in ('1', '2'):
+                continue
+            if opt_no not in students_raw:
+                students_raw[opt_no] = {
+                    'name':    row[4].strip(),
+                    'class':   row[5].strip(),
+                    'booklet': row[3].strip().upper() or 'A',
+                    'type1':   None,
+                    'type2':   None,
+                }
+            if row_type == '2':
+                students_raw[opt_no]['type2'] = row
+            else:
+                students_raw[opt_no]['type1'] = row
+
+        if not students_raw:
+            return jsonify({"error": "CSV'de öğrenci satırı bulunamadı"}), 400
+
+        def get_col(row, idx, length):
+            """Satırdan sütunu al, boşluklarla paddle veya kırp."""
+            if row is None:
+                return ' ' * length
+            val = row[idx] if len(row) > idx else ''
+            return (val + ' ' * length)[:length]
+
+        # ── 3. VERİTABANI ─────────────────────────────────────────────
+        conn = get_db()
+        cur  = conn.cursor()
+        today = date_type.today()
+        batch_time = dt_type.now()
+
+        inserted_count    = 0
+        updated_count     = 0
+        error_rows        = []
+        not_found_students = []
+        processed_pairs   = []
+
+        for opt_no, sd in students_raw.items():
+            name       = sd['name']
+            class_name = sd['class']
+            booklet    = sd.get('booklet', 'A')
+            type1      = sd['type1']
+            type2      = sd['type2']
+
+            # Öğrenci cevapları (sütun sırasına göre)
+            student_ans = {
+                'TÜRKÇE':    get_col(type2, 6,  subj_sizes['TÜRKÇE']),
+                'İNKILAP':   get_col(type2, 7,  subj_sizes['İNKILAP']),
+                'DİN':        get_col(type2, 8,  subj_sizes['DİN']),
+                'İNGİLİZCE': get_col(type2, 9,  subj_sizes['İNGİLİZCE']),
+                'MATEMATİK': get_col(type1, 10, subj_sizes['MATEMATİK']),
+                'FEN':        get_col(type1, 11, subj_sizes['FEN']),
+            }
+
+            # Puanlama
+            scores = {}
+            for sk in SUBJ_ORDER:
+                rows_key = subjects[sk]
+                s_str    = student_ans[sk]
+                correct  = wrong = 0
+
+                for r in rows_key:
+                    canon_idx = r['q'] - 1   # 0-indexed
+                    a_ans = r['a_ans']
+                    if not a_ans:
+                        continue
+
+                    if booklet == 'A':
+                        s_char = s_str[canon_idx] if canon_idx < len(s_str) else ' '
+                    else:
+                        b_pos = r['b_pos']
+                        s_char = s_str[b_pos - 1] if (b_pos and 1 <= b_pos <= len(s_str)) else ' '
+
+                    if s_char.strip() == '':
+                        pass   # boş bırakılmış
+                    elif s_char == a_ans:
+                        correct += 1
+                    else:
+                        wrong += 1
+
+                scores[SUBJ_DB[sk]] = {
+                    'dogru':  correct,
+                    'yanlis': wrong,
+                    'net':    round(correct - wrong / 3.0, 2)
+                }
+
+            # Öğrenciyi bul
+            student_id = None
+            if class_name and name:
+                cur.execute("SELECT id FROM users WHERE role='student' AND class_name=%s AND full_name=%s", (class_name, name))
+                r = cur.fetchone()
+                if r:
+                    student_id = r[0]
+            if not student_id and name:
+                cur.execute("SELECT id FROM users WHERE role='student' AND full_name=%s", (name,))
+                r = cur.fetchone()
+                if r:
+                    student_id = r[0]
+            if not student_id:
+                not_found_students.append({"class_name": class_name, "name": name})
+                error_rows.append(f"'{name}' ({class_name}) sistemde bulunamadı")
+                continue
+
+            # Deneme numarası
+            cur.execute("SELECT COALESCE(MAX(exam_number),0) FROM practice_exams WHERE student_id=%s", (student_id,))
+            max_exam = cur.fetchone()[0]
+
+            if update_mode == 'update' and max_exam > 0:
+                exam_number = max_exam
+            else:
+                exam_number = max_exam + 1
+                if exam_number > 80:
+                    error_rows.append(f"'{name}' için max 80 deneme sınırına ulaşıldı")
+                    continue
+
+            # Mevcut kayıt var mı?
+            cur.execute("SELECT id FROM practice_exams WHERE student_id=%s AND exam_number=%s", (student_id, exam_number))
+            existing = cur.fetchone()
+
+            s = scores
+            vals = (
+                s['turkce']['dogru'],    s['turkce']['yanlis'],    s['turkce']['net'],
+                s['matematik']['dogru'], s['matematik']['yanlis'], s['matematik']['net'],
+                s['fen']['dogru'],       s['fen']['yanlis'],       s['fen']['net'],
+                s['sosyal']['dogru'],    s['sosyal']['yanlis'],    s['sosyal']['net'],
+                s['ingilizce']['dogru'], s['ingilizce']['yanlis'], s['ingilizce']['net'],
+                s['din']['dogru'],       s['din']['yanlis'],       s['din']['net'],
+            )
+
+            if existing:
+                cur.execute("""
+                    UPDATE practice_exams SET
+                        turkce_dogru=%s,    turkce_yanlis=%s,    turkce_net=%s,
+                        matematik_dogru=%s, matematik_yanlis=%s, matematik_net=%s,
+                        fen_dogru=%s,       fen_yanlis=%s,       fen_net=%s,
+                        sosyal_dogru=%s,    sosyal_yanlis=%s,    sosyal_net=%s,
+                        ingilizce_dogru=%s, ingilizce_yanlis=%s, ingilizce_net=%s,
+                        din_dogru=%s,       din_yanlis=%s,       din_net=%s
+                    WHERE student_id=%s AND exam_number=%s
+                """, vals + (student_id, exam_number))
+                updated_count += 1
+            else:
+                cur.execute("""
+                    INSERT INTO practice_exams
+                        (student_id, exam_number,
+                         turkce_dogru, turkce_yanlis, turkce_net,
+                         matematik_dogru, matematik_yanlis, matematik_net,
+                         fen_dogru, fen_yanlis, fen_net,
+                         sosyal_dogru, sosyal_yanlis, sosyal_net,
+                         ingilizce_dogru, ingilizce_yanlis, ingilizce_net,
+                         din_dogru, din_yanlis, din_net)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                """, (student_id, exam_number) + vals)
+                inserted_count += 1
+
+            processed_pairs.append((student_id, exam_number))
+
+        conn.commit()
+
+        # Session atama (tarih bazlı: aynı sınıf seviyesi + aynı gün = aynı session)
+        if processed_pairs:
+            grade_pairs = {}
+            for sid, enum in processed_pairs:
+                cur.execute("SELECT LEFT(class_name,1) FROM users WHERE id=%s AND class_name ~ '^[5-8]'", (sid,))
+                rg = cur.fetchone()
+                if rg and rg[0].isdigit():
+                    grade_pairs.setdefault(int(rg[0]), []).append((sid, enum))
+
+            for g, pairs in grade_pairs.items():
+                cur.execute("SELECT id FROM exam_sessions WHERE grade_level=%s AND session_date=%s", (g, today))
+                es_row = cur.fetchone()
+                if not es_row:
+                    cur.execute("SELECT COALESCE(MAX(session_number),0) FROM exam_sessions WHERE grade_level=%s", (g,))
+                    snum = cur.fetchone()[0] + 1
+                    sname = f"{g}. Sınıf {snum}. Denemesi ({today.strftime('%d.%m.%Y')})"
+                    cur.execute(
+                        "INSERT INTO exam_sessions (grade_level, session_number, session_name, session_date, cluster_start) VALUES (%s,%s,%s,%s,%s) RETURNING id",
+                        (g, snum, sname, today, batch_time)
+                    )
+                    session_id = cur.fetchone()[0]
+                else:
+                    session_id = es_row[0]
+                for sid, enum in pairs:
+                    cur.execute("UPDATE practice_exams SET session_id=%s WHERE student_id=%s AND exam_number=%s", (session_id, sid, enum))
+
+            conn.commit()
+
+        cur.close()
+        conn.close()
+
+        success_count = inserted_count + updated_count
+        fail_count    = len(error_rows)
+        message = f"🎉 {success_count} öğrencinin sonucu yüklendi!" if fail_count == 0 else \
+                  f"✅ {success_count} öğrenci yüklendi, ❌ {fail_count} bulunamadı"
+
+        if can_send_notification(current_user) and success_count > 0:
+            send_push_notification(
+                title="Deneme Sınavı Sonuçları Eklendi",
+                message=f"{success_count} öğrencinin deneme sonucu yüklendi. Sonuçlarınızı kontrol edin!",
+                url="https://ameo-alanya.com",
+                target_role="student"
+            )
+
+        unique_nf = list({f"{s['class_name']}-{s['name']}": s for s in not_found_students}.values())
+        return jsonify({
+            "success": True,
+            "message": message,
+            "details": {
+                "inserted": inserted_count,
+                "updated":  updated_count,
+                "not_found_count": len(unique_nf),
+                "not_found_students": unique_nf,
+                "errors": error_rows[:30]
+            }
+        })
+
+    except Exception as e:
+        import traceback
+        logger.error(f"Ankara CSV yükleme hatası: {traceback.format_exc()}")
+        return jsonify({"error": f"Yükleme başarısız: {str(e)}"}), 500
+
 
 # Toplu deneme silme (sınıf + deneme numarası)
 @app.route("/admin/practice-exams/delete-bulk", methods=["POST"])
@@ -9783,18 +10405,21 @@ def get_class_subject_performance(class_name, subject):
         
         student_ids = [s['id'] for s in students]
         
-        # Her deneme için ders ortalamasını hesapla
+        # Her oturum için ders ortalamasını hesapla (session_id bazlı gruplama)
         cur.execute(f"""
             SELECT 
-                exam_number,
-                AVG({net_column}) as net_avg,
-                MIN({net_column}) as net_min,
-                MAX({net_column}) as net_max,
+                es.session_name as display_name,
+                es.session_number,
+                es.session_date,
+                AVG(pe.{net_column}) as net_avg,
+                MIN(pe.{net_column}) as net_min,
+                MAX(pe.{net_column}) as net_max,
                 COUNT(*) as student_count
-            FROM practice_exams
-            WHERE student_id = ANY(%s)
-            GROUP BY exam_number
-            ORDER BY exam_number
+            FROM practice_exams pe
+            JOIN exam_sessions es ON pe.session_id = es.id
+            WHERE pe.student_id = ANY(%s)
+            GROUP BY es.id, es.session_name, es.session_number, es.session_date
+            ORDER BY es.session_number
         """, (student_ids,))
         
         exams = cur.fetchall()
@@ -9803,6 +10428,8 @@ def get_class_subject_performance(class_name, subject):
             exam['net_avg'] = round(float(exam['net_avg']), 2) if exam['net_avg'] else 0
             exam['net_min'] = round(float(exam['net_min']), 2) if exam['net_min'] else 0
             exam['net_max'] = round(float(exam['net_max']), 2) if exam['net_max'] else 0
+            if exam.get('session_date'):
+                exam['session_date'] = exam['session_date'].strftime('%d.%m.%Y')
         
         cur.close()
         conn.close()
@@ -9857,31 +10484,36 @@ def get_class_subject_report_pdf(class_name, subject):
         student_ids = [s['id'] for s in students]
         student_names = {s['id']: s['full_name'] for s in students}
         
-        # Her deneme için ders ortalamasını hesapla
+        # Her oturum için ders ortalamasını hesapla (session_id bazlı)
         cur.execute(f"""
             SELECT 
-                exam_number,
-                AVG({net_column}) as net_avg,
-                MIN({net_column}) as net_min,
-                MAX({net_column}) as net_max,
+                es.session_name as display_name,
+                es.session_number,
+                AVG(pe.{net_column}) as net_avg,
+                MIN(pe.{net_column}) as net_min,
+                MAX(pe.{net_column}) as net_max,
                 COUNT(*) as student_count
-            FROM practice_exams
-            WHERE student_id = ANY(%s)
-            GROUP BY exam_number
-            ORDER BY exam_number
+            FROM practice_exams pe
+            JOIN exam_sessions es ON pe.session_id = es.id
+            WHERE pe.student_id = ANY(%s)
+            GROUP BY es.id, es.session_name, es.session_number, es.session_date
+            ORDER BY es.session_number
         """, (student_ids,))
         
         exams = cur.fetchall()
         
-        # Öğrenci bazlı detaylı veri
+        # Öğrenci bazlı detaylı veri (oturum bazlı)
         cur.execute(f"""
             SELECT 
                 pe.student_id,
-                pe.exam_number,
+                pe.session_id,
+                es.session_name as display_name,
+                es.session_number as session_order,
                 pe.{net_column} as net
             FROM practice_exams pe
+            JOIN exam_sessions es ON pe.session_id = es.id
             WHERE pe.student_id = ANY(%s)
-            ORDER BY pe.exam_number
+            ORDER BY es.session_number
         """, (student_ids,))
         
         student_details = cur.fetchall()
@@ -9920,7 +10552,7 @@ def get_class_subject_report_pdf(class_name, subject):
         if exams:
             fig, ax = plt.subplots(figsize=(10, 5))
             
-            exam_numbers = [f"Deneme {e['exam_number']}" for e in exams]
+            exam_numbers = [e['display_name'] for e in exams]
             averages = [round(float(e['net_avg']), 2) if e['net_avg'] else 0 for e in exams]
             
             bar_colors = ['#667eea', '#764ba2', '#f59e0b', '#10b981', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899']
@@ -9955,10 +10587,10 @@ def get_class_subject_report_pdf(class_name, subject):
         elements.append(Paragraph("<b>Deneme Bazlı Özet</b>", summary_style))
         elements.append(Spacer(1, 10))
         
-        table_data = [['Deneme No', 'Ortalama Net', 'En Düşük', 'En Yüksek', 'Öğrenci Sayısı']]
+        table_data = [['Sınav', 'Ortalama Net', 'En Düşük', 'En Yüksek', 'Öğrenci Sayısı']]
         for exam in exams:
             table_data.append([
-                f"Deneme {exam['exam_number']}",
+                exam['display_name'],
                 f"{round(float(exam['net_avg']), 2) if exam['net_avg'] else 0}",
                 f"{round(float(exam['net_min']), 2) if exam['net_min'] else 0}",
                 f"{round(float(exam['net_max']), 2) if exam['net_max'] else 0}",
@@ -17317,6 +17949,166 @@ def calculate_rankings_and_scores(cur, exam_id):
             cur.execute("""
                 UPDATE optical_student_results SET class_rank = %s WHERE id = %s
             """, (rank, result['id']))
+
+@app.route("/api/admin/optical/exams/<int:exam_id>/results-ankara-csv", methods=["POST"])
+@login_required
+def upload_optical_exam_results_ankara_csv(exam_id):
+    """Ankara ANKA optik okuyucu CSV formatından sonuçları yükle.
+    Cevap anahtarı sınav kaydından alınır — ayrı dosya gerekmez.
+    CSV format: okul;opt_no;tip(1|2);kitapçık;ad_soyad;sınıf;[cevaplar...]
+    Tip-2 (sözel) → col6=Türkçe, col7=Sosyal/İnkılap, col8=Din, col9=İngilizce
+    Tip-1 (sayısal) → col10=Matematik, col11=Fen
+    """
+    if current_user.role != 'admin':
+        return jsonify({"error": "Yetkisiz erişim"}), 403
+    try:
+        csv_file = request.files.get('csv_file')
+        if not csv_file or not csv_file.filename:
+            return jsonify({"error": "CSV dosyası seçilmedi"}), 400
+
+        import csv as csvlib, io
+
+        conn = get_db()
+        cur  = conn.cursor(cursor_factory=RealDictCursor)
+
+        # Sınav kaydını çek
+        cur.execute("SELECT * FROM optical_exams WHERE id = %s", (exam_id,))
+        exam = cur.fetchone()
+        if not exam:
+            cur.close(); conn.close()
+            return jsonify({"error": "Sınav bulunamadı"}), 404
+
+        answer_key_a = json.loads(exam['answer_key_a']) if exam['answer_key_a'] else {}
+        answer_key_b = json.loads(exam['answer_key_b']) if exam['answer_key_b'] else None
+        question_counts = json.loads(exam['question_counts'])
+
+        # Ders sırası (CSV sütun indeksi → DB key)
+        SUBJ_INFO = [
+            # (db_key,  type2/type1, col_index)
+            ('turkce',    '2', 6),
+            ('sosyal',    '2', 7),
+            ('din',       '2', 8),
+            ('ingilizce', '2', 9),
+            ('matematik', '1', 10),
+            ('fen',       '1', 11),
+        ]
+
+        # CSV'yi oku
+        csv_file.seek(0)
+        raw_bytes = csv_file.read()
+        text = None
+        for enc in ('utf-8-sig', 'cp1254', 'windows-1254', 'latin-1', 'utf-8'):
+            try: text = raw_bytes.decode(enc); break
+            except: pass
+        if text is None:
+            cur.close(); conn.close()
+            return jsonify({"error": "CSV kodlama hatası"}), 400
+
+        reader = csvlib.reader(io.StringIO(text), delimiter=';')
+        students_raw = {}
+        for row in reader:
+            if len(row) < 6: continue
+            opt_no   = row[1].strip()
+            row_type = row[2].strip()
+            if not opt_no or row_type not in ('1', '2'): continue
+            if opt_no not in students_raw:
+                students_raw[opt_no] = {
+                    'name':    row[4].strip().upper(),
+                    'class':   row[5].strip().upper(),
+                    'booklet': row[3].strip().upper() or 'A',
+                    'type1':   None,
+                    'type2':   None,
+                }
+            students_raw[opt_no]['type' + row_type] = row
+
+        if not students_raw:
+            cur.close(); conn.close()
+            return jsonify({"error": "CSV'de öğrenci satırı bulunamadı"}), 400
+
+        def get_col(row, idx, length):
+            if row is None: return ' ' * length
+            v = row[idx] if len(row) > idx else ''
+            return (v + ' ' * length)[:length]
+
+        uploaded = 0
+        errors   = []
+        not_found = []
+
+        for opt_no, sd in students_raw.items():
+            name    = sd['name']
+            cls     = sd['class']
+            booklet = sd.get('booklet', 'A')
+            if booklet not in ('A', 'B'): booklet = 'A'
+            t1 = sd['type1']
+            t2 = sd['type2']
+
+            # Öğrenci bul
+            cur.execute("""
+                SELECT id FROM users
+                WHERE role='student' AND UPPER(class_name)=%s AND UPPER(full_name)=%s
+            """, (cls, name))
+            row = cur.fetchone()
+            if not row and name:
+                cur.execute("SELECT id FROM users WHERE role='student' AND UPPER(full_name)=%s", (name,))
+                row = cur.fetchone()
+            if not row:
+                not_found.append({'class_name': cls, 'name': name})
+                errors.append(f"'{name}' ({cls}) sistemde bulunamadı")
+                continue
+
+            student_id = row['id']
+
+            # Her ders için ham cevap listesi oluştur
+            raw_answers = {}
+            for db_key, row_type, col_idx in SUBJ_INFO:
+                src_row  = t2 if row_type == '2' else t1
+                q_count  = question_counts.get(db_key, 10)
+                ans_str  = get_col(src_row, col_idx, q_count)
+                raw_answers[db_key] = [c if c.strip() else '' for c in ans_str[:q_count]]
+
+            # Puanlama (answer_key_a veya answer_key_b)
+            answer_key = answer_key_a if booklet == 'A' else (answer_key_b or answer_key_a)
+            results = calculate_student_results(raw_answers, answer_key, question_counts)
+
+            cur.execute("""
+                INSERT INTO optical_student_results
+                    (optical_exam_id, student_id, booklet_type, raw_answers, results,
+                     total_correct, total_wrong, total_empty, total_net)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (optical_exam_id, student_id) DO UPDATE SET
+                    booklet_type  = EXCLUDED.booklet_type,
+                    raw_answers   = EXCLUDED.raw_answers,
+                    results       = EXCLUDED.results,
+                    total_correct = EXCLUDED.total_correct,
+                    total_wrong   = EXCLUDED.total_wrong,
+                    total_empty   = EXCLUDED.total_empty,
+                    total_net     = EXCLUDED.total_net
+            """, (exam_id, student_id, booklet,
+                  json.dumps(raw_answers), json.dumps(results['by_subject']),
+                  results['total_correct'], results['total_wrong'],
+                  results['total_empty'], results['total_net']))
+            uploaded += 1
+
+        if uploaded > 0:
+            calculate_rankings_and_scores(cur, exam_id)
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return jsonify({
+            "success": True,
+            "uploaded": uploaded,
+            "not_found_count": len(not_found),
+            "not_found_students": not_found,
+            "errors": errors[:30]
+        })
+
+    except Exception as e:
+        import traceback
+        logger.error(f"Ankara CSV optical upload hatası: {traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route("/api/admin/optical/exams/<int:exam_id>/results", methods=["POST"])
 @login_required
