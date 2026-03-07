@@ -305,19 +305,65 @@ class S3StorageClient:
         return self.enabled
 
 
-# Object Storage: Önce Replit Object Storage dene, yoksa IDrive e2 S3 kullan
+class DualStorageClient:
+    """Replit Object Storage + IDrive e2 çift yazma client'ı.
+    Replit ortamında: her iki depoya da yazar, okumada Replit öncelikli.
+    Bu sayede Railway da IDrive e2'den okuyabilir."""
+
+    def __init__(self, primary, secondary):
+        self.primary = primary
+        self.secondary = secondary
+        self.enabled = primary.is_available()
+
+    def upload_from_file(self, source_file, destination_path):
+        result = self.primary.upload_from_file(source_file, destination_path)
+        try:
+            source_file.seek(0)
+            self.secondary.upload_from_file(source_file, destination_path)
+        except Exception as e:
+            logger.warning(f"⚠️ IDrive e2 ikincil yükleme hatası: {e}")
+        return result
+
+    def upload_from_bytes(self, data, destination_path, content_type=None):
+        result = self.primary.upload_from_bytes(data, destination_path, content_type) if content_type else self.primary.upload_from_bytes(data, destination_path)
+        try:
+            self.secondary.upload_from_bytes(data, destination_path, content_type or 'application/octet-stream')
+        except Exception as e:
+            logger.warning(f"⚠️ IDrive e2 ikincil yükleme hatası: {e}")
+        return result
+
+    def download_as_bytes(self, source_path):
+        return self.primary.download_as_bytes(source_path)
+
+    def delete(self, file_path):
+        self.primary.delete(file_path)
+        try:
+            self.secondary.delete(file_path)
+        except Exception:
+            pass
+
+    def is_available(self):
+        return self.enabled
+
+
+# Object Storage başlatma:
+# - Replit'te: DualStorage (Replit Object Storage + IDrive e2 çift yazma)
+# - Railway'de: IDrive e2 S3
 _replit_storage = ObjectStorageClient()
-if _replit_storage.is_available():
+_s3_storage = S3StorageClient()
+
+if _replit_storage.is_available() and _s3_storage.is_available():
+    object_storage = DualStorageClient(_replit_storage, _s3_storage)
+    logger.info("✅ Depolama: Çift yazma aktif (Replit Object Storage + IDrive e2)")
+elif _replit_storage.is_available():
     object_storage = _replit_storage
     logger.info("✅ Depolama: Replit Object Storage kullanılıyor")
+elif _s3_storage.is_available():
+    object_storage = _s3_storage
+    logger.info("✅ Depolama: IDrive e2 S3 kullanılıyor")
 else:
-    _s3_storage = S3StorageClient()
-    if _s3_storage.is_available():
-        object_storage = _s3_storage
-        logger.info("✅ Depolama: IDrive e2 S3 kullanılıyor")
-    else:
-        object_storage = _replit_storage
-        logger.warning("⚠️ Depolama: Hiçbir storage kullanılamıyor")
+    object_storage = _replit_storage
+    logger.warning("⚠️ Depolama: Hiçbir storage kullanılamıyor")
 
 
 app = Flask(__name__)
