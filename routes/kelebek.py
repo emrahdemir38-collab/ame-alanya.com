@@ -625,7 +625,7 @@ def upload_participants(plan_id):
 
         grade_placeholders = ','.join(['%s'] * len(grade_levels))
         cur.execute(f"""
-            SELECT full_name, username, class_name
+            SELECT full_name, username, student_no, class_name
             FROM users
             WHERE role = 'student' AND class_name IS NOT NULL
             AND CAST(SUBSTRING(class_name FROM 1 FOR 1) AS INTEGER) IN ({grade_placeholders})
@@ -637,9 +637,9 @@ def upload_participants(plan_id):
             norm_name = tr_normalize(student['full_name'])
             norm_class = tr_normalize(student['class_name'])
 
-            # 1. Öğrenci numarası eşleşmesi
-            student_no = (student['username'] or '').strip()
-            if student_no and student_no in exam_taker_keys_by_no:
+            # 1. Öğrenci okul numarası eşleşmesi (users.student_no = Excel'deki okul no)
+            okul_no = (student['student_no'] or '').strip()
+            if okul_no and okul_no in exam_taker_keys_by_no:
                 continue
 
             # 2. Tam normalize isim eşleşmesi
@@ -667,7 +667,7 @@ def upload_participants(plan_id):
             cur.execute("""
                 INSERT INTO kelebek_participants (plan_id, student_name, student_no, class_name, grade_level, is_exam_taker)
                 VALUES (%s, %s, %s, %s, %s, FALSE)
-            """, (plan_id, student['full_name'], student['username'], student['class_name'], grade_level))
+            """, (plan_id, student['full_name'], student['student_no'], student['class_name'], grade_level))
             non_exam_count += 1
 
         cur.execute("UPDATE kelebek_plans SET status = 'draft', updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul') WHERE id = %s", (plan_id,))
