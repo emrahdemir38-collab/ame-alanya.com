@@ -34,10 +34,23 @@ PDF_FONT_BOLD = 'DejaVuSans-Bold'
 
 
 def tr_normalize(s):
-    """Türkçe büyük/küçük harf farklarını (İ vs I, ı vs i) yok sayarak karşılaştırma anahtarı üretir."""
+    """Türkçe büyük/küçük harf farklarını yok sayarak karşılaştırma anahtarı üretir."""
     if not s:
         return ''
-    return s.upper().replace('İ', 'I').replace('I', 'I')
+    s = s.upper()
+    tr_map = {'İ': 'I', 'I': 'I', 'Ğ': 'G', 'Ü': 'U', 'Ö': 'O', 'Ş': 'S', 'Ç': 'C'}
+    for k, v in tr_map.items():
+        s = s.replace(k, v)
+    return s
+
+
+def name_similarity(a, b):
+    """İki isim arasındaki benzerlik oranını döndürür (0.0 - 1.0).
+    Türkçe karakterler ASCII'ye dönüştürülerek karşılaştırılır."""
+    from difflib import SequenceMatcher
+    na = tr_normalize(a)
+    nb = tr_normalize(b)
+    return SequenceMatcher(None, na, nb).ratio()
 
 
 kelebek_bp = Blueprint('kelebek', __name__, url_prefix='/admin/kelebek')
@@ -586,15 +599,25 @@ def upload_participants(plan_id):
                 'grade_level': grade_level
             })
 
-        # Sınava giren öğrencileri hem öğrenci no hem isim bazlı indeksle
-        exam_taker_keys_by_name = set()   # (normalize_isim, normalize_sınıf)
-        exam_taker_keys_by_no = set()     # öğrenci_no (username)
+        # Sınava giren öğrencileri indeksle:
+        #   1. Öğrenci no seti (farklı numaralama sistemlerinde çalışmaz ama öncelikli kontrol)
+        #   2. Normalize isim+sınıf seti (tam eşleşme)
+        #   3. Sınıfa göre normalize isim listesi (fuzzy eşleşme için)
+        FUZZY_THRESHOLD = 0.85  # %85 benzerlik → aynı kişi
+
+        exam_taker_keys_by_name = set()    # (normalize_isim, normalize_sinif)
+        exam_taker_keys_by_no = set()      # öğrenci_no stringleri
+        exam_takers_by_class = {}          # normalize_sinif → [normalize_isim, ...]
 
         for et in exam_takers:
-            key = (tr_normalize(et['student_name']), tr_normalize(et['class_name']))
-            exam_taker_keys_by_name.add(key)
+            norm_name = tr_normalize(et['student_name'])
+            norm_class = tr_normalize(et['class_name'])
+            exam_taker_keys_by_name.add((norm_name, norm_class))
             if et['student_no']:
                 exam_taker_keys_by_no.add(et['student_no'].strip())
+            if norm_class not in exam_takers_by_class:
+                exam_takers_by_class[norm_class] = []
+            exam_takers_by_class[norm_class].append(norm_name)
             cur.execute("""
                 INSERT INTO kelebek_participants (plan_id, student_name, student_no, class_name, grade_level, is_exam_taker)
                 VALUES (%s, %s, %s, %s, %s, TRUE)
@@ -611,17 +634,29 @@ def upload_participants(plan_id):
 
         non_exam_count = 0
         for student in all_students:
-            # Önce öğrenci numarasıyla eşleştir (isim hatalarını önler)
+            norm_name = tr_normalize(student['full_name'])
+            norm_class = tr_normalize(student['class_name'])
+
+            # 1. Öğrenci numarası eşleşmesi
             student_no = (student['username'] or '').strip()
             if student_no and student_no in exam_taker_keys_by_no:
-                continue  # Bu öğrenci zaten sınava giriyor
+                continue
 
-            # Öğrenci no yoksa veya eşleşmediyse isimle kontrol et
-            key = (tr_normalize(student['full_name']), tr_normalize(student['class_name']))
-            if key in exam_taker_keys_by_name:
-                continue  # İsim eşleşti, zaten sınava giriyor
+            # 2. Tam normalize isim eşleşmesi
+            if (norm_name, norm_class) in exam_taker_keys_by_name:
+                continue
 
-            # Ne no ne isim eşleşti → ders çalışacak öğrenci
+            # 3. Fuzzy isim eşleşmesi (aynı sınıf, %85+ benzerlik → aynı kişi)
+            fuzzy_match = False
+            for exam_name in exam_takers_by_class.get(norm_class, []):
+                if name_similarity(norm_name, exam_name) >= FUZZY_THRESHOLD:
+                    fuzzy_match = True
+                    logger.info(f"Fuzzy eşleşme: DB='{student['full_name']}' ~ Excel='{exam_name}' (sınıf={student['class_name']})")
+                    break
+            if fuzzy_match:
+                continue
+
+            # Hiçbir eşleşme yok → ders çalışacak öğrenci
             grade_level = None
             for ch in student['class_name']:
                 if ch.isdigit():
