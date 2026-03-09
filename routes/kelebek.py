@@ -4,6 +4,7 @@ import json
 import logging
 import random
 from io import BytesIO
+import unicodedata
 from datetime import datetime
 from flask import Blueprint, request, jsonify, render_template, send_file
 from flask_login import login_required, current_user
@@ -30,6 +31,14 @@ except Exception:
 
 PDF_FONT = 'DejaVuSans'
 PDF_FONT_BOLD = 'DejaVuSans-Bold'
+
+
+def tr_normalize(s):
+    """Türkçe büyük/küçük harf farklarını (İ vs I, ı vs i) yok sayarak karşılaştırma anahtarı üretir."""
+    if not s:
+        return ''
+    return s.upper().replace('İ', 'I').replace('I', 'I')
+
 
 kelebek_bp = Blueprint('kelebek', __name__, url_prefix='/admin/kelebek')
 
@@ -577,10 +586,15 @@ def upload_participants(plan_id):
                 'grade_level': grade_level
             })
 
-        exam_taker_keys = set()
+        # Sınava giren öğrencileri hem öğrenci no hem isim bazlı indeksle
+        exam_taker_keys_by_name = set()   # (normalize_isim, normalize_sınıf)
+        exam_taker_keys_by_no = set()     # öğrenci_no (username)
+
         for et in exam_takers:
-            key = (et['student_name'].upper(), et['class_name'].upper())
-            exam_taker_keys.add(key)
+            key = (tr_normalize(et['student_name']), tr_normalize(et['class_name']))
+            exam_taker_keys_by_name.add(key)
+            if et['student_no']:
+                exam_taker_keys_by_no.add(et['student_no'].strip())
             cur.execute("""
                 INSERT INTO kelebek_participants (plan_id, student_name, student_no, class_name, grade_level, is_exam_taker)
                 VALUES (%s, %s, %s, %s, %s, TRUE)
@@ -597,20 +611,29 @@ def upload_participants(plan_id):
 
         non_exam_count = 0
         for student in all_students:
-            key = (student['full_name'].upper(), student['class_name'].upper())
-            if key not in exam_taker_keys:
-                grade_level = None
-                for ch in student['class_name']:
-                    if ch.isdigit():
-                        grade_level = int(ch)
-                        break
-                if grade_level is None:
-                    continue
-                cur.execute("""
-                    INSERT INTO kelebek_participants (plan_id, student_name, student_no, class_name, grade_level, is_exam_taker)
-                    VALUES (%s, %s, %s, %s, %s, FALSE)
-                """, (plan_id, student['full_name'], student['username'], student['class_name'], grade_level))
-                non_exam_count += 1
+            # Önce öğrenci numarasıyla eşleştir (isim hatalarını önler)
+            student_no = (student['username'] or '').strip()
+            if student_no and student_no in exam_taker_keys_by_no:
+                continue  # Bu öğrenci zaten sınava giriyor
+
+            # Öğrenci no yoksa veya eşleşmediyse isimle kontrol et
+            key = (tr_normalize(student['full_name']), tr_normalize(student['class_name']))
+            if key in exam_taker_keys_by_name:
+                continue  # İsim eşleşti, zaten sınava giriyor
+
+            # Ne no ne isim eşleşti → ders çalışacak öğrenci
+            grade_level = None
+            for ch in student['class_name']:
+                if ch.isdigit():
+                    grade_level = int(ch)
+                    break
+            if grade_level is None:
+                continue
+            cur.execute("""
+                INSERT INTO kelebek_participants (plan_id, student_name, student_no, class_name, grade_level, is_exam_taker)
+                VALUES (%s, %s, %s, %s, %s, FALSE)
+            """, (plan_id, student['full_name'], student['username'], student['class_name'], grade_level))
+            non_exam_count += 1
 
         cur.execute("UPDATE kelebek_plans SET status = 'draft', updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul') WHERE id = %s", (plan_id,))
         conn.commit()
@@ -830,6 +853,79 @@ def _run_butterfly_algorithm(plan_id, conn):
 
     overflow_students = []
 
+    # --- Yardımcı fonksiyonlar: sınıf seviyesi eşleştirme ve şube harfi ---
+    exam_grades_in_plan = set(s['grade_level'] for s in exam_students)
+
+    def get_section(class_name):
+        """Sınıf adından şube harfini çıkar: '7A' -> 'A', '8B' -> 'B'"""
+        if class_name and len(class_name) >= 2:
+            last = class_name[-1].upper()
+            if last.isalpha():
+                return last
+        return None
+
+    def get_preferred_grades(grade):
+        """
+        Hangi sınıf seviyeleri yanyana oturmalı?
+        - 5. sınıf varsa: 5↔6, 7↔8
+        - 5. sınıf yoksa: herhangi farklı sınıf
+        """
+        has_5 = 5 in exam_grades_in_plan
+        has_6 = 6 in exam_grades_in_plan
+        if has_5 and has_6:
+            if grade == 5:
+                return [6]
+            if grade == 6:
+                return [5]
+            if grade == 7:
+                return [8]
+            if grade == 8:
+                return [7]
+        return sorted([g for g in exam_grades_in_plan if g != grade])
+
+    def pick_right_student(left_student, rbg):
+        """
+        Sol koltukta oturan öğrenciye en uygun sağ koltuk öğrencisini seç.
+        Öncelik sırası:
+          1. Tercih edilen sınıf seviyesi + aynı şube harfi
+          2. Tercih edilen sınıf seviyesi (herhangi şube)
+          3. Herhangi farklı sınıf seviyesi + aynı şube harfi (fallback)
+          4. Herhangi farklı sınıf seviyesi
+          5. Aynı sınıf seviyesi (son çare)
+        """
+        lg = left_student.get('grade_level')
+        ls = get_section(left_student.get('class_name', ''))
+        preferred = get_preferred_grades(lg)
+
+        if ls:
+            for pg in preferred:
+                for i, c in enumerate(rbg.get(pg, [])):
+                    if get_section(c.get('class_name', '')) == ls:
+                        return rbg[pg].pop(i)
+
+        for pg in preferred:
+            if rbg.get(pg):
+                return rbg[pg].pop(0)
+
+        if ls:
+            for g in sorted(rbg.keys()):
+                if g == lg:
+                    continue
+                for i, c in enumerate(rbg.get(g, [])):
+                    if get_section(c.get('class_name', '')) == ls:
+                        return rbg[g].pop(i)
+
+        for g in sorted(rbg.keys()):
+            if g != lg and rbg.get(g):
+                return rbg[g].pop(0)
+
+        for g in sorted(rbg.keys()):
+            if rbg.get(g):
+                return rbg[g].pop(0)
+
+        return None
+
+    # --- 1. Tur: Ev sınıfındaki öğrencileri sol sıralara yerleştir ---
     for room_name in exam_rooms:
         room_info = relevant_rooms[room_name]
         room_id = room_ids[room_name]
@@ -850,72 +946,68 @@ def _run_butterfly_algorithm(plan_id, conn):
                 VALUES (%s, %s, %s, %s, 'left', %s)
             """, (plan_id, room_id, student['id'], desk_num, desk_num))
 
+    # --- Kalan öğrencileri topla: sınıf seviyesine göre grupla, şubeye göre sırala ---
     all_remaining = []
     for cls, students in class_queues.items():
         all_remaining.extend(students)
     all_remaining.extend(overflow_students)
-    random.shuffle(all_remaining)
 
     remaining_by_grade = {}
     for s in all_remaining:
         remaining_by_grade.setdefault(s['grade_level'], []).append(s)
 
+    for g in remaining_by_grade:
+        remaining_by_grade[g].sort(key=lambda s: (get_section(s.get('class_name', '')) or 'Z'))
+
+    # --- 2. Tur: Sınav odalarındaki sıraları doldur ---
     for room_name in exam_rooms:
         room_info = relevant_rooms[room_name]
         room_id = room_ids[room_name]
         num_desks = room_info['desks']
 
-        room_grade = extract_grade_from_room(room_name)
-
-        cur.execute("SELECT desk_number FROM kelebek_assignments WHERE room_id = %s ORDER BY desk_number", (room_id,))
-        filled_left_desks = set(row['desk_number'] for row in cur.fetchall())
+        cur.execute("""
+            SELECT a.desk_number, a.seat_position, p.grade_level, p.class_name
+            FROM kelebek_assignments a
+            JOIN kelebek_participants p ON a.participant_id = p.id
+            WHERE a.room_id = %s
+        """, (room_id,))
+        existing_seats = {}
+        for row in cur.fetchall():
+            existing_seats[(row['desk_number'], row['seat_position'])] = {
+                'grade_level': row['grade_level'],
+                'class_name': row['class_name']
+            }
 
         for desk_num in range(1, num_desks + 1):
-            if desk_num in filled_left_desks:
-                other_grades = [g for g in remaining_by_grade if g != room_grade and len(remaining_by_grade[g]) > 0]
-                if other_grades:
-                    other_grades.sort(key=lambda g: len(remaining_by_grade[g]), reverse=True)
-                    student = remaining_by_grade[other_grades[0]].pop(0)
+            has_left = (desk_num, 'left') in existing_seats
+            has_right = (desk_num, 'right') in existing_seats
+
+            if has_left and not has_right:
+                left_info = existing_seats[(desk_num, 'left')]
+                right_student = pick_right_student(left_info, remaining_by_grade)
+                if right_student:
                     cur.execute("""
                         INSERT INTO kelebek_assignments (plan_id, room_id, participant_id, desk_number, seat_position, row_number)
                         VALUES (%s, %s, %s, %s, 'right', %s)
-                    """, (plan_id, room_id, student['id'], desk_num, desk_num))
-                else:
-                    any_remaining = [g for g in remaining_by_grade if len(remaining_by_grade[g]) > 0]
-                    if any_remaining:
-                        student = remaining_by_grade[any_remaining[0]].pop(0)
-                        cur.execute("""
-                            INSERT INTO kelebek_assignments (plan_id, room_id, participant_id, desk_number, seat_position, row_number)
-                            VALUES (%s, %s, %s, %s, 'right', %s)
-                        """, (plan_id, room_id, student['id'], desk_num, desk_num))
-            else:
-                any_left = [g for g in remaining_by_grade if len(remaining_by_grade[g]) > 0]
+                    """, (plan_id, room_id, right_student['id'], desk_num, desk_num))
+
+            elif not has_left and not has_right:
+                any_left = [g for g in remaining_by_grade if remaining_by_grade[g]]
                 if not any_left:
                     continue
                 any_left.sort(key=lambda g: len(remaining_by_grade[g]), reverse=True)
                 left_student = remaining_by_grade[any_left[0]].pop(0)
-                left_grade = left_student['grade_level']
                 cur.execute("""
                     INSERT INTO kelebek_assignments (plan_id, room_id, participant_id, desk_number, seat_position, row_number)
                     VALUES (%s, %s, %s, %s, 'left', %s)
                 """, (plan_id, room_id, left_student['id'], desk_num, desk_num))
 
-                other_grades = [g for g in remaining_by_grade if g != left_grade and len(remaining_by_grade[g]) > 0]
-                if other_grades:
-                    other_grades.sort(key=lambda g: len(remaining_by_grade[g]), reverse=True)
-                    right_student = remaining_by_grade[other_grades[0]].pop(0)
+                right_student = pick_right_student(left_student, remaining_by_grade)
+                if right_student:
                     cur.execute("""
                         INSERT INTO kelebek_assignments (plan_id, room_id, participant_id, desk_number, seat_position, row_number)
                         VALUES (%s, %s, %s, %s, 'right', %s)
                     """, (plan_id, room_id, right_student['id'], desk_num, desk_num))
-                else:
-                    same_left = [g for g in remaining_by_grade if len(remaining_by_grade[g]) > 0]
-                    if same_left:
-                        right_student = remaining_by_grade[same_left[0]].pop(0)
-                        cur.execute("""
-                            INSERT INTO kelebek_assignments (plan_id, room_id, participant_id, desk_number, seat_position, row_number)
-                            VALUES (%s, %s, %s, %s, 'right', %s)
-                        """, (plan_id, room_id, right_student['id'], desk_num, desk_num))
 
     cur.execute("UPDATE kelebek_plans SET status = 'generated', updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul') WHERE id = %s", (plan_id,))
     conn.commit()
@@ -1307,6 +1399,172 @@ def download_room_list_pdf(plan_id):
         )
     except Exception as e:
         logger.error(f"Error generating PDF: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@kelebek_bp.route('/api/class-report-pdf/<int:plan_id>')
+@login_required
+def download_class_report_pdf(plan_id):
+    if current_user.role not in ['admin']:
+        return jsonify({"error": "Yetkisiz erişim"}), 403
+
+    conn = None
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+
+        cur.execute("SELECT * FROM kelebek_plans WHERE id = %s", (plan_id,))
+        plan = cur.fetchone()
+        if not plan:
+            return jsonify({"error": "Plan bulunamadı"}), 404
+
+        cur.execute("SELECT * FROM kelebek_rooms WHERE plan_id = %s", (plan_id,))
+        rooms = {r['id']: r for r in cur.fetchall()}
+
+        cur.execute("""
+            SELECT p.id, p.student_name, p.class_name, p.grade_level, p.student_no, p.is_exam_taker,
+                   a.room_id, r.room_name, r.room_type
+            FROM kelebek_participants p
+            LEFT JOIN kelebek_assignments a ON a.participant_id = p.id AND a.plan_id = p.plan_id
+            LEFT JOIN kelebek_rooms r ON r.id = a.room_id
+            WHERE p.plan_id = %s
+            ORDER BY p.class_name, p.student_name
+        """, (plan_id,))
+        all_participants = cur.fetchall()
+
+        if not all_participants:
+            return jsonify({"error": "Bu planda katılımcı bulunamadı"}), 404
+
+        by_class = {}
+        for p in all_participants:
+            cls = p['class_name']
+            by_class.setdefault(cls, []).append(p)
+
+        exam_date_str = ''
+        if plan.get('exam_date'):
+            ed = plan['exam_date']
+            if hasattr(ed, 'strftime'):
+                exam_date_str = ed.strftime('%d.%m.%Y')
+            else:
+                exam_date_str = str(ed)
+
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4,
+                                topMargin=1.0*cm, bottomMargin=1.0*cm,
+                                leftMargin=1.2*cm, rightMargin=1.2*cm)
+
+        styles = getSampleStyleSheet()
+        plan_title_style = ParagraphStyle('PlanTitle', parent=styles['Normal'],
+                                          fontName=PDF_FONT_BOLD, fontSize=8,
+                                          alignment=TA_CENTER, textColor=colors.HexColor('#4b5563'),
+                                          spaceAfter=2)
+        class_title_style = ParagraphStyle('ClassTitle', parent=styles['Title'],
+                                           fontName=PDF_FONT_BOLD, fontSize=14,
+                                           alignment=TA_CENTER, spaceAfter=2)
+        class_subtitle_style = ParagraphStyle('ClassSub', parent=styles['Normal'],
+                                              fontName=PDF_FONT, fontSize=8,
+                                              alignment=TA_CENTER, textColor=colors.HexColor('#6b7280'),
+                                              spaceAfter=6)
+        header_style = ParagraphStyle('CRHeader', parent=styles['Normal'],
+                                      fontName=PDF_FONT_BOLD, fontSize=8,
+                                      alignment=TA_CENTER, textColor=colors.white)
+        cell_style = ParagraphStyle('CRCell', parent=styles['Normal'],
+                                    fontName=PDF_FONT, fontSize=8, alignment=TA_LEFT)
+        cell_center = ParagraphStyle('CRCellC', parent=styles['Normal'],
+                                     fontName=PDF_FONT, fontSize=8, alignment=TA_CENTER)
+        dest_style_exam = ParagraphStyle('CRDestExam', parent=styles['Normal'],
+                                         fontName=PDF_FONT_BOLD, fontSize=8,
+                                         alignment=TA_CENTER, textColor=colors.HexColor('#1d4ed8'))
+        dest_style_study = ParagraphStyle('CRDestStudy', parent=styles['Normal'],
+                                          fontName=PDF_FONT_BOLD, fontSize=8,
+                                          alignment=TA_CENTER, textColor=colors.HexColor('#92400e'))
+        dest_style_none = ParagraphStyle('CRDestNone', parent=styles['Normal'],
+                                         fontName=PDF_FONT, fontSize=8,
+                                         alignment=TA_CENTER, textColor=colors.HexColor('#dc2626'))
+
+        elements = []
+        sorted_classes = sorted(by_class.keys())
+
+        for cls_idx, class_name in enumerate(sorted_classes):
+            students = by_class[class_name]
+
+            plan_info = plan['plan_name']
+            if exam_date_str:
+                plan_info += f"  |  {exam_date_str}"
+            elements.append(Paragraph(plan_info, plan_title_style))
+            elements.append(Paragraph(f"{class_name} SINIFI", class_title_style))
+            elements.append(Paragraph(f"Toplam {len(students)} öğrenci", class_subtitle_style))
+
+            table_data = [[
+                Paragraph('No', header_style),
+                Paragraph('Ad Soyad', header_style),
+                Paragraph('Gideceği Yer', header_style),
+            ]]
+
+            row_styles = []
+            for idx, s in enumerate(students, 1):
+                row_num = idx  # header is row 0, data starts at row 1
+                if s.get('room_name'):
+                    room_type = s.get('room_type', '')
+                    if room_type == 'exam':
+                        dest_text = f"{s['room_name']} - SINAV SALONU"
+                        dest_para = Paragraph(dest_text, dest_style_exam)
+                        row_styles.append(('BACKGROUND', (2, row_num), (2, row_num), colors.HexColor('#dbeafe')))
+                    else:
+                        dest_text = f"{s['room_name']} - DERS SALONU"
+                        dest_para = Paragraph(dest_text, dest_style_study)
+                        row_styles.append(('BACKGROUND', (2, row_num), (2, row_num), colors.HexColor('#fef9c3')))
+                else:
+                    dest_para = Paragraph("Yerleştirilmedi", dest_style_none)
+                    row_styles.append(('BACKGROUND', (2, row_num), (2, row_num), colors.HexColor('#fee2e2')))
+
+                table_data.append([
+                    Paragraph(str(idx), cell_center),
+                    Paragraph(s['student_name'], cell_style),
+                    dest_para,
+                ])
+
+            page_w = A4[0] - 2.4*cm
+            col_widths = [1.2*cm, page_w * 0.55, page_w * 0.38]
+            t = Table(table_data, colWidths=col_widths, repeatRows=1)
+            base_style = [
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e3a5f')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (0, -1), 'CENTER'),
+                ('ALIGN', (2, 0), (2, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('FONTNAME', (0, 0), (-1, 0), PDF_FONT_BOLD),
+                ('FONTSIZE', (0, 0), (-1, 0), 8),
+                ('FONTNAME', (0, 1), (-1, -1), PDF_FONT),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#d1d5db')),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8fafc')]),
+                ('TOPPADDING', (0, 0), (-1, -1), 3),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+                ('LEFTPADDING', (0, 0), (-1, -1), 4),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+            ]
+            t.setStyle(TableStyle(base_style + row_styles))
+            elements.append(t)
+
+            if cls_idx < len(sorted_classes) - 1:
+                elements.append(PageBreak())
+
+        doc.build(elements)
+        buffer.seek(0)
+
+        plan_name_safe = plan['plan_name'].replace(' ', '_')
+        return send_file(
+            buffer,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f'sinif_raporu_{plan_name_safe}.pdf'
+        )
+    except Exception as e:
+        logger.error(f"Error generating class report PDF: {e}")
         return jsonify({"error": str(e)}), 500
     finally:
         if conn:
